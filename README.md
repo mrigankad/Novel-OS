@@ -45,31 +45,25 @@ Traditional AI writing generates one response and forgets everything. Novel OS i
 
 ## 🏛️ Architecture at a Glance
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                             NOVEL OS ENGINE                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
-│   │ 🏗️ ARCHITECT│◄──►│ ✍️  SCRIBE  │◄──►│ 🔍  EDITOR  │◄──►│ 🛡️ GUARDIAN│  │
-│   │  (Planner)  │    │  (Drafter)  │    │  (Refiner)  │    │ (Validator) │  │
-│   └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘  │
-│          │                  │                  │                  │         │
-│          └──────────────────┴──────────────────┴──────────────────┘         │
-│                                     │                                        │
-│                                     ▼                                        │
-│                          ┌─────────────────────┐                             │
-│                          │    STATE MANAGER     │                             │
-│                          │   (Central Memory)   │                             │
-│                          └─────────────────────┘                             │
-│                                     │                                        │
-│                                     ▼                                        │
-│                        ┌────────────────────────┐                            │
-│                        │  🎨  STYLE CURATOR      │                            │
-│                        │  (Voice & Consistency)  │                            │
-│                        └────────────────────────┘                            │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    A["🏗️ Architect\nPlanner"] <--> B["✍️ Scribe\nDrafter"]
+    B <--> C["🔍 Editor\nRefiner"]
+    C <--> D["🛡️ Guardian\nValidator"]
+
+    A --> SM["🧠 State Manager\nCentral Memory"]
+    B --> SM
+    C --> SM
+    D --> SM
+
+    SM --> SC["🎨 Style Curator\nVoice & Consistency"]
+
+    style A fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    style B fill:#1a4731,stroke:#4ade80,color:#fff
+    style C fill:#3b1f5e,stroke:#a78bfa,color:#fff
+    style D fill:#5e1f1f,stroke:#f87171,color:#fff
+    style SM fill:#1f3a4f,stroke:#fbbf24,color:#fff
+    style SC fill:#4a1f4a,stroke:#e879f9,color:#fff
 ```
 
 ---
@@ -175,26 +169,21 @@ The Style Curator ensures that Chapter 32 **sounds like the same author** as Cha
 
 Every chapter travels through **six quality gates** before it's approved:
 
-```
-CHAPTER N                                            CHAPTER N+1
-    │                                                    ▲
-    ▼                                                    │
-┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐│
-│  PLAN   │───►│  DRAFT  │───►│  EDIT   │───►│VALIDATE ││
-│Architect│    │ Scribe  │    │ Editor  │    │Guardian ││
-└─────────┘    └─────────┘    └─────────┘    └────┬────┘│
-                                                  │     │
-                                                  ▼     │
-                                           ┌─────────┐  │
-                                           │  STYLE  │  │
-                                           │ Curator │  │
-                                           └────┬────┘  │
-                                                │       │
-                                                ▼       │
-                                         ┌──────────┐   │
-                                         │  STATE   │───┘
-                                         │  UPDATE  │
-                                         └──────────┘
+```mermaid
+flowchart LR
+    P["🏗️ PLAN\nArchitect"] --> D["✍️ DRAFT\nScribe"]
+    D --> E["🔍 EDIT\nEditor"]
+    E --> V["🛡️ VALIDATE\nGuardian"]
+    V --> S["🎨 STYLE\nCurator"]
+    S --> U["💾 STATE\nUpdate"]
+    U -->|"Next Chapter ↺"| P
+
+    style P fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    style D fill:#1a4731,stroke:#4ade80,color:#fff
+    style E fill:#3b1f5e,stroke:#a78bfa,color:#fff
+    style V fill:#5e1f1f,stroke:#f87171,color:#fff
+    style S fill:#4a1f4a,stroke:#e879f9,color:#fff
+    style U fill:#1f3a4f,stroke:#fbbf24,color:#fff
 ```
 
 **A chapter cannot advance until:**
