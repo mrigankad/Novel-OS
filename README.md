@@ -1,4 +1,8 @@
 <div align="center">
+  <img src="assets/mascot.png" alt="Novel OS Mascot" width="600">
+</div>
+
+<div align="center">
 
 <h1>🎭 Novel OS</h1>
 <h3>A Production-Grade Multi-Agent Fiction Writing Framework</h3>
