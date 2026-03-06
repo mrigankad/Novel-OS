@@ -6,6 +6,10 @@ Central orchestration system that coordinates agents through the novel writing w
 
 import json
 import argparse
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
@@ -14,13 +18,32 @@ from datetime import datetime
 # Import state manager
 from state_manager import StoryState, Character, PlotThread, ChapterState, TimelineEvent, StyleProfile, initialize_project
 
+# Import NIM client (optional - for AI-powered generation)
+try:
+    from nim_client import NIMClient, AgentRunner, NIM_MODELS
+    NIM_AVAILABLE = True
+except ImportError:
+    NIM_AVAILABLE = False
+
+# Import token management (optional - enhances NIM integration)
+try:
+    from token_manager import (
+        estimate_tokens, get_model_limits, trim_to_token_budget,
+        SmartPromptBuilder, ChunkedWriter, ChapterSummarizer,
+        trim_characters_context, trim_plot_threads_context,
+        print_token_report,
+    )
+    TOKEN_MGMT_AVAILABLE = True
+except ImportError:
+    TOKEN_MGMT_AVAILABLE = False
+
 
 class NovelOrchestrator:
     """
     Orchestrates the novel writing workflow across all agents.
     """
     
-    def __init__(self, project_path: str = "."):
+    def __init__(self, project_path: str = ".", nim_api_key: str = "", nim_model: str = "", chunk_limit: Optional[int] = None):
         self.project_path = Path(project_path)
         self.state = StoryState(project_path)
         self.agents_dir = Path(__file__).parent.parent / "agents"
@@ -28,6 +51,37 @@ class NovelOrchestrator:
         self.outputs_dir = self.project_path / "outputs"
         self.manuscript_dir = self.outputs_dir / "manuscript"
         self.feedback_dir = self.outputs_dir / "feedback"
+        
+        # NIM integration
+        self.nim_client = None
+        self.agent_runner = None
+        self.chapter_summarizer = None
+        self.chunked_writer = None
+        self.prompt_builder = None
+        
+        # Initialize chapter summarizer (works even without NIM)
+        if TOKEN_MGMT_AVAILABLE:
+            self.chapter_summarizer = ChapterSummarizer(str(self.project_path))
+        
+        if nim_api_key and NIM_AVAILABLE:
+            try:
+                model = nim_model or "llama-3.1-70b"
+                self.nim_client = NIMClient(
+                    api_key=nim_api_key,
+                    default_model=model,
+                )
+                self.agent_runner = AgentRunner(self.nim_client, str(self.agents_dir))
+                print(f"🟢 NIM API connected (model: {model})")
+                
+                # Initialize token-aware components
+                if TOKEN_MGMT_AVAILABLE:
+                    self.chunked_writer = ChunkedWriter(self.agent_runner, custom_word_target=chunk_limit)
+                    self.prompt_builder = SmartPromptBuilder(model)
+                    limits = get_model_limits(model)
+                    print(f"   Context window: {limits.context_window:,} tokens")
+                    print(f"   Max output: {limits.max_output_tokens:,} tokens")
+            except Exception as e:
+                print(f"⚠️  NIM setup failed: {e}. Running in offline/prompt-only mode.")
         
         self._ensure_directories()
     
@@ -234,9 +288,22 @@ class NovelOrchestrator:
         print("\n🏗️  ARCHITECT: Creating story outline...")
         print(f"   Target: {num_chapters} chapters, ~{target_words:,} words")
         
-        # This would typically call an AI agent
-        # For now, we create a template outline
+        # If NIM is available, use AI to generate the outline
+        if self.agent_runner:
+            task_prompt = self._build_outline_task_prompt(num_chapters, target_words)
+            ai_outline = self.agent_runner.run_agent(
+                agent_name="architect",
+                task_prompt=task_prompt,
+                temperature=0.7,
+                max_tokens=4096,
+                stream=True,
+            )
+            # Save AI-generated outline as markdown
+            outline_md_path = self.outputs_dir / "outline_ai.md"
+            outline_md_path.write_text(ai_outline, encoding='utf-8')
+            print(f"\n✅ AI-generated outline saved: {outline_md_path}")
         
+        # Also create the structured JSON outline (template)
         outline = {
             'metadata': {
                 'title': self.state.metadata.get('title', 'Untitled'),
@@ -254,10 +321,48 @@ class NovelOrchestrator:
         with open(outline_path, 'w', encoding='utf-8') as f:
             json.dump(outline, f, indent=2)
         
-        print(f"✅ Outline created: {outline_path}")
-        print(f"\n📝 Next: Review outline.json and run 'plan chapter --number 1'")
+        print(f"✅ Outline template created: {outline_path}")
+        print(f"\n📝 Next: Review outline and run 'plan chapter --number 1'")
         
         return outline
+    
+    def _build_outline_task_prompt(self, num_chapters: int, target_words: int) -> str:
+        """Build a task prompt for the Architect to generate an outline."""
+        title = self.state.metadata.get('title', 'Untitled')
+        genre = self.state.metadata.get('genre', 'Unknown')
+        
+        characters = self.state.get_all_characters()
+        char_section = ""
+        if characters:
+            char_section = "\n## Existing Characters\n"
+            for c in characters:
+                char_section += f"- **{c.full_name}** ({c.role}): {c.internal_desire or 'No desire defined'}\n"
+        
+        threads = list(self.state.plot_threads.values())
+        plot_section = ""
+        if threads:
+            plot_section = "\n## Existing Plot Threads\n"
+            for t in threads:
+                plot_section += f"- **{t.name}** ({t.thread_type}): {t.description}\n"
+        
+        return f"""Create a detailed story outline for the following novel:
+
+# Project Details
+- **Title**: {title}
+- **Genre**: {genre}
+- **Target Chapters**: {num_chapters}
+- **Target Word Count**: {target_words:,}
+{char_section}
+{plot_section}
+
+Provide a complete outline with:
+1. A compelling logline
+2. Theme statement
+3. Three-act structure with chapter assignments
+4. Beat sheet with all major story beats
+5. Character arc maps for each main character
+6. Chapter-by-chapter summary (one paragraph each)
+"""
     
     def _generate_act_structure(self, num_chapters: int) -> List[Dict]:
         """Generate a 3-act structure template."""
@@ -355,18 +460,60 @@ class NovelOrchestrator:
         characters = self.state.get_all_characters()
         active_threads = self.state.get_active_plot_threads()
         
-        prompt = f"""# SCRIBE PROMPT: Chapter {chapter.number}
+        chapter_info = f"""# SCRIBE PROMPT: Chapter {chapter.number}
 
 ## Chapter Information
 - **Number**: {chapter.number}
 - **Title**: {chapter.title or 'TBD'}
 - **POV Character**: {chapter.pov_character or '[Specify]'}
-- **Target Word Count**: {chapter.target_word_count}
+- **Target Word Count**: {chapter.target_word_count}"""
 
-## Story Context
+        writing_instructions = f"""## Chapter Goals
+- [Primary plot advancement]
+- [Character development moment]
+- [Emotional beat to hit]
 
-### Characters in This Chapter
-"""
+## Scene Outline
+1. [Scene 1: Opening hook]
+2. [Scene 2: Complication]
+3. [Scene 3: Climax/Resolution]
+
+## Writing Requirements
+- Maintain deep POV for {chapter.pov_character or '[POV character]'}
+- Include at least 3 sensory details
+- End with a compelling hook
+- Target: {chapter.target_word_count} words
+
+---
+
+**Write the complete chapter now. Follow all protocols in your system instructions.**"""
+
+        style_context = f"""- Tone: {self.state.style_profile.tone}
+- POV: {self.state.style_profile.point_of_view}
+- Style: {self.state.style_profile.prose_style}"""
+
+        # Use SmartPromptBuilder if available for token-aware context
+        if TOKEN_MGMT_AVAILABLE and self.prompt_builder and self.agent_runner:
+            budget = self.prompt_builder.limits.recommended_input
+            char_context = trim_characters_context(characters, budget // 4, chapter.number)
+            thread_context = trim_plot_threads_context(active_threads, budget // 4)
+            history_context = self.chapter_summarizer.get_context_for_chapter(chapter.number, budget // 4) if self.chapter_summarizer else ""
+            
+            system_prompt = self.agent_runner._load_agent_prompt("scribe")
+            final_prompt, stats = self.prompt_builder.build_writing_prompt(
+                system_prompt=system_prompt,
+                chapter_info=chapter_info,
+                characters_context=char_context,
+                plot_threads_context=thread_context,
+                style_context=style_context,
+                history_context=history_context,
+                writing_instructions=writing_instructions,
+            )
+            print_token_report("Scribe Prompt Generation", stats)
+            return final_prompt
+
+        # Fallback to naive prompt construction (offline mode)
+        prompt = f"{chapter_info}\n\n## Story Context\n\n### Characters in This Chapter\n"
         
         for char in characters:
             if char.last_appearance_chapter >= chapter.number - 3:
@@ -383,30 +530,10 @@ class NovelOrchestrator:
 ### Previous Chapter Recap
 [Summary of Chapter {chapter.number - 1}]
 
-## Chapter Goals
-- [Primary plot advancement]
-- [Character development moment]
-- [Emotional beat to hit]
-
-## Scene Outline
-1. [Scene 1: Opening hook]
-2. [Scene 2: Complication]
-3. [Scene 3: Climax/Resolution]
-
-## Writing Requirements
-- Maintain deep POV for {chapter.pov_character or '[POV character]'}
-- Include at least 3 sensory details
-- End with a compelling hook
-- Target: {chapter.target_word_count} words
+{writing_instructions}
 
 ## Style Profile
-- Tone: {self.state.style_profile.tone}
-- POV: {self.state.style_profile.point_of_view}
-- Style: {self.state.style_profile.prose_style}
-
----
-
-**Write the complete chapter now. Follow all protocols in your system instructions.**
+{style_context}
 """
         return prompt
     
@@ -431,9 +558,43 @@ class NovelOrchestrator:
             draft_path.write_text(draft_text, encoding='utf-8')
             
             print(f"   Draft saved: {draft_path}")
+        elif self.agent_runner:
+            # Use NIM AI to generate the chapter
+            prompt = self._generate_chapter_prompt(chapter)
+            
+            # Check if chunked generation is needed
+            if self.chunked_writer and self.chunked_writer.needs_chunking(chapter.target_word_count):
+                print(f"   🤖 Generating chapter with AI (chunked mode)...")
+                print(f"   Chapter target ({chapter.target_word_count} words) exceeds single-call limit")
+                ai_draft = self.chunked_writer.generate_chapter_chunked(
+                    base_prompt=prompt,
+                    target_word_count=chapter.target_word_count,
+                    agent_name="scribe",
+                    temperature=0.8,
+                    stream=True,
+                )
+            else:
+                print(f"   🤖 Generating chapter with AI (Scribe agent)...")
+                ai_draft = self.agent_runner.run_agent(
+                    agent_name="scribe",
+                    task_prompt=prompt,
+                    temperature=0.8,
+                    max_tokens=4096,
+                    stream=True,
+                )
+            
+            chapter.status = 'drafted'
+            chapter.word_count = len(ai_draft.split())
+            
+            draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
+            draft_path.write_text(ai_draft, encoding='utf-8')
+            
+            print(f"\n   ✅ AI draft saved: {draft_path}")
+            print(f"   Word count: {chapter.word_count}")
         else:
-            print(f"   No draft text provided. Ready for AI generation.")
+            print(f"   No draft text provided and NIM not configured.")
             print(f"   Use prompt: outputs/chapter_{chapter_number:03d}_prompt.md")
+            print(f"   Or add --nim-key to enable AI generation.")
         
         self.state.save_state()
     
@@ -473,17 +634,34 @@ class NovelOrchestrator:
         
         draft_text = draft_path.read_text(encoding='utf-8')
         
-        # This would call the Editor agent
-        # For now, create editing prompt
+        # Generate editing prompt
         edit_prompt = self._generate_edit_prompt(chapter, draft_text, mode)
         
-        edit_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_edit_prompt.md"
-        edit_prompt_path.write_text(edit_prompt, encoding='utf-8')
+        if self.agent_runner:
+            # Use NIM AI for editing
+            print(f"   🤖 Running Editor agent with AI...")
+            ai_edit = self.agent_runner.run_agent(
+                agent_name="editor",
+                task_prompt=edit_prompt,
+                temperature=0.5,  # Lower temperature for editing precision
+                max_tokens=4096,
+                stream=True,
+            )
+            
+            # Save AI editor feedback and revised text
+            feedback_path = self.feedback_dir / f"chapter_{chapter_number:03d}_editor_feedback.md"
+            feedback_path.write_text(ai_edit, encoding='utf-8')
+            
+            print(f"\n   ✅ Editor feedback saved: {feedback_path}")
+            chapter.status = 'editing'
+        else:
+            # Offline mode: save the prompt for manual use
+            edit_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_edit_prompt.md"
+            edit_prompt_path.write_text(edit_prompt, encoding='utf-8')
+            chapter.status = 'editing'
+            print(f"✅ Editing prompt created: {edit_prompt_path}")
         
-        chapter.status = 'editing'
         self.state.save_state()
-        
-        print(f"✅ Editing prompt created: {edit_prompt_path}")
     
     def _generate_edit_prompt(self, chapter: ChapterState, draft_text: str, mode: str) -> str:
         """Generate an editing prompt."""
@@ -604,11 +782,25 @@ Provide:
         # Generate validation prompt for Continuity Guardian
         validation_prompt = self._generate_validation_prompt(chapter_number, chapter_text)
         
-        validation_path = self.feedback_dir / f"chapter_{chapter_number:03d}_validation.md"
-        validation_path.write_text(validation_prompt, encoding='utf-8')
-        
-        print(f"✅ Validation prompt created: {validation_path}")
-        print(f"   This checks continuity, timeline, and world consistency.")
+        if self.agent_runner:
+            # Use NIM AI for validation
+            print(f"   🤖 Running Continuity Guardian with AI...")
+            ai_validation = self.agent_runner.run_agent(
+                agent_name="continuity",
+                task_prompt=validation_prompt,
+                temperature=0.3,  # Low temperature for factual checking
+                max_tokens=4096,
+                stream=True,
+            )
+            
+            validation_path = self.feedback_dir / f"chapter_{chapter_number:03d}_validation_report.md"
+            validation_path.write_text(ai_validation, encoding='utf-8')
+            print(f"\n✅ AI validation report saved: {validation_path}")
+        else:
+            validation_path = self.feedback_dir / f"chapter_{chapter_number:03d}_validation.md"
+            validation_path.write_text(validation_prompt, encoding='utf-8')
+            print(f"✅ Validation prompt created: {validation_path}")
+            print(f"   This checks continuity, timeline, and world consistency.")
     
     def _generate_validation_prompt(self, chapter_number: int, chapter_text: str) -> str:
         """Generate a validation prompt."""
@@ -704,6 +896,17 @@ New_Facts_Established: [List]
         # (In practice, this would parse the state updates from agents)
         
         self.state.save_state()
+        
+        # Auto-generate chapter summary for future context windows
+        if self.chapter_summarizer:
+            for suffix in ['_revised', '_draft']:
+                ch_path = self.manuscript_dir / f"chapter_{chapter_number:03d}{suffix}.md"
+                if ch_path.exists():
+                    chapter_text = ch_path.read_text(encoding='utf-8')
+                    summaries = self.chapter_summarizer.generate_summary_from_text(chapter_text, chapter_number)
+                    print(f"📝 Auto-generated chapter summary for future context:")
+                    print(f"   One-liner: {summaries['one_liner']}")
+                    break
         
         print(f"✅ Chapter {chapter_number} approved and marked complete!")
         
@@ -807,7 +1010,16 @@ Examples:
         """
     )
     
+    # Global NIM arguments
+    parser.add_argument('--nim-key', default='', help='NVIDIA NIM API key (or set NVIDIA_NIM_API_KEY env var)')
+    parser.add_argument('--nim-model', default='', help='NIM model to use (default: llama-3.1-70b)')
+    parser.add_argument('--chunk-limit', type=int, default=None, help='Words per section before chunking (e.g. 2000)')
+    
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
+    
+    # NIM test command
+    nim_parser = subparsers.add_parser('nim', help='Test NIM API connection')
+    nim_parser.add_argument('--list-models', action='store_true', help='List available NIM models')
     
     # Init command
     init_parser = subparsers.add_parser('init', help='Initialize a new project')
@@ -885,8 +1097,32 @@ Examples:
         parser.print_help()
         return
     
-    # Initialize orchestrator
-    orchestrator = NovelOrchestrator()
+    # Resolve NIM API key from args or environment
+    nim_key = args.nim_key or os.environ.get('NVIDIA_NIM_API_KEY', '')
+    
+    # Handle NIM test command before initializing orchestrator
+    if args.command == 'nim':
+        if not NIM_AVAILABLE:
+            print("❌ NIM client not available. Check that nim_client.py exists in core/.")
+            return
+        if not nim_key:
+            print("❌ NIM API key required. Use --nim-key or set NVIDIA_NIM_API_KEY env var.")
+            return
+        client = NIMClient(api_key=nim_key, default_model=args.nim_model or 'llama-3.1-70b')
+        if hasattr(args, 'list_models') and args.list_models:
+            print("📋 Pre-configured NIM Models:")
+            for short, full in NIM_MODELS.items():
+                print(f"  • {short:20s} → {full}")
+            print("\n📋 Fetching available models from API...")
+            models = client.list_available_models()
+            for m in models:
+                print(f"  • {m.get('id', 'unknown')}")
+        else:
+            client.test_connection()
+        return
+    
+    # Initialize orchestrator (with optional NIM)
+    orchestrator = NovelOrchestrator(nim_api_key=nim_key, nim_model=args.nim_model, chunk_limit=args.chunk_limit)
     
     # Route commands
     if args.command == 'init':

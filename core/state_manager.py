@@ -228,7 +228,7 @@ class StoryState:
         # Create backup of existing state
         if self.state_file.exists():
             backup_path = self.state_file.with_suffix('.json.bak')
-            self.state_file.rename(backup_path)
+            self.state_file.replace(backup_path)
         
         with open(self.state_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

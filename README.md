@@ -74,32 +74,55 @@ novel-os/
 
 ## 🚀 Quick Start
 
-### 1. Initialize a New Novel Project
+### 1. Setup NVIDIA NIM API
 
+Create a `.env` file in the root directory and add your NIM API key:
+```env
+NVIDIA_NIM_API_KEY="nvapi-your-key-here"
+```
+Install the necessary requirements:
 ```bash
-python novel-os/core/orchestrator.py init --title "My Novel" --genre "thriller"
+pip install requests python-dotenv
 ```
 
-### 2. Define Your Foundation
-
-Edit `outputs/state/story_bible.json` with your world, characters, and themes.
-
-### 3. Generate Outline
+### 2. Initialize a New Novel Project
 
 ```bash
-python novel-os/core/orchestrator.py plan --phase outline
+python core/orchestrator.py init --title "My Novel" --genre "Sci-Fi" --author "Your Name"
 ```
 
-### 4. Write Chapters
+### 3. Build Your Story State
 
+Add characters and plot threads to the central state:
 ```bash
-python novel-os/core/orchestrator.py write --chapter 1
+python core/orchestrator.py character add --name "Elara Vance" --role "protagonist"
+python core/orchestrator.py plot add --name "The Obsidian Threat" --description "Dark energy anomaly." --type "main"
 ```
 
-### 5. Review and Refine
+### 4. Plan the Outline & Chapters
 
+Generate an AI-powered story outline:
 ```bash
-python novel-os/core/orchestrator.py edit --chapter 1 --focus style
+python core/orchestrator.py plan outline --chapters 10 --words 20000
+```
+Plan individual chapters:
+```bash
+python core/orchestrator.py plan chapter --number 1 --pov "Elara Vance" --summary "Elara explores a derelict ship."
+```
+
+### 5. Write Chapters with Token Management
+
+Leverage the **Smart Chunked Generation** pipeline to write massive chapters safely without hitting LLM output limits:
+```bash
+# Writes Chapter 1 sequentially in 1200-word chunks 
+python core/orchestrator.py --chunk-limit 1200 write --chapter 1
+```
+
+### 6. Review and Refine
+
+Pass the text to the AI Editor:
+```bash
+python core/orchestrator.py edit --chapter 1 --mode line
 ```
 
 ## 🎭 The Agents
