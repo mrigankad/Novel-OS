@@ -1,0 +1,5 @@
+# Install only what you actually use — each backend is optional.
+anthropic>=0.40.0           # for provider=anthropic
+openai>=1.50.0              # for openai, azure, kimi, groq, together, openrouter, deepseek, mistral, fireworks, ollama, lmstudio, openai_compatible
+google-genai>=0.3.0         # for provider=gemini
+python-dotenv>=1.0.0        # optional, for .env loading

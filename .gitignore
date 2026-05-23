@@ -1,0 +1,51 @@
+# --- Secrets & local config ---
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.ipynb_checkpoints/
+
+# --- Novel OS runtime artifacts ---
+outputs/
+*.bak
+examples/last_smoke_run/
+_smoke_*.py
+_verify_*.py
+
+# --- Editors & OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Temporary / Editor Duplicates ---
+.claude/
+ChatGPT Image *.png
+

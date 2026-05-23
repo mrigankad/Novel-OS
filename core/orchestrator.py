@@ -8,11 +8,21 @@ import json
 import argparse
 import sys
 from pathlib import Path
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 # Import state manager
 from state_manager import StoryState, Character, PlotThread, ChapterState, TimelineEvent, StyleProfile, initialize_project
+from llm_client import LLMClient, LLMError
+from state_parser import ingest_agent_output
+from continuity_engine import run_all as run_continuity_checks, summarize as summarize_findings, to_context_block
 
 
 class NovelOrchestrator:
@@ -30,7 +40,53 @@ class NovelOrchestrator:
         self.feedback_dir = self.outputs_dir / "feedback"
         
         self._ensure_directories()
-    
+        self._llm: Optional[LLMClient] = None
+
+    def _get_llm(self) -> LLMClient:
+        if self._llm is None:
+            self._llm = LLMClient()
+        return self._llm
+
+    def _run_agent_or_save_prompt(
+        self,
+        agent_name: str,
+        user_prompt: str,
+        prompt_path: Path,
+        output_path: Path,
+        dry_run: bool,
+        label: str,
+        chapter_number: Optional[int] = None,
+    ) -> Optional[str]:
+        """Either save the prompt (dry-run) or call the agent and save its output.
+
+        On a successful real call, also ingest any state-update blocks the agent
+        emitted into StoryState so persistent memory actually updates.
+        """
+        prompt_path.write_text(user_prompt, encoding='utf-8')
+        if dry_run:
+            print(f"   [dry-run] Prompt saved: {prompt_path}")
+            return None
+        try:
+            llm = self._get_llm()
+            print(f"   {label} ({llm.provider}:{llm.model})...")
+            result = llm.run_agent(agent_name, user_prompt)
+        except LLMError as e:
+            print(f"❌ LLM call failed: {e}")
+            print(f"   Prompt saved at {prompt_path} — you can run it manually.")
+            return None
+        output_path.write_text(result, encoding='utf-8')
+        print(f"✅ Output saved: {output_path}")
+
+        if chapter_number is not None:
+            changes = ingest_agent_output(self.state, chapter_number, agent_name, result)
+            if changes:
+                print(f"   📝 State updates ({len(changes)}):")
+                for line in changes:
+                    print(f"      • {line}")
+                self.state.save_state()
+
+        return result
+
     def _ensure_directories(self):
         """Create output directories."""
         self.manuscript_dir.mkdir(parents=True, exist_ok=True)
@@ -321,32 +377,34 @@ class NovelOrchestrator:
             for i in range(1, num_chapters + 1)
         ]
     
-    def plan_chapter(self, chapter_number: int, summary: str = "", pov: str = ""):
-        """Plan a specific chapter in detail."""
+    def plan_chapter(self, chapter_number: int, summary: str = "", pov: str = "", dry_run: bool = False):
+        """Plan a specific chapter in detail (Architect agent expands the outline)."""
         print(f"\n📋 Planning Chapter {chapter_number}...")
-        
-        # Create or update chapter state
+
         chapter = self.state.get_chapter(chapter_number)
         if not chapter:
             chapter = self.state.create_chapter(chapter_number)
-        
+
         if summary:
             chapter.plot_advances.append(summary)
-        
         if pov:
             chapter.pov_character = pov
-        
+
         chapter.status = 'planned'
         self.state.save_state()
-        
-        # Generate chapter prompt for Scribe
+
         prompt = self._generate_chapter_prompt(chapter)
-        
         prompt_path = self.outputs_dir / f"chapter_{chapter_number:03d}_prompt.md"
-        prompt_path.write_text(prompt, encoding='utf-8')
-        
-        print(f"✅ Chapter {chapter_number} planned")
-        print(f"   Prompt saved: {prompt_path}")
+        outline_path = self.outputs_dir / f"chapter_{chapter_number:03d}_outline.md"
+
+        self._run_agent_or_save_prompt(
+            agent_name="architect",
+            user_prompt=prompt,
+            prompt_path=prompt_path,
+            output_path=outline_path,
+            dry_run=dry_run,
+            label="Architect expanding chapter outline",
+        )
     
     def _generate_chapter_prompt(self, chapter: ChapterState) -> str:
         """Generate a detailed prompt for the Scribe agent."""
@@ -412,78 +470,108 @@ class NovelOrchestrator:
     
     # ===== Writing Phase =====
     
-    def write_chapter(self, chapter_number: int, draft_text: str = ""):
-        """Process a chapter draft through the workflow."""
+    def write_chapter(self, chapter_number: int, draft_text: str = "", dry_run: bool = False):
+        """Call the Scribe agent to draft the chapter, or accept supplied draft text."""
         print(f"\n✍️  Writing Chapter {chapter_number}...")
-        
+
         chapter = self.state.get_chapter(chapter_number)
         if not chapter:
             print(f"❌ Chapter {chapter_number} not found. Run 'plan chapter --number {chapter_number}' first.")
             return
-        
-        # If draft text provided, save it
+
+        draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
+
         if draft_text:
             chapter.status = 'drafted'
             chapter.word_count = len(draft_text.split())
-            
-            # Save draft
-            draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
             draft_path.write_text(draft_text, encoding='utf-8')
-            
             print(f"   Draft saved: {draft_path}")
+            self.state.save_state()
+            return
+
+        # Build Scribe user prompt: prefer expanded outline if present, else fall back.
+        outline_path = self.outputs_dir / f"chapter_{chapter_number:03d}_outline.md"
+        if outline_path.exists():
+            user_prompt = outline_path.read_text(encoding='utf-8')
         else:
-            print(f"   No draft text provided. Ready for AI generation.")
-            print(f"   Use prompt: outputs/chapter_{chapter_number:03d}_prompt.md")
-        
+            user_prompt = self._generate_chapter_prompt(chapter)
+
+        prompt_path = self.outputs_dir / f"chapter_{chapter_number:03d}_scribe_prompt.md"
+        result = self._run_agent_or_save_prompt(
+            agent_name="scribe",
+            user_prompt=user_prompt,
+            prompt_path=prompt_path,
+            output_path=draft_path,
+            dry_run=dry_run,
+            label="Scribe drafting chapter",
+            chapter_number=chapter_number,
+        )
+
+        if result is not None:
+            chapter.status = 'drafted'
+            chapter.word_count = len(result.split())
         self.state.save_state()
     
     def submit_draft(self, chapter_number: int, draft_path: str):
-        """Submit a draft file for a chapter."""
+        """Submit a draft file for a chapter (also ingests embedded state-update blocks)."""
         draft_file = Path(draft_path)
         if not draft_file.exists():
             print(f"❌ Draft file not found: {draft_path}")
             return
-        
+
         draft_text = draft_file.read_text(encoding='utf-8')
         self.write_chapter(chapter_number, draft_text)
-        
+
+        changes = ingest_agent_output(self.state, chapter_number, "scribe", draft_text)
+        if changes:
+            print(f"   📝 State updates ({len(changes)}):")
+            for line in changes:
+                print(f"      • {line}")
+            self.state.save_state()
+
         print(f"✅ Draft submitted for Chapter {chapter_number}")
         print(f"   Next: Run 'edit chapter --number {chapter_number}'")
     
     # ===== Editing Phase =====
     
-    def edit_chapter(self, chapter_number: int, mode: str = "line"):
-        """Process a chapter through editing workflow."""
+    def edit_chapter(self, chapter_number: int, mode: str = "line", dry_run: bool = False):
+        """Call the Editor agent to revise the chapter."""
         print(f"\n🔍 EDITING Chapter {chapter_number} (Mode: {mode})")
-        
+
         chapter = self.state.get_chapter(chapter_number)
         if not chapter:
             print(f"❌ Chapter {chapter_number} not found.")
             return
-        
-        if chapter.status not in ['drafted', 'editing']:
+        if chapter.status not in ['drafted', 'editing', 'edited']:
             print(f"❌ Chapter {chapter_number} has no draft to edit.")
             return
-        
-        # Load draft
+
         draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
         if not draft_path.exists():
             print(f"❌ Draft file not found: {draft_path}")
             return
-        
+
         draft_text = draft_path.read_text(encoding='utf-8')
-        
-        # This would call the Editor agent
-        # For now, create editing prompt
         edit_prompt = self._generate_edit_prompt(chapter, draft_text, mode)
-        
         edit_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_edit_prompt.md"
-        edit_prompt_path.write_text(edit_prompt, encoding='utf-8')
-        
+        revised_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_revised.md"
+
         chapter.status = 'editing'
         self.state.save_state()
-        
-        print(f"✅ Editing prompt created: {edit_prompt_path}")
+
+        result = self._run_agent_or_save_prompt(
+            agent_name="editor",
+            user_prompt=edit_prompt,
+            prompt_path=edit_prompt_path,
+            output_path=revised_path,
+            dry_run=dry_run,
+            label=f"Editor revising ({mode})",
+            chapter_number=chapter_number,
+        )
+
+        if result is not None:
+            chapter.status = 'edited'
+            self.state.save_state()
     
     def _generate_edit_prompt(self, chapter: ChapterState, draft_text: str, mode: str) -> str:
         """Generate an editing prompt."""
@@ -561,37 +649,43 @@ Provide:
 """
     
     def submit_edit(self, chapter_number: int, edited_path: str):
-        """Submit an edited chapter."""
+        """Submit an edited chapter (also ingests embedded editor state-updates)."""
         edit_file = Path(edited_path)
         if not edit_file.exists():
             print(f"❌ Edit file not found: {edited_path}")
             return
-        
-        # Copy to manuscript as revised
+
         revised_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_revised.md"
         import shutil
         shutil.copy(edit_file, revised_path)
-        
+
+        text = edit_file.read_text(encoding='utf-8')
+        changes = ingest_agent_output(self.state, chapter_number, "editor", text)
+
         chapter = self.state.get_chapter(chapter_number)
         if chapter:
             chapter.status = 'edited'
-            self.state.save_state()
-        
+
+        if changes:
+            print(f"   📝 State updates ({len(changes)}):")
+            for line in changes:
+                print(f"      • {line}")
+        self.state.save_state()
+
         print(f"✅ Edit submitted for Chapter {chapter_number}")
         print(f"   Next: Run 'validate chapter --number {chapter_number}'")
     
     # ===== Validation Phase =====
     
-    def validate_chapter(self, chapter_number: int):
-        """Run continuity and style validation on a chapter."""
+    def validate_chapter(self, chapter_number: int, dry_run: bool = False):
+        """Call the Continuity Guardian agent to validate the chapter."""
         print(f"\n🛡️  VALIDATING Chapter {chapter_number}...")
-        
+
         chapter = self.state.get_chapter(chapter_number)
         if not chapter:
             print(f"❌ Chapter {chapter_number} not found.")
             return
-        
-        # Load the chapter text
+
         for suffix in ['_revised', '_draft']:
             text_path = self.manuscript_dir / f"chapter_{chapter_number:03d}{suffix}.md"
             if text_path.exists():
@@ -600,15 +694,33 @@ Provide:
         else:
             print(f"❌ No chapter file found.")
             return
-        
-        # Generate validation prompt for Continuity Guardian
+
+        # Deterministic pre-check — runs free, gives the Guardian a head start.
+        findings = run_continuity_checks(self.state, self.project_path, as_of_chapter=chapter_number)
+        if findings:
+            print(f"   🔬 Pre-check: {len(findings)} deterministic finding(s)")
+            # Persist into chapter state and surface to the Guardian via the prompt.
+            chapter.continuity_checks['pre_check_findings'] = [f.to_dict() for f in findings]
+
         validation_prompt = self._generate_validation_prompt(chapter_number, chapter_text)
-        
-        validation_path = self.feedback_dir / f"chapter_{chapter_number:03d}_validation.md"
-        validation_path.write_text(validation_prompt, encoding='utf-8')
-        
-        print(f"✅ Validation prompt created: {validation_path}")
-        print(f"   This checks continuity, timeline, and world consistency.")
+        if findings:
+            validation_prompt = to_context_block(findings) + "\n" + validation_prompt
+        validation_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_validation_prompt.md"
+        report_path = self.feedback_dir / f"chapter_{chapter_number:03d}_continuity_report.md"
+
+        result = self._run_agent_or_save_prompt(
+            agent_name="continuity_guardian",
+            user_prompt=validation_prompt,
+            prompt_path=validation_prompt_path,
+            output_path=report_path,
+            dry_run=dry_run,
+            label="Continuity Guardian validating",
+            chapter_number=chapter_number,
+        )
+
+        if result is not None:
+            chapter.status = 'validated'
+            self.state.save_state()
     
     def _generate_validation_prompt(self, chapter_number: int, chapter_text: str) -> str:
         """Generate a validation prompt."""
@@ -692,26 +804,50 @@ New_Facts_Established: [List]
         return prompt
     
     def approve_chapter(self, chapter_number: int):
-        """Mark a chapter as complete and update state."""
+        """Mark a chapter as complete and surface accumulated state changes."""
         chapter = self.state.get_chapter(chapter_number)
         if not chapter:
             print(f"❌ Chapter {chapter_number} not found.")
             return
-        
+
+        # Gate: don't approve if continuity validation failed
+        cstatus = chapter.continuity_checks.get('status')
+        if cstatus == 'FAIL':
+            issues = chapter.continuity_checks.get('critical_issues', [])
+            print(f"❌ Cannot approve — Continuity Guardian reported FAIL with {len(issues)} critical issue(s).")
+            print("   Resolve or override by editing the chapter, then re-validate.")
+            return
+
         chapter.status = 'complete'
-        
-        # Update character positions/emotions based on state update blocks
-        # (In practice, this would parse the state updates from agents)
-        
         self.state.save_state()
-        
-        print(f"✅ Chapter {chapter_number} approved and marked complete!")
-        
-        # Progress report
+
+        print(f"✅ Chapter {chapter_number} approved.")
+        if chapter.plot_advances:
+            print(f"   Events: {len(chapter.plot_advances)}")
+        if chapter.foreshadowing_planted:
+            print(f"   Foreshadowing planted: {len(chapter.foreshadowing_planted)}")
+        if chapter.foreshadowing_resolved:
+            print(f"   Foreshadowing resolved: {len(chapter.foreshadowing_resolved)}")
+        if chapter.quality_scores:
+            scored = ", ".join(f"{k}={v}" for k, v in chapter.quality_scores.items())
+            print(f"   Scores: {scored}")
+        if cstatus:
+            print(f"   Continuity: {cstatus}")
+
         completed = len(self.state.get_completed_chapters())
         total = len(self.state.chapters)
-        print(f"\n📊 Progress: {completed}/{total} chapters complete ({completed/total*100:.1f}%)")
+        if total:
+            print(f"\n📊 Progress: {completed}/{total} chapters complete ({completed/total*100:.1f}%)")
     
+    # ===== Continuity Engine =====
+
+    def run_checks(self, chapter_number: Optional[int] = None) -> int:
+        """Run the deterministic continuity engine. Returns count of critical findings."""
+        findings = run_continuity_checks(self.state, self.project_path, as_of_chapter=chapter_number)
+        print(summarize_findings(findings))
+        critical = sum(1 for f in findings if f.severity == "critical")
+        return critical
+
     # ===== Status and Reporting =====
     
     def status(self):
@@ -849,28 +985,37 @@ Examples:
     plan_chapter.add_argument('--number', type=int, required=True, help='Chapter number')
     plan_chapter.add_argument('--summary', default='', help='Chapter summary')
     plan_chapter.add_argument('--pov', default='', help='POV character')
-    
+    plan_chapter.add_argument('--dry-run', action='store_true', help='Save prompt only, do not call LLM')
+
     # Write command
     write_parser = subparsers.add_parser('write', help='Writing phase')
     write_parser.add_argument('--chapter', type=int, required=True, help='Chapter number')
     write_parser.add_argument('--draft-file', default='', help='Path to draft file')
-    
+    write_parser.add_argument('--dry-run', action='store_true', help='Save prompt only, do not call LLM')
+
     # Edit command
     edit_parser = subparsers.add_parser('edit', help='Editing phase')
     edit_parser.add_argument('--chapter', type=int, required=True, help='Chapter number')
-    edit_parser.add_argument('--mode', default='line', 
+    edit_parser.add_argument('--mode', default='line',
                             choices=['line', 'developmental', 'pacing', 'dialogue', 'tension'],
                             help='Editing mode')
     edit_parser.add_argument('--edited-file', default='', help='Path to edited file')
-    
+    edit_parser.add_argument('--dry-run', action='store_true', help='Save prompt only, do not call LLM')
+
     # Validate command
     validate_parser = subparsers.add_parser('validate', help='Validation phase')
     validate_parser.add_argument('--chapter', type=int, required=True, help='Chapter number')
+    validate_parser.add_argument('--dry-run', action='store_true', help='Save prompt only, do not call LLM')
     
     # Approve command
     approve_parser = subparsers.add_parser('approve', help='Approve chapter')
     approve_parser.add_argument('--chapter', type=int, required=True, help='Chapter number')
     
+    # Check command — deterministic continuity engine
+    check_parser = subparsers.add_parser('check', help='Run deterministic continuity checks (no LLM)')
+    check_parser.add_argument('--chapter', type=int, default=None,
+                              help='Evaluate as-of this chapter (default: latest drafted)')
+
     # Status command
     status_parser = subparsers.add_parser('status', help='Show project status')
     
@@ -912,28 +1057,32 @@ Examples:
         if args.plan_command == 'outline':
             orchestrator.plan_outline(args.chapters, args.words)
         elif args.plan_command == 'chapter':
-            orchestrator.plan_chapter(args.number, args.summary, args.pov)
+            orchestrator.plan_chapter(args.number, args.summary, args.pov, dry_run=args.dry_run)
         else:
             plan_parser.print_help()
-    
+
     elif args.command == 'write':
         if args.draft_file:
             orchestrator.submit_draft(args.chapter, args.draft_file)
         else:
-            orchestrator.write_chapter(args.chapter)
-    
+            orchestrator.write_chapter(args.chapter, dry_run=args.dry_run)
+
     elif args.command == 'edit':
         if args.edited_file:
             orchestrator.submit_edit(args.chapter, args.edited_file)
         else:
-            orchestrator.edit_chapter(args.chapter, args.mode)
-    
+            orchestrator.edit_chapter(args.chapter, args.mode, dry_run=args.dry_run)
+
     elif args.command == 'validate':
-        orchestrator.validate_chapter(args.chapter)
+        orchestrator.validate_chapter(args.chapter, dry_run=args.dry_run)
     
     elif args.command == 'approve':
         orchestrator.approve_chapter(args.chapter)
     
+    elif args.command == 'check':
+        critical = orchestrator.run_checks(args.chapter)
+        sys.exit(1 if critical else 0)
+
     elif args.command == 'status':
         orchestrator.status()
     

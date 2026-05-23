@@ -1,191 +1,144 @@
-# 🎭 Novel OS - System Overview
+# 🎭 Novel OS — System Overview
 
-**A Production-Grade Multi-Agent Fiction Writing Framework**
-
----
-
-## What is Novel OS?
-
-Novel OS is a complete architecture for writing professional novels using multiple specialized AI agents working in concert. It provides:
-
-- **Long-term memory** through persistent state management
-- **Continuity protection** via automated fact-checking
-- **Quality assurance** through multi-stage editing
-- **Voice consistency** with style curation
-- **Workflow orchestration** for seamless collaboration
+A production-grade multi-agent fiction writing framework.
 
 ---
 
-## Architecture
+## Mission
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           NOVEL OS ARCHITECTURE                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐   │
-│  │  ARCHITECT  │◄──►│   SCRIBE    │◄──►│   EDITOR    │◄──►│  CONTINUITY │   │
-│  │  (Planner)  │    │  (Drafter)  │    │  (Refiner)  │    │  (Guardian) │   │
-│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘   │
-│         │                  │                  │                  │          │
-│         └──────────────────┴──────────────────┴──────────────────┘          │
-│                                    │                                        │
-│                                    ▼                                        │
-│                         ┌─────────────────────┐                             │
-│                         │   STATE MANAGER     │                             │
-│                         │  (Central Memory)   │                             │
-│                         └─────────────────────┘                             │
-│                                    │                                        │
-│                                    ▼                                        │
-│                       ┌─────────────────────────┐                           │
-│                       │    STYLE CURATOR        │                           │
-│                       └─────────────────────────┘                           │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+Novel OS exists to make AI-assisted novel writing **stateful**, **provider-agnostic**, and **auditable**. It treats a novel like a build pipeline: discrete agents do specialised passes, every pass mutates a central state file, deterministic checks gate progression, and any LLM provider can sit behind the prompts.
 
 ---
 
-## The Agents
+## Architecture at a Glance
 
-### 1. 🏗️ THE ARCHITECT (Planner)
-**Purpose**: Master story planning and structural engineering
+```mermaid
+graph TB
+    subgraph Interface
+        CLI["core/orchestrator.py<br/>CLI + workflow"]
+    end
 
-**Responsibilities**:
-- Design 3-act structure
-- Map character arcs
-- Plan narrative beats
-- Validate plot logic
-- Create chapter outlines
+    subgraph Agents["agents/*/prompt.md"]
+        A[Architect]
+        B[Scribe]
+        E[Editor]
+        G[Guardian]
+        S[Curator]
+    end
 
-**Key Strength**: Sees the skeleton beneath the story's skin
+    subgraph Core["core/"]
+        LC["llm_client.py<br/>provider abstraction"]
+        SP["state_parser.py<br/>block extraction + applier"]
+        CE["continuity_engine.py<br/>deterministic checks"]
+        SM["state_manager.py<br/>StoryState dataclasses"]
+    end
 
-### 2. ✍️ THE SCRIBE (Drafter)
-**Purpose**: Prose craftsman and scene executor
+    subgraph Storage
+        ST["outputs/state/<br/>story_state.json"]
+        MS["outputs/manuscript/<br/>chapter_NNN_*.md"]
+        FB["outputs/feedback/<br/>reports + prompts"]
+    end
 
-**Responsibilities**:
-- Write immersive narrative
-- Deep POV execution
-- Dialogue crafting
-- Sensory immersion
-- Maintain momentum
+    CLI --> Agents
+    Agents --> LC
+    LC -.responses.-> SP
+    SP --> SM
+    CE --> SM
+    SM --> ST
+    Agents -.artifacts.-> MS
+    Agents -.artifacts.-> FB
+    CE -.findings.-> G
 
-**Key Strength**: Makes readers forget they're reading
-
-### 3. 🔍 THE EDITOR (Refiner)
-**Purpose**: Literary surgeon and prose optimizer
-
-**Responsibilities**:
-- Line editing
-- Structural improvements
-- Pacing optimization
-- Tension enhancement
-- Redundancy elimination
-
-**Key Strength**: Elevates without homogenizing
-
-### 4. 🛡️ THE CONTINUITY GUARDIAN (Validator)
-**Purpose**: Fact-checker and consistency enforcer
-
-**Responsibilities**:
-- Character consistency
-- Timeline coherence
-- World-rule adherence
-- Plot thread tracking
-- Contradiction detection
-
-**Key Strength**: No plot hole escapes notice
-
-### 5. 🎨 THE STYLE CURATOR (Voice Agent)
-**Purpose**: Voice guardian and prose stylist
-
-**Responsibilities**:
-- Maintain voice consistency
-- Enforce style profile
-- Adapt to genre conventions
-- Manage prose rhythm
-- Control vocabulary
-
-**Key Strength**: Every sentence sings
-
----
-
-## State Management
-
-The **StoryState** is the heart of Novel OS—a central JSON database tracking:
-
-### Story Bible
-- Genre, themes, tone
-- Setting details
-- World rules (magic/tech systems)
-- Social structures
-
-### Character Database
-For each character:
-- Full profile (desires, fears, arcs)
-- Current location and emotional state
-- Relationship mapping
-- Development progress
-
-### Plot Tracker
-- Active threads
-- Foreshadowing status
-- Unresolved conflicts
-- Milestone tracking
-
-### Timeline Control
-- Chapter mapping
-- Event chronology
-- Character movements
-- Season/time tracking
-
-### Style Profile
-- Voice parameters
-- Genre conventions
-- Prose preferences
-- Forbidden/preferred words
-
----
-
-## The Workflow Loop
-
-```
-CHAPTER N                                    CHAPTER N+1
-    │                                            ▲
-    │                                            │
-    ▼                                            │
-┌─────────┐    ┌─────────┐    ┌─────────┐       │
-│  PLAN   │───►│  DRAFT  │───►│  EDIT   │       │
-│Architect│    │ Scribe  │    │ Editor  │       │
-└─────────┘    └─────────┘    └────┬────┘       │
-                                   │            │
-                                   ▼            │
-                            ┌─────────────┐     │
-                            │   VALIDATE  │     │
-                            │  Guardian   │     │
-                            └──────┬──────┘     │
-                                   │            │
-                                   ▼            │
-                            ┌─────────────┐     │
-                            │    STYLE    │     │
-                            │   Curator   │     │
-                            └──────┬──────┘     │
-                                   │            │
-                                   ▼            │
-                            ┌─────────────┐     │
-                            │    STATE    │─────┘
-                            │   UPDATE    │
-                            └─────────────┘
+    style CLI fill:#1e3a5f,stroke:#4a9eff,color:#fff
+    style LC  fill:#06b6d4,stroke:#0e7490,color:#000
+    style SP  fill:#1f3a4f,stroke:#fbbf24,color:#fff
+    style CE  fill:#1f3a4f,stroke:#fbbf24,color:#fff
+    style SM  fill:#1f3a4f,stroke:#fbbf24,color:#fff
 ```
 
-Each chapter flows through:
-1. **PLAN** → Architect creates detailed outline
-2. **DRAFT** → Scribe writes prose
-3. **EDIT** → Editor refines quality
-4. **VALIDATE** → Guardian checks consistency
-5. **STYLE** → Curator polishes voice
-6. **STATE UPDATE** → System tracks all changes
-7. **LOOP** → Next chapter begins
+---
+
+## The Five Agents
+
+| # | Agent | Purpose | Output blocks parsed back to state |
+|---|---|---|---|
+| 1 | 🏗️ **Architect** | Story planning, 3-act structure, beats, chapter outlines | (none — produces outline files) |
+| 2 | ✍️ **Scribe** | Drafts prose in deep POV | `[SCRIBE_STATE_UPDATE]` → characters_present, key_events, emotional_shifts, foreshadowing |
+| 3 | 🔍 **Editor** | Five modes: line / developmental / pacing / dialogue / tension | `[EDITOR_STATE_UPDATE]` → quality_score_before/after |
+| 4 | 🛡️ **Continuity Guardian** | Character / timeline / world / plot validation | `[CONTINUITY_REPORT]` + `[CONTINUITY_STATE_UPDATE]` → status, critical_issues, warnings, updated_character_positions, new_facts |
+| 5 | 🎨 **Style Curator** | Voice consistency, genre adherence, prose rhythm | `[STYLE_STATE_UPDATE]` → consistency_score, genre_adherence, voice_strength |
+
+Each agent prompt ends with a strict **OUTPUT CONTRACT** that forces the LLM to emit machine-parseable blocks. Verified working with frontier models (Claude, GPT) and open-weight models (Llama 3.3 70B via NVIDIA NIM).
+
+---
+
+## Persistent State
+
+The `StoryState` (`core/state_manager.py`) is a single JSON document tracking:
+
+- **Story bible** — genre, themes, tone, setting, world rules
+- **Characters** — desires, fears, arcs, knowledge, possessions, current location, emotional state, last appearance
+- **Plot threads** — type, priority, status, milestones, foreshadowing planted, target resolution chapter
+- **Chapters** — POV, status, word count, scenes, plot advances, emotional beats, foreshadowing in/out, continuity check results, quality scores
+- **Timeline** — chronological event log
+- **Style profile** — POV, tense, prose style, sentence-length targets, vocabulary level, ratios
+- **Session log** — every state-mutating action
+
+Atomic writes with `.bak` rollback (Windows-safe via `os.replace`).
+
+---
+
+## Chapter Workflow
+
+```mermaid
+flowchart LR
+    P["PLAN<br/>Architect"] --> D["DRAFT<br/>Scribe"]
+    D --> Px1["Parse → State"]
+    Px1 --> Ed["EDIT<br/>Editor"]
+    Ed --> Px2["Parse → State"]
+    Px2 --> CE["PRE-CHECK<br/>Continuity Engine"]
+    CE --> V["VALIDATE<br/>Guardian (LLM)"]
+    V --> Px3["Parse → State"]
+    Px3 --> Ap["APPROVE<br/>(gates on FAIL)"]
+    Ap -->|next| P
+```
+
+Each LLM call goes through `core/llm_client.py` (provider-agnostic). Each response is fed to `core/state_parser.py`, which extracts `[*_STATE_UPDATE]` blocks and mutates the central state. The deterministic `core/continuity_engine.py` runs before the LLM Guardian to catch obvious issues for free and seed the Guardian's prompt.
+
+---
+
+## LLM Provider Layer
+
+`core/llm_client.py` resolves a provider from environment in this order:
+
+1. `NOVEL_OS_LLM_PROVIDER` env var (explicit)
+2. First native key found: `ANTHROPIC_API_KEY` → `OPENAI_API_KEY` → `AZURE_OPENAI_API_KEY` → `GEMINI_API_KEY`
+3. First OpenAI-compatible alias key: NVIDIA, Kimi, Groq, Together, OpenRouter, DeepSeek, Mistral, Fireworks
+4. Custom: `NOVEL_OS_BASE_URL` + `NOVEL_OS_API_KEY` for any other OpenAI-compatible endpoint
+
+Native backends: Anthropic SDK, OpenAI SDK, Azure OpenAI client, google-genai. All other providers route through the OpenAI SDK with a custom `base_url`.
+
+`.env` files are auto-loaded (with or without `python-dotenv` installed).
+
+---
+
+## Continuity Engine
+
+Deterministic checks (`core/continuity_engine.py`) — free, instant, no LLM:
+
+| Check | Severity | Default threshold |
+|---|---|---|
+| `dormant_thread` | warning | active thread not advanced in >3 chapters |
+| `overdue_thread` | **critical** | active thread past `target_resolution_chapter` |
+| `unresolved_foreshadowing` | warning | planted seed unmatched for >3 chapters |
+| `absent_character` | warning | main character silent >5 chapters |
+| `never_appeared` | warning | protagonist/antagonist with zero appearances |
+| `dead_character_state` | warning | flagged-dead character with active state |
+| `missing_chapter_file` | **critical** | chapter marked complete with no manuscript file |
+| `status_drift` | info | draft exists but status still `planned` |
+| `thin_character` | info | main character with no `internal_desire` |
+
+Available as `python core/orchestrator.py check [--chapter N]` (exits 1 on any critical).
 
 ---
 
@@ -193,179 +146,73 @@ Each chapter flows through:
 
 ```
 novel-os/
-├── README.md                    # Main documentation
-├── SYSTEM_OVERVIEW.md           # This file
-├── AGENTS.md                    # Agent definitions
+├── README.md                       # quick start + provider matrix
+├── AGENTS.md                       # five agent specs with output contracts
+├── SYSTEM_OVERVIEW.md              # this file
+├── requirements.txt
+├── .env.example                    # provider configuration template
 │
-├── core/                        # Core system files
-│   ├── state_manager.py         # State management
-│   ├── orchestrator.py          # Workflow orchestration
-│   ├── continuity_engine.py     # Validation logic
-│   └── style_engine.py          # Style analysis
+├── core/                           # all runtime code
+│   ├── orchestrator.py             # CLI + workflow orchestration
+│   ├── state_manager.py            # StoryState dataclasses + JSON persistence
+│   ├── llm_client.py               # 13+ provider abstraction
+│   ├── state_parser.py             # agent output block parser + applier
+│   └── continuity_engine.py        # deterministic checks
 │
-├── agents/                      # Agent prompts
-│   ├── architect/prompt.md      # Planner agent
-│   ├── scribe/prompt.md         # Writer agent
-│   ├── editor/prompt.md         # Editor agent
-│   ├── continuity_guardian/     # Validator agent
-│   │   └── prompt.md
-│   └── style_curator/           # Style agent
-│       └── prompt.md
+├── agents/
+│   ├── architect/prompt.md
+│   ├── scribe/prompt.md
+│   ├── editor/prompt.md
+│   ├── continuity_guardian/prompt.md
+│   └── style_curator/prompt.md
 │
-├── templates/                   # Starting templates
-│   ├── story_bible/template.md
-│   ├── character/template.md
-│   ├── outline/template.json
-│   └── chapter/template.md
-│
-├── docs/                        # Documentation
+├── templates/                      # story bible, character, outline, chapter starters
+├── docs/
 │   ├── WORKFLOWS.md
 │   └── API.md
+├── examples/
+│   ├── demo_project/               # canned worked example
+│   └── last_smoke_run/             # most recent live-LLM artifacts (gitignored)
+├── assets/                         # mascot + optional generated imagery
 │
-├── examples/                    # Example projects
-│   └── demo_project/            # Complete demo
-│       ├── story_bible.md
-│       ├── characters/
-│       ├── outline.json
-│       └── outputs/
-│
-└── outputs/                     # Generated content
-    ├── state/
-    │   └── story_state.json     # Central state file
-    ├── manuscript/              # Chapter drafts
-    └── feedback/                # Agent reports
+└── outputs/                        # (per project, gitignored)
+    ├── state/story_state.json
+    ├── manuscript/                 # drafts and revisions
+    └── feedback/                   # reports and prompts
 ```
+
+---
+
+## Design Principles
+
+- **State first**: the JSON is the source of truth. Everything else can be regenerated.
+- **Provider neutral**: never hard-code a model. The agent prompts are providers-agnostic.
+- **Cheap before expensive**: deterministic checks before LLM calls.
+- **Auditable**: every prompt sent and response received is saved to disk.
+- **Atomic edits**: state writes never corrupt on interruption.
+- **Soft failure**: an LLM failure prints the prompt path so you can hand-run it; nothing is lost.
 
 ---
 
 ## Quick Start
 
-### 1. Initialize
 ```bash
-cd novel-os
-python core/orchestrator.py init --title "Your Novel" --genre "Sci-Fi"
-```
+git clone https://github.com/mrigankad/Novel-OS.git
+cd Novel-OS
+pip install -r requirements.txt
+cp .env.example .env       # add your provider key
 
-### 2. Plan
-```bash
+python core/orchestrator.py init --title "My Novel" --genre "Sci-Fi"
+python core/orchestrator.py character add --name "Hero" --role protagonist
 python core/orchestrator.py plan outline --chapters 32
-python core/orchestrator.py plan chapter --number 1 --pov "Protagonist"
-```
-
-### 3. Write
-Use the generated prompt with your AI assistant, then:
-```bash
-python core/orchestrator.py write --chapter 1 --draft-file chapter1.md
-```
-
-### 4. Refine
-```bash
-python core/orchestrator.py edit --chapter 1 --mode line
+python core/orchestrator.py plan chapter --number 1 --pov "Hero"
+python core/orchestrator.py write --chapter 1
+python core/orchestrator.py edit  --chapter 1 --mode line
 python core/orchestrator.py validate --chapter 1
-python core/orchestrator.py approve --chapter 1
-```
-
-### 5. Continue
-Repeat for each chapter, then:
-```bash
+python core/orchestrator.py approve  --chapter 1
 python core/orchestrator.py export
 ```
 
 ---
 
-## Features
-
-### Memory Scaffolding
-- Characters never forget what they know
-- Timeline stays consistent
-- Plot threads tracked automatically
-- World rules enforced
-
-### Quality Gates
-- Deep POV maintained
-- No info-dumps allowed
-- Show don't tell enforced
-- Pacing optimized
-- Tension escalated
-
-### Style Control
-- Voice consistency across chapters
-- Genre convention compliance
-- Prose rhythm management
-- Vocabulary calibration
-
-### Collaboration
-- Multiple agents work in sequence
-- Each specializes in one aspect
-- State shared between all agents
-- Conflicts flagged for resolution
-
----
-
-## Use Cases
-
-| Use Case | Configuration |
-|----------|--------------|
-| Commercial Fiction | Standard 5-Agent Loop |
-| Epic Fantasy | + World-Builder Agent |
-| Mystery/Thriller | + Clue-Tracker Agent |
-| Romance | + Emotional Arc Agent |
-| Literary Fiction | + Theme Weaver Agent |
-| Series Writing | + Canon Manager Agent |
-
----
-
-## Why Novel OS Works
-
-### Without Novel OS:
-- ❌ Characters forget motivations
-- ❌ Plot holes emerge
-- ❌ Style drifts between chapters
-- ❌ Timeline inconsistencies
-- ❌ Dropped subplots
-- ❌ Tension collapses
-
-### With Novel OS:
-- ✅ Consistent character psychology
-- ✅ Validated continuity
-- ✅ Locked voice and style
-- ✅ Coherent timeline
-- ✅ Resolved plot threads
-- ✅ Progressive escalation
-
----
-
-## Technical Specifications
-
-- **Language**: Python 3.8+
-- **State Format**: JSON
-- **CLI**: argparse-based
-- **Extensible**: Easy to add agents/templates
-- **Portable**: Pure Python, no external dependencies
-
----
-
-## Next Steps
-
-1. Read `AGENTS.md` for detailed agent instructions
-2. Review `docs/WORKFLOWS.md` for complete workflows
-3. Explore `examples/demo_project/` for working example
-4. Run `python core/orchestrator.py --help` for CLI options
-
----
-
-## The Vision
-
-Novel OS transforms AI-assisted writing from a single prompt into a collaborative editorial process. It's not about replacing the author—it's about giving every author an entire editorial team that:
-
-- Never gets tired
-- Never forgets a detail
-- Works 24/7
-- Maintains perfect consistency
-- Helps the story become its best self
-
-**Write novels like a professional author, with an entire editorial team at your command.**
-
----
-
-*Novel OS v1.0 | Production-Ready Fiction Framework*
+*Novel OS v1.1 | Production-Ready Fiction Framework | MIT License*
