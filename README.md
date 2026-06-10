@@ -291,6 +291,26 @@ python core/orchestrator.py export --format markdown
 
 ---
 
+## 🖥️ Web UI (local)
+
+A browser dashboard to view your projects, chapters, outlines, and drafts. Two
+processes — the API and the React dev server:
+
+```bash
+# 1. Backend (from repo root)
+pip install -r requirements.txt
+export NOVEL_OS_PROJECTS_DIR=./projects   # folder of project dirs
+uvicorn api.main:app --reload --port 8000
+
+# 2. Frontend (in another terminal)
+cd web && npm install && npm run dev      # http://localhost:5173
+```
+
+Each project is a folder under `NOVEL_OS_PROJECTS_DIR` containing
+`outputs/state/story_state.json` (created by `python core/orchestrator.py init …`).
+
+---
+
 ## 🗂️ CLI Reference
 
 | Command | Purpose |
