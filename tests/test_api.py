@@ -118,3 +118,82 @@ def test_characters_endpoint(tmp_path):
     sf.write_text(json.dumps(data), encoding="utf-8")
     rows = _client(tmp_path).get("/api/projects/p/characters").json()
     assert rows[0]["full_name"] == "Lena"
+
+
+# --- M2: chapter stages + editable Final -------------------------------------
+
+def _seed_chapter_files(root: Path, slug: str, number: int,
+                        outline=None, draft=None, revised=None, final=None) -> None:
+    proj = root / slug / "outputs"
+    nnn = f"{number:03d}"
+    (proj / "manuscript").mkdir(parents=True, exist_ok=True)
+    if outline is not None:
+        (proj / f"chapter_{nnn}_outline.md").write_text(outline, encoding="utf-8")
+    if draft is not None:
+        (proj / "manuscript" / f"chapter_{nnn}_draft.md").write_text(draft, encoding="utf-8")
+    if revised is not None:
+        (proj / "manuscript" / f"chapter_{nnn}_revised.md").write_text(revised, encoding="utf-8")
+    if final is not None:
+        (proj / "manuscript" / f"chapter_{nnn}_final.md").write_text(final, encoding="utf-8")
+
+
+def _seed_with_chapter(tmp_path, number=1, status="drafted", **files):
+    chapters = {str(number): {"number": number, "title": "Opening", "status": status,
+                              "word_count": 0, "pov_character": "Lena"}}
+    _seed_project(tmp_path, "p", "P", "Drama", chapters=chapters)
+    _seed_chapter_files(tmp_path, "p", number, **files)
+
+
+def test_stages_returns_all_present_artifacts(tmp_path):
+    _seed_with_chapter(tmp_path, outline="# Beats", draft="Draft text", revised="Revised text")
+    body = _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()
+    assert body["outline"] == "# Beats"
+    assert body["draft"] == "Draft text"
+    assert body["revised"] == "Revised text"
+    assert body["final"] is None
+
+
+def test_stages_404_for_missing_chapter(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    assert _client(tmp_path).get("/api/projects/p/chapters/9/stages").status_code == 404
+
+
+def test_promote_final_prefers_revised(tmp_path):
+    _seed_with_chapter(tmp_path, draft="Draft text", revised="Revised text")
+    resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
+    assert resp.status_code == 200
+    assert resp.json()["final"] == "Revised text"
+    # now present in stages
+    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"] == "Revised text"
+
+
+def test_promote_final_falls_back_to_draft(tmp_path):
+    _seed_with_chapter(tmp_path, draft="Only draft")
+    resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
+    assert resp.json()["final"] == "Only draft"
+
+
+def test_promote_final_conflict_when_no_source(tmp_path):
+    _seed_with_chapter(tmp_path)  # no artifacts at all
+    assert _client(tmp_path).post("/api/projects/p/chapters/1/final/promote").status_code == 409
+
+
+def test_promote_is_idempotent_without_force(tmp_path):
+    _seed_with_chapter(tmp_path, revised="Revised", final="Hand-edited final")
+    # already has a final — promote without force must not clobber the human edit
+    resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
+    assert resp.json()["final"] == "Hand-edited final"
+
+
+def test_save_final_writes_and_updates_word_count(tmp_path):
+    _seed_with_chapter(tmp_path, draft="x")
+    resp = _client(tmp_path).put("/api/projects/p/chapters/1/final", json={"text": "one two three"})
+    assert resp.status_code == 200
+    assert resp.json()["word_count"] == 3
+    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"] == "one two three"
+
+
+def test_save_final_404_for_missing_chapter(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    assert _client(tmp_path).put("/api/projects/p/chapters/9/final",
+                                 json={"text": "x"}).status_code == 404

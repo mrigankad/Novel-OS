@@ -36,3 +36,23 @@ class ProjectDetail(BaseModel):
     chapter_count: int
     status: str
     style: dict
+
+
+class ChapterStages(BaseModel):
+    """The pipeline lineage of a chapter: how outline → draft → revised → final."""
+    number: int
+    status: str
+    outline: str | None
+    draft: str | None
+    revised: str | None
+    final: str | None
+    continuity: dict | None
+
+
+class FinalSave(BaseModel):
+    text: str
+
+
+class FinalResult(BaseModel):
+    final: str
+    word_count: int
