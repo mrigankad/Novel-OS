@@ -56,3 +56,25 @@ def test_get_projects_endpoint(projects_root):
     assert resp.status_code == 200
     body = resp.json()
     assert body[0]["id"] == "the-last-signal"
+
+
+def test_project_detail(projects_root):
+    resp = _client(projects_root).get("/api/projects/the-last-signal")
+    assert resp.status_code == 200
+    assert resp.json()["author"] == "Test Author"
+
+
+def test_project_detail_404(projects_root):
+    resp = _client(projects_root).get("/api/projects/nope")
+    assert resp.status_code == 404
+
+
+def test_chapters_list(tmp_path):
+    chapters = {"1": {"number": 1, "title": "Opening", "status": "drafted",
+                      "word_count": 2300, "pov_character": "Lena"}}
+    _seed_project(tmp_path, "p", "P", "Drama", chapters=chapters)
+    resp = _client(tmp_path).get("/api/projects/p/chapters")
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert rows[0]["number"] == 1
+    assert rows[0]["pov"] == "Lena"

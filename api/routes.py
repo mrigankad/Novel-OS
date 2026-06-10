@@ -1,10 +1,10 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from .models import ProjectSummary
-from .services import ProjectService
+from .models import ChapterSummary, ProjectDetail, ProjectSummary
+from .services import ProjectNotFound, ProjectService
 
 router = APIRouter(prefix="/api")
 
@@ -22,3 +22,19 @@ def health() -> dict:
 @router.get("/projects", response_model=list[ProjectSummary])
 def list_projects(svc: ProjectService = Depends(get_service)):
     return svc.list_projects()
+
+
+@router.get("/projects/{project_id}", response_model=ProjectDetail)
+def project_detail(project_id: str, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.project_detail(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.get("/projects/{project_id}/chapters", response_model=list[ChapterSummary])
+def list_chapters(project_id: str, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.list_chapters(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")

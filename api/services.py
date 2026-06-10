@@ -54,3 +54,32 @@ class ProjectService:
                 status=s.metadata.get("status", "in_progress"),
             ))
         return out
+
+    def project_detail(self, project_id: str) -> ProjectDetail:
+        s = self._load(project_id)
+        return ProjectDetail(
+            id=project_id,
+            title=s.metadata.get("title", project_id),
+            genre=s.metadata.get("genre", ""),
+            author=s.metadata.get("author", ""),
+            chapter_count=len(s.chapters),
+            status=s.metadata.get("status", "in_progress"),
+            style={
+                "tone": s.style_profile.tone,
+                "point_of_view": s.style_profile.point_of_view,
+                "prose_style": s.style_profile.prose_style,
+            },
+        )
+
+    def list_chapters(self, project_id: str) -> list[ChapterSummary]:
+        s = self._load(project_id)
+        return [
+            ChapterSummary(
+                number=c.number,
+                title=c.title or "",
+                status=c.status,
+                word_count=c.word_count,
+                pov=c.pov_character or "",
+            )
+            for c in sorted(s.chapters.values(), key=lambda c: c.number)
+        ]
