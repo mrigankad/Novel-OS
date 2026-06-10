@@ -44,3 +44,15 @@ def test_list_projects(projects_root):
     assert projects[0].id == "the-last-signal"
     assert projects[0].title == "The Last Signal"
     assert projects[0].chapter_count == 0
+
+
+def _client(projects_root):
+    app = create_app(projects_root=projects_root)
+    return TestClient(app)
+
+
+def test_get_projects_endpoint(projects_root):
+    resp = _client(projects_root).get("/api/projects")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body[0]["id"] == "the-last-signal"
