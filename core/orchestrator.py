@@ -393,7 +393,7 @@ class NovelOrchestrator:
         chapter.status = 'planned'
         self.state.save_state()
 
-        prompt = self._generate_chapter_prompt(chapter)
+        prompt = self._generate_chapter_outline_prompt(chapter)
         prompt_path = self.outputs_dir / f"chapter_{chapter_number:03d}_prompt.md"
         outline_path = self.outputs_dir / f"chapter_{chapter_number:03d}_outline.md"
 
@@ -405,7 +405,73 @@ class NovelOrchestrator:
             dry_run=dry_run,
             label="Architect expanding chapter outline",
         )
-    
+
+    def _generate_chapter_outline_prompt(self, chapter: ChapterState) -> str:
+        """Prompt the Architect to produce a STRUCTURED BEAT-SHEET (not prose).
+
+        This is deliberately distinct from `_generate_chapter_prompt` (the Scribe's
+        drafting prompt). The Architect plans the chapter; the Scribe writes it.
+        """
+        characters = self.state.get_all_characters()
+        active_threads = self.state.get_active_plot_threads()
+
+        prompt = f"""# ARCHITECT TASK: Outline Chapter {chapter.number}
+
+Produce a structured **beat-sheet outline** for this chapter that the Scribe will
+later expand into prose. This is a PLANNING artifact.
+
+## Chapter Information
+- **Number**: {chapter.number}
+- **Title**: {chapter.title or 'Propose a fitting title'}
+- **POV Character**: {chapter.pov_character or '[Specify]'}
+- **Target Word Count**: {chapter.target_word_count}
+
+## Story Context
+
+### Relevant Characters
+"""
+        for char in characters:
+            if char.last_appearance_chapter >= chapter.number - 3:
+                prompt += f"\n**{char.full_name}** ({char.role}) — "
+                prompt += f"location: {char.current_location or 'Unknown'}, "
+                prompt += f"emotion: {char.emotional_state or 'Unknown'}, "
+                prompt += f"arc: {char.arc_stage} ({char.arc_progress}%)\n"
+
+        prompt += "\n### Active Plot Threads\n"
+        for thread in active_threads[:5]:
+            prompt += f"- **{thread.name}**: {thread.description[:100]}...\n"
+
+        prompt += f"""
+## Required Output Format
+
+Return ONLY the outline, in this Markdown structure — do NOT write any prose,
+dialogue, or narrative paragraphs:
+
+```
+# Chapter {chapter.number}: <title>
+
+**POV:** {chapter.pov_character or '[POV]'} | **Target:** {chapter.target_word_count} words
+
+## Chapter Goal
+<1-2 sentences: what must change by the end of this chapter>
+
+## Beats
+1. **<beat name>** — <1-2 sentence summary of what happens; the conflict/turn>
+2. **<beat name>** — <...>
+3. **<beat name>** — <...>
+(4-7 beats total)
+
+## Continuity Notes
+- <facts the Scribe must honor: who knows what, locations, timeline>
+
+## Ending Hook
+<the line/turn that pulls the reader into the next chapter>
+```
+
+Write the beat-sheet now. Outline only — no prose.
+"""
+        return prompt
+
     def _generate_chapter_prompt(self, chapter: ChapterState) -> str:
         """Generate a detailed prompt for the Scribe agent."""
         
