@@ -190,6 +190,7 @@ Pick any of these — auto-detected from whichever API key is present:
 
 | Provider | `NOVEL_OS_LLM_PROVIDER` | Key env var |
 |---|---|---|
+| **Claude Code CLI (no API key — free with your subscription)** | `claude_cli` | — (just `claude login`) |
 | Anthropic Claude | `anthropic` | `ANTHROPIC_API_KEY` |
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Azure OpenAI | `azure` | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` |
@@ -209,6 +210,7 @@ Pick any of these — auto-detected from whichever API key is present:
 ```mermaid
 graph LR
     A[Architect] & B[Scribe] & E[Editor] & G[Guardian] & S[Curator] --> LC{🔌 LLMClient}
+    LC --> P0[Claude Code CLI<br/>no key · subscription]
     LC --> P1[Anthropic]
     LC --> P2[OpenAI]
     LC --> P3[Azure]
@@ -230,8 +232,23 @@ graph LR
 git clone https://github.com/mrigankad/Novel-OS.git
 cd Novel-OS
 pip install -r requirements.txt   # install only the SDKs you need
-cp .env.example .env              # add your API key(s)
 ```
+
+### 0 — Configure your LLM (one command)
+
+Let the setup wizard detect what you already have — the Claude Code CLI, any API
+key, or a local model server — test the connection, and write your `.env` for you:
+
+```bash
+python core/orchestrator.py setup        # or: python -m core.setup_wizard
+```
+
+> **No API key?** If you have the [Claude Code CLI](https://docs.claude.com/claude-code)
+> installed and `claude login` done, Novel OS runs entirely on your subscription —
+> the wizard picks it automatically, and there are zero per-token API charges.
+
+Prefer to configure by hand? `cp .env.example .env` and set your key(s). If you run a
+writing command with nothing configured, Novel OS offers the wizard automatically.
 
 ### 1 — Initialize
 

@@ -924,6 +924,20 @@ New_Facts_Established: [List]
         # TODO: Add other formats (docx, pdf, etc.)
 
 
+def _provider_configured() -> bool:
+    """True if LLMClient can resolve a provider from the environment."""
+    try:
+        LLMClient()
+        return True
+    except LLMError:
+        return False
+
+
+def _is_dry_run(args) -> bool:
+    """Dry-run commands only save prompts, so they don't need a live LLM."""
+    return bool(getattr(args, 'dry_run', False))
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Novel OS - Multi-Agent Fiction Writing Framework",
@@ -1023,16 +1037,38 @@ Examples:
     export_parser = subparsers.add_parser('export', help='Export manuscript')
     export_parser.add_argument('--format', default='markdown', choices=['markdown', 'docx'],
                               help='Export format')
-    
+
+    # Setup wizard — configure which LLM Novel OS talks to.
+    subparsers.add_parser('setup', help='Configure your LLM provider (interactive)')
+
     args = parser.parse_args()
-    
+
     if not args.command:
         parser.print_help()
         return
-    
+
+    # Setup wizard runs without an orchestrator (it configures the LLM itself).
+    if args.command == 'setup':
+        from setup_wizard import run_wizard
+        sys.exit(run_wizard())
+
+    # Commands that need a working LLM. If none resolves, offer the wizard first.
+    _LLM_COMMANDS = {'plan', 'write', 'edit', 'validate'}
+    if args.command in _LLM_COMMANDS and not _is_dry_run(args):
+        if not _provider_configured():
+            print("No LLM provider is configured yet.")
+            answer = input("Run the setup wizard now? [Y/n]: ").strip().lower() or "y"
+            if answer == "y":
+                from setup_wizard import run_wizard
+                if run_wizard() != 0:
+                    sys.exit(1)
+            else:
+                print("You can configure later with: python -m core.orchestrator setup")
+                sys.exit(1)
+
     # Initialize orchestrator
     orchestrator = NovelOrchestrator()
-    
+
     # Route commands
     if args.command == 'init':
         orchestrator.init_project(args.title, args.genre, args.author)

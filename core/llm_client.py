@@ -1,8 +1,9 @@
 """
 Novel OS - Pluggable LLM Client
 
-Supports any LLM provider via four backend types:
+Supports any LLM provider via these backend types:
 
+  - claude_cli   Claude Code CLI (no API key — uses your `claude` login / subscription)
   - anthropic    Claude (anthropic SDK)
   - openai       Native OpenAI (openai SDK)
   - azure        Azure OpenAI (openai SDK, AzureOpenAI client)
@@ -32,7 +33,10 @@ Provider-native keys also work as fallbacks:
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -135,18 +139,28 @@ class LLMClient:
                 return alias
         if os.environ.get("NOVEL_OS_API_KEY") and os.environ.get("NOVEL_OS_BASE_URL"):
             return "openai_compatible"
+        # No paid key anywhere — fall back to the Claude Code CLI if it's installed,
+        # so subscription users get zero-config, zero-cost generation.
+        if shutil.which("claude"):
+            return "claude_cli"
         raise LLMError(
             "No LLM provider configured. Set NOVEL_OS_LLM_PROVIDER and a key, or "
             "one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, AZURE_OPENAI_API_KEY, "
             "GEMINI_API_KEY, KIMI_API_KEY, GROQ_API_KEY, TOGETHER_API_KEY, "
             "OPENROUTER_API_KEY, DEEPSEEK_API_KEY, MISTRAL_API_KEY, "
-            "FIREWORKS_API_KEY, or NOVEL_OS_BASE_URL+NOVEL_OS_API_KEY."
+            "FIREWORKS_API_KEY, or NOVEL_OS_BASE_URL+NOVEL_OS_API_KEY. "
+            "Or install the Claude Code CLI and run `claude login` (no API key needed), "
+            "then run `python -m core.setup_wizard`."
         )
 
     def _build_backend(self, model: Optional[str]) -> Tuple[object, str]:
         name = self.provider_name
         env_model = os.environ.get("NOVEL_OS_MODEL")
 
+        if name == "claude_cli":
+            # No SDK/client to build; the backend is the `claude` CLI itself.
+            # A model is optional — if unset, the CLI uses its configured default.
+            return self._build_claude_cli(), model or env_model or ""
         if name == "anthropic":
             return self._build_anthropic(), model or env_model or DEFAULT_ANTHROPIC_MODEL
         if name == "openai":
@@ -172,6 +186,16 @@ class LLMClient:
         raise LLMError(f"Unknown provider '{name}'.")
 
     # ----- backend builders
+
+    def _build_claude_cli(self) -> str:
+        """Locate the Claude Code CLI. The 'backend' is just the path to the binary."""
+        cli = shutil.which("claude")
+        if not cli:
+            raise LLMError(
+                "The Claude Code CLI ('claude') was not found on PATH. Install it from "
+                "https://docs.claude.com/claude-code, then run `claude login`."
+            )
+        return cli
 
     def _build_anthropic(self):
         try:
@@ -233,6 +257,8 @@ class LLMClient:
 
     def complete(self, system: str, user: str) -> str:
         """Single-turn message → assistant text."""
+        if self.provider_name == "claude_cli":
+            return self._complete_claude_cli(system, user)
         if self.provider_name == "anthropic":
             return self._complete_anthropic(system, user)
         if self.provider_name == "gemini":
@@ -248,6 +274,50 @@ class LLMClient:
         return self.complete(prompt_path.read_text(encoding="utf-8"), user)
 
     # ----- backend completions
+
+    def _complete_claude_cli(self, system: str, user: str) -> str:
+        """Run the prompt through the Claude Code CLI in non-interactive print mode.
+
+        Uses the user's `claude` login (subscription) — no API key, no per-token billing.
+        The user prompt is passed on stdin (not argv) to avoid length/quoting limits.
+        """
+        cli = self._backend  # path to the claude binary
+        cmd = [
+            cli,
+            "-p",
+            "--append-system-prompt", system,
+            "--output-format", "json",
+        ]
+        if self.model:
+            cmd += ["--model", self.model]
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=user,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+        except OSError as e:
+            raise LLMError(f"Failed to invoke the Claude Code CLI: {e}") from e
+        if proc.returncode != 0:
+            stderr = (proc.stderr or "").strip()
+            hint = ""
+            if "login" in stderr.lower() or "auth" in stderr.lower() or not stderr:
+                hint = " — you may need to run `claude login`."
+            raise LLMError(f"Claude Code CLI failed (exit {proc.returncode}): {stderr}{hint}")
+        out = (proc.stdout or "").strip()
+        if not out:
+            raise LLMError("Claude Code CLI returned no output.")
+        try:
+            data = json.loads(out)
+        except json.JSONDecodeError as e:
+            raise LLMError(f"Could not parse Claude Code CLI output as JSON: {e}") from e
+        # The print-mode JSON envelope carries the assistant text in "result".
+        text = data.get("result") if isinstance(data, dict) else None
+        if not text:
+            raise LLMError(f"Claude Code CLI JSON had no 'result' text: {out[:200]}")
+        return text
 
     def _complete_anthropic(self, system: str, user: str) -> str:
         resp = self._backend.messages.create(
