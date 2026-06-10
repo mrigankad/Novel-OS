@@ -1,111 +1,109 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+@theme {
+  /* Ink — the binder / chrome */
+  --color-ink: #0e1320;
+  --color-ink-800: #161d2e;
+  --color-ink-700: #202a40;
+  --color-ink-line: #2b3650;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Paper — the manuscript canvas */
+  --color-paper: #f3ecdd;
+  --color-paper-card: #fffdf7;
+  --color-paper-line: #e4dcc8;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  /* Text */
+  --color-ink-text: #1b2233;
+  --color-ink-muted: #6b6657;
+  --color-paper-muted: #9c9684;
+
+  /* Accent */
+  --color-amber: #f4b740;
+  --color-amber-deep: #c98a16;
+
+  /* Status */
+  --color-st-drafted: #4a83c4;
+  --color-st-planned: #b08642;
+  --color-st-approved: #4f9d6b;
+  --color-st-edited: #8a6bb0;
+
+  --font-display: "Fraunces", Georgia, serif;
+  --font-prose: "Newsreader", Georgia, serif;
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-paper: 0 1px 2px rgba(20, 16, 8, 0.04), 0 8px 24px -12px rgba(20, 16, 8, 0.18);
+  --shadow-lift: 0 2px 4px rgba(20, 16, 8, 0.06), 0 18px 40px -18px rgba(20, 16, 8, 0.28);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-paper-line);
   }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+  html, body, #root {
+    height: 100%;
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-ink-text);
+    background-color: var(--color-paper);
+    background-image:
+      radial-gradient(120% 80% at 100% 0%, rgba(244, 183, 64, 0.07), transparent 55%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    -webkit-font-smoothing: antialiased;
   }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+  ::selection {
+    background: rgba(244, 183, 64, 0.32);
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(107, 102, 87, 0.32);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
-}
-p {
-  margin: 0;
+  ::-webkit-scrollbar-thumb:hover { background: rgba(107, 102, 87, 0.5); background-clip: content-box; }
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+@layer components {
+  .status-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider;
+  }
+  .status-pill::before {
+    content: "";
+    @apply h-1.5 w-1.5 rounded-full bg-current;
+  }
+  /* The manuscript prose — drafts rendered as a real page */
+  .prose-manuscript {
+    font-family: var(--font-prose);
+    font-size: 1.075rem;
+    line-height: 1.85;
+    color: #2a2a24;
+  }
+  .prose-manuscript p { margin: 0 0 1.1em; text-align: justify; hyphens: auto; }
+  .prose-manuscript h1, .prose-manuscript h2, .prose-manuscript h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.2;
+    margin: 1.4em 0 0.5em;
+  }
+  .prose-manuscript h1 { font-size: 1.5rem; }
+  .prose-manuscript em { font-style: italic; }
+  .prose-manuscript hr { border: 0; text-align: center; margin: 2em 0; }
+  .prose-manuscript hr::before { content: "✦"; color: var(--color-amber-deep); letter-spacing: 0.4em; }
+  /* outline / beat-sheet — index-card styling */
+  .prose-outline {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: #3a3a30;
+  }
+  .prose-outline h1 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; margin: 0 0 0.6em; }
+  .prose-outline h2 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-ink-muted); margin: 1.3em 0 0.4em; font-weight: 700; }
+  .prose-outline ul, .prose-outline ol { margin: 0 0 0.8em; padding-left: 1.2em; }
+  .prose-outline li { margin: 0.25em 0; }
+  .prose-outline strong { color: var(--color-ink-text); }
+  .prose-outline p { margin: 0 0 0.7em; }
 }
