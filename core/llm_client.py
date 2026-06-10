@@ -285,15 +285,32 @@ class LLMClient:
         cmd = [
             cli,
             "-p",
-            "--append-system-prompt", system,
             "--output-format", "json",
         ]
         if self.model:
             cmd += ["--model", self.model]
+        # Fold the agent's system prompt into the message turn. Passing it via
+        # --append-system-prompt buries the instruction beneath Claude Code's own
+        # interactive base prompt, which makes the model ask for confirmation
+        # instead of executing the task. Inlining the directive keeps it imperative.
+        #
+        # The preamble makes the CLI behave like a plain completion API: other
+        # providers treat the system prompt as a standing order and just produce
+        # the artifact; the `claude` CLI is interactive by default and will ask
+        # clarifying questions unless told to act. This keeps behavior consistent.
+        preamble = (
+            "You are operating as a non-interactive text-generation engine, not a "
+            "conversational assistant. Follow the ROLE and TASK below exactly and "
+            "output ONLY the requested artifact (e.g. the prose, the outline, the "
+            "JSON). Do not ask questions, do not add preamble, commentary, or "
+            "meta-discussion. If information is missing, make reasonable creative "
+            "choices and proceed.\n\n"
+        )
+        prompt = f"{preamble}# ROLE\n{system}\n\n# TASK / CONTEXT\n{user}" if system else user
         try:
             proc = subprocess.run(
                 cmd,
-                input=user,
+                input=prompt,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

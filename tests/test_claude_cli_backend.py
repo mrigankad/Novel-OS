@@ -79,9 +79,12 @@ def test_complete_claude_cli_parses_result(clean_env):
     clean_env.setattr(llm_client.subprocess, "run", fake_run)
     out = client.complete(system="be brief", user="say hi")
     assert out == "Hello world"
-    # system goes via flag, user via stdin
-    assert "--append-system-prompt" in captured["cmd"]
-    assert captured["input"] == "say hi"
+    # system + user are folded into the message turn (not a system flag), so the
+    # agent's instruction stays imperative instead of being buried under Claude
+    # Code's interactive base prompt.
+    assert "--append-system-prompt" not in captured["cmd"]
+    assert "be brief" in captured["input"]
+    assert "say hi" in captured["input"]
 
 
 def test_complete_claude_cli_includes_model_flag(clean_env):
