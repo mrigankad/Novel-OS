@@ -5,3 +5,7 @@ anthropic>=0.40.0           # for provider=anthropic
 openai>=1.50.0              # for openai, azure, kimi, groq, together, openrouter, deepseek, mistral, fireworks, ollama, lmstudio, openai_compatible
 google-genai>=0.3.0         # for provider=gemini
 python-dotenv>=1.0.0        # optional, for .env loading
+
+# Web UI backend (optional — only needed to run the dashboard)
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
