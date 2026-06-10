@@ -23,6 +23,23 @@ Scrivener = Word + Notion + Trello + research DB for authors (binder, corkboard,
 
 So: **build the studio, then make every studio feature AI-native.**
 
+## 1.5 The core lifecycle — **AI-computed → human-reviewed → Final**
+
+One principle governs the whole studio: **the AI proposes, the human disposes.** Everything an agent produces is a *proposal* until a human reviews it. The reviewed result is the **Final** — the only human-owned, mutable, canonical artifact. This is universal, not prose-specific:
+
+| Thing | AI computes (proposal) | Human reviews | Final (canonical) |
+|---|---|---|---|
+| Chapter/scene prose | outline → draft → revised | read, edit, accept/reject | `final.md` |
+| Metadata (tension, emotion, pacing, keywords) | suggested values | confirm or override | recorded value |
+| Codex entry (character/location/world) | extracted from prose | confirm/correct | saved entry |
+| Inline edit (M6) | rewrite + story ripple | accept / tweak / discard | applied to Final + state |
+
+Implications baked into the engine and UI from M0 on:
+- A three-state lifecycle on every writable unit: **`proposed` → `in_review` → `final`** (extends today's status enum).
+- **Provenance is immutable.** Drafts, AI revisions, and suggestions are kept as read-only history; only Final and human-confirmed metadata are mutable. Nothing is "Final" until a human reviewed it.
+- **Every AI output has a review surface** — a diff/accept/reject affordance — not a silent overwrite. Agents never write Final directly.
+- Each artifact records `produced_by` (agent/model) and `reviewed_by`/`reviewed_at`, so you always know what's machine-proposed vs human-blessed.
+
 ## 2. Scrivener → Novel OS feature map
 
 Each row = a Scrivener capability, the Novel OS engine support it needs, the UI surface, and the AI upgrade that makes ours better.
