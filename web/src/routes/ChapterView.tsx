@@ -1,21 +1,57 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
-import { api, type ChapterDetail, type ChapterSummary } from "../api/client";
+import {
+  api,
+  type ChapterDetail,
+  type ChapterStages,
+  type ChapterSummary,
+} from "../api/client";
 import StatusPill from "../components/StatusPill";
+import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
+
+function firstPresent(s: ChapterStages): StageKey {
+  if (s.final != null) return "final";
+  if (s.revised != null) return "revised";
+  if (s.draft != null) return "draft";
+  return "outline";
+}
 
 export default function ChapterView() {
   const { id = "", n = "0" } = useParams();
   const num = Number(n);
-  const [chapter, setChapter] = useState<ChapterDetail | null>(null);
+
+  const [meta, setMeta] = useState<ChapterDetail | null>(null);
+  const [stages, setStages] = useState<ChapterStages | null>(null);
   const [siblings, setSiblings] = useState<ChapterSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<StageKey>("outline");
+
+  // editable Final buffer
+  const [finalText, setFinalText] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState<null | "saving" | "promoting">(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    api.chapter(id, num).then(setChapter).catch((e) => setError(String(e)));
-    // binder is supplementary — never let its failure blank the page
+    setError(null);
+    api.chapter(id, num).then(setMeta).catch((e) => setError(String(e)));
     api.chapters(id).then(setSiblings).catch(() => setSiblings([]));
+    api
+      .stages(id, num)
+      .then((s) => {
+        setStages(s);
+        setSelected(firstPresent(s));
+        setFinalText(s.final ?? "");
+        setDirty(false);
+      })
+      .catch((e) => setError(String(e)));
   }, [id, num]);
+
+  const wordCount = useMemo(
+    () => (finalText.trim() ? finalText.trim().split(/\s+/).length : 0),
+    [finalText],
+  );
 
   if (error)
     return (
@@ -25,11 +61,46 @@ export default function ChapterView() {
         </div>
       </div>
     );
-  if (!chapter) return <div className="px-10 py-12 text-ink-muted">Loading…</div>;
+  if (!stages) return <div className="px-10 py-12 text-ink-muted">Loading…</div>;
+
+  async function promote() {
+    setBusy("promoting");
+    setNotice(null);
+    try {
+      const r = await api.promoteFinal(id, num);
+      setFinalText(r.final);
+      setDirty(false);
+      setStages((s) => (s ? { ...s, final: r.final } : s));
+      setSelected("final");
+    } catch (e) {
+      setNotice(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function save() {
+    setBusy("saving");
+    setNotice(null);
+    try {
+      const r = await api.saveFinal(id, num, finalText);
+      setStages((s) => (s ? { ...s, final: r.final } : s));
+      setDirty(false);
+      setNotice("Saved");
+      setTimeout(() => setNotice(null), 1800);
+    } catch (e) {
+      setNotice(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const canPromote = stages.revised != null || stages.draft != null;
+  const promoteFrom = stages.revised != null ? "Revised" : "Draft";
 
   return (
     <div className="flex h-full">
-      {/* Binder rail */}
+      {/* Binder */}
       <nav className="hidden w-[210px] shrink-0 flex-col border-r border-paper-line bg-paper-card/40 lg:flex">
         <div className="px-5 pb-3 pt-6">
           <Link
@@ -60,72 +131,156 @@ export default function ChapterView() {
         </div>
       </nav>
 
-      {/* Editor — the manuscript page */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="border-b border-paper-line bg-paper-card/30 px-10 py-6 backdrop-blur">
-          <div className="mx-auto flex max-w-[680px] flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-amber-deep">
-                Chapter {chapter.number}
-              </p>
-              <h1 className="font-display text-[26px] font-semibold tracking-tight text-ink-text">
-                {chapter.title || "Untitled"}
-              </h1>
+      {/* Pipeline editor */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <div className="border-b border-paper-line bg-paper-card/30 px-8 py-5">
+          <div className="mx-auto max-w-[760px]">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-amber-deep">
+                  Chapter {num}
+                </p>
+                <h1 className="font-display text-[24px] font-semibold tracking-tight text-ink-text">
+                  {meta?.title || stages.status}
+                </h1>
+              </div>
+              <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
+                <StatusPill status={stages.status} />
+                {meta?.pov && <span>POV {meta.pov}</span>}
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
-              <StatusPill status={chapter.status} />
-              <span>{chapter.word_count.toLocaleString()} words</span>
-              {chapter.pov && <span>· POV {chapter.pov}</span>}
-            </div>
+            <PipelineFlow stages={stages} selected={selected} onSelect={setSelected} />
           </div>
         </div>
 
-        <div className="px-10 py-10">
-          <article className="mx-auto max-w-[680px] rounded-md bg-paper-card px-12 py-14 shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
-            {chapter.draft ? (
-              <div className="prose-manuscript">
-                <ReactMarkdown>{chapter.draft}</ReactMarkdown>
-              </div>
-            ) : (
-              <EmptyState
-                title="Draft not generated yet"
-                hint="Run the Scribe to draft this chapter from its outline."
+        <div className="px-8 py-10">
+          <div className="mx-auto max-w-[760px]">
+            {selected === "final" ? (
+              <FinalPane
+                hasFinal={stages.final != null}
+                canPromote={canPromote}
+                promoteFrom={promoteFrom}
+                text={finalText}
+                onChange={(v) => {
+                  setFinalText(v);
+                  setDirty(true);
+                }}
+                onSave={save}
+                onPromote={promote}
+                dirty={dirty}
+                busy={busy}
+                notice={notice}
+                wordCount={wordCount}
               />
+            ) : (
+              <ProvenancePane stage={selected} text={stages[selected]} />
             )}
-          </article>
+          </div>
         </div>
       </div>
-
-      {/* Inspector — the beat-sheet */}
-      <aside className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l border-paper-line bg-paper-card/40 xl:flex">
-        <p className="px-6 pb-3 pt-6 text-[10.5px] font-bold uppercase tracking-[0.16em] text-paper-muted">
-          Outline · Beat sheet
-        </p>
-        <div className="px-6 pb-10">
-          <div className="rounded-lg border border-paper-line bg-[#fffef9] p-5 shadow-[var(--shadow-paper)]">
-            {chapter.outline ? (
-              <div className="prose-outline">
-                <ReactMarkdown>{chapter.outline}</ReactMarkdown>
-              </div>
-            ) : (
-              <EmptyState
-                title="Outline not generated yet"
-                hint="The Architect plans the beats before the Scribe writes."
-                compact
-              />
-            )}
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }
 
-function EmptyState({ title, hint, compact }: { title: string; hint: string; compact?: boolean }) {
+function ProvenancePane({ stage, text }: { stage: StageKey; text: string | null }) {
+  if (text == null) {
+    return (
+      <Empty
+        title={`${cap(stage)} not generated yet`}
+        hint={
+          stage === "outline"
+            ? "The Architect plans the beats first."
+            : "Run the pipeline to produce this stage."
+        }
+      />
+    );
+  }
+  const outline = stage === "outline";
   return (
-    <div className={compact ? "py-4 text-center" : "py-10 text-center"}>
-      <p className="font-display text-[17px] text-ink-text">{title}</p>
+    <article className="rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
+      <div className="mb-6 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-paper-muted">
+        <span className="h-1.5 w-1.5 rounded-full bg-st-approved" />
+        Provenance · read-only — the reviewed Final is canonical
+      </div>
+      <div className={outline ? "prose-outline" : "prose-manuscript"}>
+        <ReactMarkdown>{text}</ReactMarkdown>
+      </div>
+    </article>
+  );
+}
+
+function FinalPane(props: {
+  hasFinal: boolean;
+  canPromote: boolean;
+  promoteFrom: string;
+  text: string;
+  onChange: (v: string) => void;
+  onSave: () => void;
+  onPromote: () => void;
+  dirty: boolean;
+  busy: null | "saving" | "promoting";
+  notice: string | null;
+  wordCount: number;
+}) {
+  const { hasFinal, canPromote, promoteFrom, text, onChange, onSave, onPromote, dirty, busy, notice, wordCount } = props;
+
+  if (!hasFinal) {
+    return (
+      <div className="rounded-md bg-paper-card px-11 py-14 text-center shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
+        <p className="font-display text-[20px] text-ink-text">No Final yet</p>
+        <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ink-muted">
+          The Final is the human-reviewed, canonical chapter. Promote the latest AI stage to
+          start reviewing — your drafts stay untouched as provenance.
+        </p>
+        <button
+          onClick={onPromote}
+          disabled={!canPromote || busy != null}
+          className="mt-6 inline-flex items-center rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-paper transition-colors hover:bg-ink-800 disabled:opacity-40"
+        >
+          {busy === "promoting" ? "Promoting…" : canPromote ? `Promote ${promoteFrom} → Final` : "Nothing to promote yet"}
+        </button>
+        {notice && <p className="mt-3 text-[12.5px] text-red-600">{notice}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-deep">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-deep" />
+          Final · editable
+        </div>
+        <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
+          <span>{wordCount.toLocaleString()} words</span>
+          {dirty && <span className="text-amber-deep">● unsaved</span>}
+          {notice && <span className={notice === "Saved" ? "text-st-approved" : "text-red-600"}>{notice}</span>}
+          <button
+            onClick={onSave}
+            disabled={!dirty || busy != null}
+            className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-semibold text-paper transition-colors hover:bg-ink-800 disabled:opacity-40"
+          >
+            {busy === "saving" ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck
+        className="prose-manuscript min-h-[60vh] w-full resize-y rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line outline-none focus:ring-amber/60"
+      />
+    </div>
+  );
+}
+
+function Empty({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="rounded-md bg-paper-card px-11 py-14 text-center shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
+      <p className="font-display text-[18px] text-ink-text">{title}</p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{hint}</p>
     </div>
   );
 }
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
