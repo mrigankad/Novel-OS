@@ -78,3 +78,43 @@ def test_chapters_list(tmp_path):
     rows = resp.json()
     assert rows[0]["number"] == 1
     assert rows[0]["pov"] == "Lena"
+
+
+def test_chapter_detail_with_files(tmp_path):
+    chapters = {"1": {"number": 1, "title": "Opening", "status": "drafted",
+                      "word_count": 5, "pov_character": "Lena"}}
+    _seed_project(tmp_path, "p", "P", "Drama", chapters=chapters)
+    proj = tmp_path / "p"
+    (proj / "outputs" / "chapter_001_outline.md").write_text("# Beat sheet", encoding="utf-8")
+    (proj / "outputs" / "manuscript").mkdir(parents=True, exist_ok=True)
+    (proj / "outputs" / "manuscript" / "chapter_001_draft.md").write_text("Prose here", encoding="utf-8")
+    resp = _client(tmp_path).get("/api/projects/p/chapters/1")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["outline"] == "# Beat sheet"
+    assert body["draft"] == "Prose here"
+
+
+def test_chapter_detail_missing_files(tmp_path):
+    chapters = {"2": {"number": 2, "title": "", "status": "planned",
+                      "word_count": 0, "pov_character": ""}}
+    _seed_project(tmp_path, "p", "P", "Drama", chapters=chapters)
+    body = _client(tmp_path).get("/api/projects/p/chapters/2").json()
+    assert body["outline"] is None
+    assert body["draft"] is None
+
+
+def test_chapter_404(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    resp = _client(tmp_path).get("/api/projects/p/chapters/9")
+    assert resp.status_code == 404
+
+
+def test_characters_endpoint(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    sf = tmp_path / "p" / "outputs" / "state" / "story_state.json"
+    data = json.loads(sf.read_text())
+    data["characters"] = {"char_001": {"id": "char_001", "full_name": "Lena", "role": "protagonist"}}
+    sf.write_text(json.dumps(data), encoding="utf-8")
+    rows = _client(tmp_path).get("/api/projects/p/characters").json()
+    assert rows[0]["full_name"] == "Lena"

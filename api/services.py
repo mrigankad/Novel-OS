@@ -83,3 +83,34 @@ class ProjectService:
             )
             for c in sorted(s.chapters.values(), key=lambda c: c.number)
         ]
+
+    def chapter_detail(self, project_id: str, number: int) -> ChapterDetail:
+        s = self._load(project_id)
+        c = s.chapters.get(number)
+        if c is None:
+            raise ChapterNotFound(number)
+        proj = self._project_dir(project_id)
+        nnn = f"{number:03d}"
+        outline_path = proj / "outputs" / f"chapter_{nnn}_outline.md"
+        draft_path = proj / "outputs" / "manuscript" / f"chapter_{nnn}_draft.md"
+        return ChapterDetail(
+            number=c.number,
+            title=c.title or "",
+            status=c.status,
+            word_count=c.word_count,
+            pov=c.pov_character or "",
+            outline=outline_path.read_text(encoding="utf-8") if outline_path.exists() else None,
+            draft=draft_path.read_text(encoding="utf-8") if draft_path.exists() else None,
+        )
+
+    def list_characters(self, project_id: str) -> list[CharacterSummary]:
+        s = self._load(project_id)
+        return [
+            CharacterSummary(id=c.id, full_name=c.full_name, role=c.role)
+            for c in s.get_all_characters()
+        ]
+
+    def raw_state(self, project_id: str) -> dict:
+        import json as _json
+        sf = self._project_dir(project_id) / "outputs" / "state" / "story_state.json"
+        return _json.loads(sf.read_text(encoding="utf-8"))
