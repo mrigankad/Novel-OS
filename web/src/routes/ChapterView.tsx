@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -10,6 +10,7 @@ import {
 import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
 import { useToast } from "../components/Toaster";
+import { useRunPhase } from "../hooks/useRunPhase";
 
 const STAGE_KEYS: StageKey[] = ["outline", "draft", "revised", "final"];
 
@@ -60,7 +61,7 @@ export default function ChapterView() {
     );
   }
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     setError(null);
     api.chapter(id, num).then(setMeta).catch((e) => setError(String(e)));
     api.chapters(id).then(setSiblings).catch(() => setSiblings([]));
@@ -68,11 +69,21 @@ export default function ChapterView() {
       .stages(id, num)
       .then((s) => {
         setStages(s);
-        setFinalText(s.final ?? "");
-        setDirty(false);
+        // don't clobber an in-progress human edit when a job refreshes data
+        if (!dirtyRef.current) {
+          setFinalText(s.final ?? "");
+          setDirty(false);
+        }
       })
       .catch((e) => setError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, num]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const { run, runningStage, isRunning } = useRunPhase(id, reload);
 
   // Warn on tab close / refresh with unsaved edits
   useEffect(() => {
@@ -191,6 +202,25 @@ export default function ChapterView() {
               </div>
             </div>
             <PipelineFlow stages={stages} selected={selected} onSelect={selectStage} />
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <RunButton label="Generate Draft" running={runningStage === "write"}
+                         disabled={isRunning} onClick={() => run("write", { number: num })} />
+              <RunButton label="Revise" running={runningStage === "edit"}
+                         disabled={isRunning || stages.draft == null}
+                         onClick={() => run("edit", { number: num })} />
+              <RunButton label="Validate" running={runningStage === "validate"}
+                         disabled={isRunning || (stages.draft == null && stages.revised == null)}
+                         onClick={() => run("validate", { number: num })} />
+              <RunButton label="Approve" running={runningStage === "approve"}
+                         disabled={isRunning} onClick={() => run("approve", { number: num })} />
+              {isRunning && (
+                <span className="ml-1 inline-flex items-center gap-2 text-[12px] text-ink-muted" aria-live="polite">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-amber-deep" />
+                  Agent working…
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -356,6 +386,20 @@ function Empty({ title, hint }: { title: string; hint: string }) {
       <p className="font-display text-[18px] text-ink-text">{title}</p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{hint}</p>
     </div>
+  );
+}
+
+function RunButton({
+  label, onClick, running, disabled,
+}: { label: string; onClick: () => void; running: boolean; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-lg border border-paper-line bg-paper-card px-3.5 py-1.5 text-[12.5px] font-semibold text-ink-text transition-colors hover:bg-ink/5 disabled:opacity-40"
+    >
+      {running ? "Running…" : label}
+    </button>
   );
 }
 

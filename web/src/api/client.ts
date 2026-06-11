@@ -22,6 +22,10 @@ export interface ChapterStages {
 export interface FinalResult {
   final: string; word_count: number;
 }
+export interface JobStatus {
+  job_id: string; kind: string;
+  status: "running" | "done" | "error"; error: string | null;
+}
 
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
@@ -56,4 +60,14 @@ export const api = {
     send<FinalResult>(`/api/projects/${id}/chapters/${n}/final/promote`, "POST"),
   saveFinal: (id: string, n: number, text: string) =>
     send<FinalResult>(`/api/projects/${id}/chapters/${n}/final`, "PUT", { text }),
+  createProject: (body: { title: string; genre: string; author: string }) =>
+    send<ProjectSummary>("/api/projects", "POST", body),
+  addCharacter: (id: string, name: string, role: string) =>
+    send<{ id: string; full_name: string; role: string }[]>(
+      `/api/projects/${id}/characters`, "POST", { name, role }),
+  runPhase: (id: string, stage: string, params: Record<string, unknown> = {}) =>
+    send<JobStatus>(`/api/projects/${id}/run`, "POST", { stage, params }),
+  getJob: (jobId: string) => get<JobStatus>(`/api/jobs/${jobId}`),
+  exportUrl: (id: string) => `${BASE}/api/projects/${id}/export`,
 };
+
