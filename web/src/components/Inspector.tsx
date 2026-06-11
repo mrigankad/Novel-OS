@@ -3,6 +3,7 @@ import {
   api, type SnapshotMeta, type SnapshotText, type CommentItem,
 } from "../api/client";
 import { useToast } from "./Toaster";
+import { useConfirm } from "./Confirm";
 import DiffView from "./DiffView";
 
 function when(iso: string) {
@@ -46,6 +47,7 @@ function Snapshots({ id, num, currentText, flush, onRestored }: {
   flush: () => Promise<void>; onRestored: (finalText: string) => void;
 }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState<SnapshotMeta[]>([]);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,6 +90,13 @@ function Snapshots({ id, num, currentText, flush, onRestored }: {
   }
 
   async function remove(sid: string) {
+    const ok = await confirm({
+      title: "Delete version",
+      message: "This permanently deletes this snapshot. It can't be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try { await api.deleteSnapshot(id, num, sid); reload(); if (viewing?.id === sid) setViewing(null); }
     catch (e) { toast(e instanceof Error ? e.message : String(e), "error"); }
   }
@@ -140,6 +149,7 @@ function Snapshots({ id, num, currentText, flush, onRestored }: {
 
 function Comments({ id, num }: { id: string; num: number }) {
   const toast = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState<CommentItem[]>([]);
   const [body, setBody] = useState("");
   const [quote, setQuote] = useState("");
@@ -148,6 +158,13 @@ function Comments({ id, num }: { id: string; num: number }) {
     api.comments(id, num).then(setList).catch(() => setList([]));
   }, [id, num]);
   useEffect(reload, [reload]);
+
+  async function removeComment(cid: string) {
+    const ok = await confirm({
+      title: "Delete note", message: "Delete this note?", confirmLabel: "Delete", danger: true,
+    });
+    if (ok) api.deleteComment(id, num, cid).then(reload).catch(() => {});
+  }
 
   async function add() {
     if (!body.trim()) return;
@@ -191,7 +208,7 @@ function Comments({ id, num }: { id: string; num: number }) {
                     className="font-medium text-st-approved hover:underline">
               {c.resolved ? "Reopen" : "Resolve"}
             </button>
-            <button onClick={() => api.deleteComment(id, num, c.id).then(reload)}
+            <button onClick={() => removeComment(c.id)}
                     className="font-medium text-ink-muted hover:text-red-600">Delete</button>
           </div>
         </div>

@@ -148,7 +148,15 @@ export default function ChapterView() {
         </div>
       </div>
     );
-  if (!stages) return <div className="px-10 py-12 text-ink-muted">Loading…</div>;
+  if (!stages)
+    return (
+      <div className="mx-auto max-w-[760px] px-10 py-12">
+        <div className="h-3.5 w-40 animate-pulse rounded bg-paper-card" />
+        <div className="mt-4 h-8 w-1/2 animate-pulse rounded bg-paper-card" />
+        <div className="mt-6 h-16 w-full animate-pulse rounded-lg bg-paper-card" />
+        <div className="mt-8 h-[50vh] w-full animate-pulse rounded-md bg-paper-card" />
+      </div>
+    );
 
   async function promote() {
     setBusy("promoting");

@@ -4,7 +4,9 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Sidebar from "./components/Sidebar";
 import CommandPalette from "./components/CommandPalette";
 import ShortcutsHelp from "./components/ShortcutsHelp";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toaster";
+import { ConfirmProvider } from "./components/Confirm";
 
 // Code-split routes so the CodeMirror editor only loads on the chapter view.
 const ProjectsList = lazy(() => import("./routes/ProjectsList"));
@@ -40,15 +42,19 @@ export default function App() {
     <BrowserRouter>
       <MotionConfig reducedMotion="user">
         <ToastProvider>
-          <a href="#main" className="skip-link">Skip to content</a>
-          <CommandPalette />
-          <ShortcutsHelp />
-          <div className="flex h-full">
-            <Sidebar />
-            <main id="main" className="h-full flex-1 overflow-y-auto">
-              <AnimatedRoutes />
-            </main>
-          </div>
+          <ConfirmProvider>
+            <a href="#main" className="skip-link">Skip to content</a>
+            <CommandPalette />
+            <ShortcutsHelp />
+            <div className="flex h-full">
+              <Sidebar />
+              <main id="main" className="h-full flex-1 overflow-y-auto">
+                <ErrorBoundary>
+                  <AnimatedRoutes />
+                </ErrorBoundary>
+              </main>
+            </div>
+          </ConfirmProvider>
         </ToastProvider>
       </MotionConfig>
     </BrowserRouter>

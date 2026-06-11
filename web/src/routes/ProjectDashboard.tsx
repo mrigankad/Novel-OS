@@ -34,7 +34,18 @@ export default function ProjectDashboard() {
         </div>
       </div>
     );
-  if (!project) return <div className="px-10 py-12 text-ink-muted">Loading…</div>;
+  if (!project)
+    return (
+      <div className="mx-auto max-w-5xl px-10 py-12">
+        <div className="h-3.5 w-24 animate-pulse rounded bg-paper-card" />
+        <div className="mt-4 h-10 w-2/3 animate-pulse rounded bg-paper-card" />
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-paper-card" />
+          ))}
+        </div>
+      </div>
+    );
 
   const words = chapters.reduce((s, c) => s + c.word_count, 0);
   const drafted = chapters.filter((c) => c.status !== "planned").length;
