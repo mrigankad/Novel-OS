@@ -47,7 +47,8 @@ def test_list_projects(projects_root):
 
 
 def _client(projects_root):
-    app = create_app(projects_root=projects_root)
+    db_url = f"sqlite:///{(Path(projects_root) / 'novel_os_test.db').as_posix()}"
+    app = create_app(projects_root=projects_root, db_url=db_url)
     return TestClient(app)
 
 
@@ -291,3 +292,76 @@ def test_export_prefers_final(tmp_path):
     assert "Compiled Tale" in text
     assert "FINAL body" in text
     assert "DRAFT body" not in text
+
+
+# --- Tier 1: snapshots + comments + DB ingest ---------------------------------
+
+import api.db as dbmod
+
+
+def test_snapshot_lifecycle(tmp_path):
+    _seed_with_chapter(tmp_path, draft="draft body")
+    c = _client(tmp_path)
+    c.post("/api/projects/p/chapters/1/final/promote")
+    r = c.post("/api/projects/p/chapters/1/snapshots", json={"label": "v1"})
+    assert r.status_code == 201
+    sid = r.json()["id"]
+    assert any(s["id"] == sid for s in c.get("/api/projects/p/chapters/1/snapshots").json())
+    got = c.get(f"/api/projects/p/chapters/1/snapshots/{sid}").json()
+    assert got["text"] == "draft body" and got["label"] == "v1"
+
+
+def test_snapshot_409_without_final(tmp_path):
+    _seed_with_chapter(tmp_path)
+    assert _client(tmp_path).post("/api/projects/p/chapters/1/snapshots", json={}).status_code == 409
+
+
+def test_snapshot_restore_makes_backup(tmp_path):
+    _seed_with_chapter(tmp_path, draft="orig")
+    c = _client(tmp_path)
+    c.post("/api/projects/p/chapters/1/final/promote")
+    sid = c.post("/api/projects/p/chapters/1/snapshots", json={"label": "v1"}).json()["id"]
+    c.put("/api/projects/p/chapters/1/final", json={"text": "changed"})
+    r = c.post(f"/api/projects/p/chapters/1/snapshots/{sid}/restore")
+    assert r.status_code == 200 and r.json()["final"] == "orig"
+    assert c.get("/api/projects/p/chapters/1/stages").json()["final"] == "orig"
+    labels = [s["label"] for s in c.get("/api/projects/p/chapters/1/snapshots").json()]
+    assert "Before restore" in labels
+
+
+def test_snapshot_delete(tmp_path):
+    _seed_with_chapter(tmp_path, draft="x")
+    c = _client(tmp_path)
+    c.post("/api/projects/p/chapters/1/final/promote")
+    sid = c.post("/api/projects/p/chapters/1/snapshots", json={}).json()["id"]
+    assert c.delete(f"/api/projects/p/chapters/1/snapshots/{sid}").status_code == 204
+    assert c.get("/api/projects/p/chapters/1/snapshots").json() == []
+
+
+def test_comment_crud(tmp_path):
+    _seed_with_chapter(tmp_path)
+    c = _client(tmp_path)
+    r = c.post("/api/projects/p/chapters/1/comments", json={"body": "tighten this", "quote": "the pipe"})
+    assert r.status_code == 201
+    cid = r.json()["id"]
+    rows = c.get("/api/projects/p/chapters/1/comments").json()
+    assert rows[0]["body"] == "tighten this" and rows[0]["quote"] == "the pipe"
+    up = c.patch(f"/api/projects/p/chapters/1/comments/{cid}", json={"resolved": True})
+    assert up.json()["resolved"] is True
+    assert c.delete(f"/api/projects/p/chapters/1/comments/{cid}").status_code == 204
+    assert c.get("/api/projects/p/chapters/1/comments").json() == []
+
+
+def test_comment_requires_body(tmp_path):
+    _seed_with_chapter(tmp_path)
+    assert _client(tmp_path).post("/api/projects/p/chapters/1/comments", json={"body": "  "}).status_code == 400
+
+
+def test_ingest_mirrors_content_to_db(tmp_path):
+    _seed_with_chapter(tmp_path, outline="# Beats", draft="draft body")
+    c = _client(tmp_path)
+    c.post("/api/projects/p/chapters/1/final/promote")  # dual-writes final to DB
+    assert dbmod.get_artifact_text("p", 1, "final") == "draft body"
+    c.get("/api/projects/p/chapters/1/stages")  # triggers ingest of outline/draft
+    assert dbmod.get_artifact_text("p", 1, "outline") == "# Beats"
+    assert dbmod.get_artifact_text("p", 1, "draft") == "draft body"

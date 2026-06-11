@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from . import db
 from .models import (
     ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
     ProjectDetail, ProjectSummary,
@@ -176,11 +177,25 @@ class ProjectService:
             "final": proj / "outputs" / "manuscript" / f"chapter_{nnn}_final.md",
         }
 
+    def ensure_chapter(self, project_id: str, number: int) -> None:
+        """Raise ProjectNotFound / ChapterNotFound if the chapter doesn't exist."""
+        s = self._load(project_id)
+        if number not in s.chapters:
+            raise ChapterNotFound(number)
+
+    def get_final_text(self, project_id: str, number: int) -> str | None:
+        return _read(self._stage_paths(project_id, number)["final"])
+
     def chapter_stages(self, project_id: str, number: int) -> ChapterStages:
         s = self._load(project_id)
         c = s.chapters.get(number)
         if c is None:
             raise ChapterNotFound(number)
+        # keep the DB mirror fresh with whatever the engine produced
+        try:
+            db.ingest_project(self.root, project_id)
+        except Exception:  # noqa: BLE001 - ingest is best-effort
+            pass
         p = self._stage_paths(project_id, number)
         return ChapterStages(
             number=number,
@@ -203,6 +218,11 @@ class ProjectService:
         c.word_count = wc
         c.last_modified = datetime.now(timezone.utc).isoformat()
         s.save_state()
+        # DB is the system-of-record for the human-owned Final
+        try:
+            db.upsert_artifact(project_id, number, "final", text)
+        except Exception:  # noqa: BLE001
+            pass
         return wc
 
     def promote_final(self, project_id: str, number: int, force: bool = False) -> str:

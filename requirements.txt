@@ -9,3 +9,4 @@ python-dotenv>=1.0.0        # optional, for .env loading
 # Web UI backend (optional — only needed to run the dashboard)
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
+sqlmodel>=0.0.38             # SQLite persistence layer for the API

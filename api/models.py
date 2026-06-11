@@ -81,3 +81,36 @@ class Job(BaseModel):
     error: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
+
+
+class SnapshotMeta(BaseModel):
+    id: str
+    label: str
+    created_at: str
+    word_count: int
+    source: str
+
+
+class SnapshotText(SnapshotMeta):
+    text: str
+
+
+class CreateSnapshot(BaseModel):
+    label: str = "Manual"
+
+
+class Comment(BaseModel):
+    id: str
+    body: str
+    quote: str = ""
+    created_at: str
+    resolved: bool = False
+
+
+class AddComment(BaseModel):
+    body: str
+    quote: str = ""
+
+
+class UpdateComment(BaseModel):
+    resolved: bool

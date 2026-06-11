@@ -3,12 +3,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from fastapi import Response
 from fastapi.responses import PlainTextResponse
 
+from . import db
 from .jobs import runner
 from .models import (
-    AddCharacter, ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
-    CreateProject, FinalResult, FinalSave, Job, ProjectDetail, ProjectSummary, RunPhase,
+    AddCharacter, AddComment, ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
+    Comment, CreateProject, CreateSnapshot, FinalResult, FinalSave, Job, ProjectDetail,
+    ProjectSummary, RunPhase, SnapshotMeta, SnapshotText, UpdateComment,
 )
 from .services import (
     BadRequest, ChapterNotFound, NoSourceArtifact, ProjectNotFound, ProjectService,
@@ -76,6 +79,100 @@ def export_markdown(project_id: str, svc: ProjectService = Depends(get_service))
         return svc.export_markdown(project_id)
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+# ----- Tier 1: snapshots (version history) — DB-backed
+
+def _ensure_chapter_or_404(svc: ProjectService, project_id: str, number: int):
+    try:
+        svc.ensure_chapter(project_id, number)
+    except (ProjectNotFound, ChapterNotFound) as e:
+        raise _not_found(project_id, number, e)
+
+
+@router.get("/projects/{project_id}/chapters/{number}/snapshots", response_model=list[SnapshotMeta])
+def list_snapshots(project_id: str, number: int, svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    return db.snapshots_list(project_id, number)
+
+
+@router.post("/projects/{project_id}/chapters/{number}/snapshots", response_model=SnapshotMeta, status_code=201)
+def create_snapshot(project_id: str, number: int, body: CreateSnapshot,
+                    svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    text = svc.get_final_text(project_id, number)
+    if text is None:
+        raise HTTPException(status_code=409, detail="No Final to snapshot yet.")
+    return db.snapshot_create(project_id, number, text, body.label, "final")
+
+
+@router.get("/projects/{project_id}/chapters/{number}/snapshots/{snap_id}", response_model=SnapshotText)
+def get_snapshot(project_id: str, number: int, snap_id: str,
+                 svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    snap = db.snapshot_get(project_id, number, snap_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return snap
+
+
+@router.post("/projects/{project_id}/chapters/{number}/snapshots/{snap_id}/restore", response_model=FinalResult)
+def restore_snapshot(project_id: str, number: int, snap_id: str,
+                     svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    snap = db.snapshot_get(project_id, number, snap_id)
+    if snap is None:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    current = svc.get_final_text(project_id, number)
+    if current is not None:
+        db.snapshot_create(project_id, number, current, "Before restore", "final")
+    wc = svc.save_final(project_id, number, snap.text)
+    return FinalResult(final=snap.text, word_count=wc)
+
+
+@router.delete("/projects/{project_id}/chapters/{number}/snapshots/{snap_id}", status_code=204)
+def delete_snapshot(project_id: str, number: int, snap_id: str,
+                    svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    if not db.snapshot_delete(project_id, number, snap_id):
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return Response(status_code=204)
+
+
+# ----- Tier 1: comments / annotations — DB-backed
+
+@router.get("/projects/{project_id}/chapters/{number}/comments", response_model=list[Comment])
+def list_comments(project_id: str, number: int, svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    return db.comments_list(project_id, number)
+
+
+@router.post("/projects/{project_id}/chapters/{number}/comments", response_model=Comment, status_code=201)
+def add_comment(project_id: str, number: int, body: AddComment,
+                svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    if not body.body.strip():
+        raise HTTPException(status_code=400, detail="Comment body is required.")
+    return db.comment_add(project_id, number, body.body, body.quote)
+
+
+@router.patch("/projects/{project_id}/chapters/{number}/comments/{cid}", response_model=Comment)
+def update_comment(project_id: str, number: int, cid: str, body: UpdateComment,
+                   svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    c = db.comment_update(project_id, number, cid, body.resolved)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return c
+
+
+@router.delete("/projects/{project_id}/chapters/{number}/comments/{cid}", status_code=204)
+def delete_comment(project_id: str, number: int, cid: str,
+                   svc: ProjectService = Depends(get_service)):
+    _ensure_chapter_or_404(svc, project_id, number)
+    if not db.comment_delete(project_id, number, cid):
+        raise HTTPException(status_code=404, detail="Comment not found")
+    return Response(status_code=204)
 
 
 @router.get("/projects/{project_id}", response_model=ProjectDetail)
