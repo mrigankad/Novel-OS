@@ -26,6 +26,13 @@ export interface JobStatus {
   job_id: string; kind: string;
   status: "running" | "done" | "error"; error: string | null;
 }
+export interface SnapshotMeta {
+  id: string; label: string; created_at: string; word_count: number; source: string;
+}
+export interface SnapshotText extends SnapshotMeta { text: string; }
+export interface CommentItem {
+  id: string; body: string; quote: string; created_at: string; resolved: boolean;
+}
 
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
@@ -33,7 +40,7 @@ async function get<T>(path: string): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-async function send<T>(path: string, method: "POST" | "PUT", body?: unknown): Promise<T> {
+async function send<T>(path: string, method: "POST" | "PUT" | "PATCH", body?: unknown): Promise<T> {
   const resp = await fetch(`${BASE}${path}`, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -48,6 +55,11 @@ async function send<T>(path: string, method: "POST" | "PUT", body?: unknown): Pr
     throw new Error(detail);
   }
   return resp.json() as Promise<T>;
+}
+
+async function del(path: string): Promise<void> {
+  const resp = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  if (!resp.ok && resp.status !== 204) throw new Error(`${resp.status} ${resp.statusText}`);
 }
 
 export const api = {
@@ -69,5 +81,25 @@ export const api = {
     send<JobStatus>(`/api/projects/${id}/run`, "POST", { stage, params }),
   getJob: (jobId: string) => get<JobStatus>(`/api/jobs/${jobId}`),
   exportUrl: (id: string) => `${BASE}/api/projects/${id}/export`,
+  // snapshots
+  snapshots: (id: string, n: number) =>
+    get<SnapshotMeta[]>(`/api/projects/${id}/chapters/${n}/snapshots`),
+  createSnapshot: (id: string, n: number, label: string) =>
+    send<SnapshotMeta>(`/api/projects/${id}/chapters/${n}/snapshots`, "POST", { label }),
+  getSnapshot: (id: string, n: number, sid: string) =>
+    get<SnapshotText>(`/api/projects/${id}/chapters/${n}/snapshots/${sid}`),
+  restoreSnapshot: (id: string, n: number, sid: string) =>
+    send<FinalResult>(`/api/projects/${id}/chapters/${n}/snapshots/${sid}/restore`, "POST"),
+  deleteSnapshot: (id: string, n: number, sid: string) =>
+    del(`/api/projects/${id}/chapters/${n}/snapshots/${sid}`),
+  // comments
+  comments: (id: string, n: number) =>
+    get<CommentItem[]>(`/api/projects/${id}/chapters/${n}/comments`),
+  addComment: (id: string, n: number, body: string, quote: string) =>
+    send<CommentItem>(`/api/projects/${id}/chapters/${n}/comments`, "POST", { body, quote }),
+  updateComment: (id: string, n: number, cid: string, resolved: boolean) =>
+    send<CommentItem>(`/api/projects/${id}/chapters/${n}/comments/${cid}`, "PATCH", { resolved }),
+  deleteComment: (id: string, n: number, cid: string) =>
+    del(`/api/projects/${id}/chapters/${n}/comments/${cid}`),
 };
 

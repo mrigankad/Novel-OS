@@ -10,6 +10,7 @@ import {
 import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
 import FinalEditor from "../components/FinalEditor";
+import Inspector from "../components/Inspector";
 import { useToast } from "../components/Toaster";
 import { useRunPhase } from "../hooks/useRunPhase";
 
@@ -157,6 +158,10 @@ export default function ChapterView() {
   }
   saveRef.current = save;
 
+  async function flush() {
+    if (dirtyRef.current && busyRef.current == null) await save();
+  }
+
   const canPromote = stages.revised != null || stages.draft != null;
   const promoteFrom = stages.revised != null ? "Revised" : "Draft";
 
@@ -262,6 +267,20 @@ export default function ChapterView() {
           </div>
         </div>
       </div>
+
+      {!focus && (
+        <Inspector
+          id={id}
+          num={num}
+          currentText={finalText}
+          flush={flush}
+          onRestored={(text) => {
+            setFinalText(text);
+            setDirty(false);
+            reload();
+          }}
+        />
+      )}
     </div>
   );
 }

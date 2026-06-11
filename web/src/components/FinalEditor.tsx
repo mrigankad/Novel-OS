@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { type EditorView, type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import ReactMarkdown from "react-markdown";
+import { openSearchPanel } from "@codemirror/search";
 import MarkdownEditor from "./MarkdownEditor";
 import { surround, prefixLine, insertBlock } from "./editorCommands";
 
@@ -128,6 +129,8 @@ export default function FinalEditor(props: {
           <TBtn onClick={() => cmd((v) => prefixLine(v, "## "))} label="Heading">H</TBtn>
           <TBtn onClick={() => cmd((v) => prefixLine(v, "> "))} label="Quote">”</TBtn>
           <TBtn onClick={() => cmd((v) => insertBlock(v, "\n\n---\n\n"))} label="Scene break">✦</TBtn>
+          <div className="mx-1 h-5 w-px bg-paper-line" />
+          <TBtn onClick={() => cmd((v) => openSearchPanel(v))} label="Find & replace">⌕</TBtn>
         </div>
       )}
 

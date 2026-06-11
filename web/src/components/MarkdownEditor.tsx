@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import CodeMirror, { EditorView, type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { search } from "@codemirror/search";
 
 // Editor styled to read like the manuscript page; colors come from CSS vars so it
 // adapts to light/dark automatically.
@@ -46,6 +47,7 @@ const MarkdownEditor = forwardRef<ReactCodeMirrorRef, {
       extensions={[
         markdown({ base: markdownLanguage }),
         EditorView.lineWrapping,
+        search({ top: true }),
         manuscriptTheme,
       ]}
     />
