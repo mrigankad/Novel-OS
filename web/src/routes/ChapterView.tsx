@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
   api,
@@ -40,6 +40,9 @@ export default function ChapterView() {
   const [busy, setBusy] = useState<null | "saving" | "promoting">(null);
   const [focus, setFocus] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
+  const [showBinder, setShowBinder] = useState(true);
+  const [showInspector, setShowInspector] = useState(true);
+  const navigate = useNavigate();
 
   // refs so the unmount/unload/autosave handlers see the latest values
   const dirtyRef = useRef(false);
@@ -118,6 +121,25 @@ export default function ChapterView() {
     return () => clearTimeout(t);
   }, [finalText, dirty]);
 
+  // [ / ] jump between chapters (ignored while typing in an editor/field)
+  useEffect(() => {
+    const isTyping = () => {
+      const el = document.activeElement as HTMLElement | null;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isTyping() || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== "[" && e.key !== "]") return;
+      const ordered = [...siblings].sort((a, b) => a.number - b.number);
+      const idx = ordered.findIndex((c) => c.number === num);
+      if (e.key === "[" && idx > 0) navigate(`/projects/${id}/chapters/${ordered[idx - 1].number}`);
+      if (e.key === "]" && idx >= 0 && idx < ordered.length - 1)
+        navigate(`/projects/${id}/chapters/${ordered[idx + 1].number}`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [siblings, num, id, navigate]);
+
   if (error)
     return (
       <div className="px-10 py-12">
@@ -169,7 +191,7 @@ export default function ChapterView() {
   return (
     <div className="flex h-full">
       {/* Binder */}
-      <nav className={`hidden w-[210px] shrink-0 flex-col border-r border-paper-line bg-paper-card/40 ${focus ? "" : "lg:flex"}`}>
+      <nav className={`w-[210px] shrink-0 flex-col border-r border-paper-line bg-paper-card/40 ${showBinder && !focus ? "flex" : "hidden"}`}>
         <div className="px-5 pb-3 pt-6">
           <Link
             to={`/projects/${id}`}
@@ -219,8 +241,12 @@ export default function ChapterView() {
                 </h1>
               </div>
               <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
-                <StatusPill status={stages.status} />
                 {meta?.pov && <span>POV {meta.pov}</span>}
+                <StatusPill status={stages.status} />
+                <div className="flex overflow-hidden rounded-lg border border-paper-line">
+                  <PanelToggle on={showBinder} onClick={() => setShowBinder((b) => !b)} label="Binder" />
+                  <PanelToggle on={showInspector} onClick={() => setShowInspector((s) => !s)} label="Notes" border />
+                </div>
               </div>
             </div>
             <PipelineFlow stages={stages} selected={selected} onSelect={selectStage} />
@@ -274,7 +300,7 @@ export default function ChapterView() {
         </div>
       </div>
 
-      {!focus && (
+      {showInspector && !focus && (
         <Inspector
           id={id}
           num={num}
@@ -324,6 +350,23 @@ function Empty({ title, hint }: { title: string; hint: string }) {
       <p className="font-display text-[18px] text-ink-text">{title}</p>
       <p className="mt-1.5 text-[13px] leading-relaxed text-ink-muted">{hint}</p>
     </div>
+  );
+}
+
+function PanelToggle({ on, onClick, label, border }: {
+  on: boolean; onClick: () => void; label: string; border?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      title={`Toggle ${label}`}
+      className={`px-2.5 py-1 text-[12px] font-medium transition-colors ${border ? "border-l border-paper-line" : ""} ${
+        on ? "bg-ink/[0.06] text-ink-text" : "text-ink-muted hover:bg-ink/5"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

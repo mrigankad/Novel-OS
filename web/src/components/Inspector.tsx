@@ -19,7 +19,7 @@ export default function Inspector({
 }) {
   const [tab, setTab] = useState<"versions" | "comments">("versions");
   return (
-    <aside className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-l border-paper-line bg-paper-card/40 xl:flex">
+    <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-paper-line bg-paper-card/40">
       <div className="flex border-b border-paper-line">
         {(["versions", "comments"] as const).map((t) => (
           <button
