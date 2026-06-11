@@ -33,6 +33,9 @@ export interface SnapshotText extends SnapshotMeta { text: string; }
 export interface CommentItem {
   id: string; body: string; quote: string; created_at: string; resolved: boolean;
 }
+export interface CharacterSummary {
+  id: string; full_name: string; role: string;
+}
 
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
@@ -74,9 +77,9 @@ export const api = {
     send<FinalResult>(`/api/projects/${id}/chapters/${n}/final`, "PUT", { text }),
   createProject: (body: { title: string; genre: string; author: string }) =>
     send<ProjectSummary>("/api/projects", "POST", body),
+  characters: (id: string) => get<CharacterSummary[]>(`/api/projects/${id}/characters`),
   addCharacter: (id: string, name: string, role: string) =>
-    send<{ id: string; full_name: string; role: string }[]>(
-      `/api/projects/${id}/characters`, "POST", { name, role }),
+    send<CharacterSummary[]>(`/api/projects/${id}/characters`, "POST", { name, role }),
   runPhase: (id: string, stage: string, params: Record<string, unknown> = {}) =>
     send<JobStatus>(`/api/projects/${id}/run`, "POST", { stage, params }),
   getJob: (jobId: string) => get<JobStatus>(`/api/jobs/${jobId}`),

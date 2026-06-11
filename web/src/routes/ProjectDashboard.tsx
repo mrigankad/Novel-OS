@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, type ProjectDetail, type ChapterSummary } from "../api/client";
+import { api, type ProjectDetail, type ChapterSummary, type CharacterSummary } from "../api/client";
 import ChapterBoard from "../components/ChapterBoard";
+import Outliner from "../components/Outliner";
 import Modal, { Field, fieldClass } from "../components/Modal";
 import { useToast } from "../components/Toaster";
 import { useRunPhase } from "../hooks/useRunPhase";
+
+const ROLE_COLOR: Record<string, string> = {
+  protagonist: "var(--color-st-approved)",
+  antagonist: "var(--color-st-planned)",
+  supporting: "var(--color-st-drafted)",
+  minor: "var(--color-ink-muted)",
+};
 
 const ROLES = ["protagonist", "antagonist", "supporting", "minor"];
 
@@ -12,12 +20,15 @@ export default function ProjectDashboard() {
   const { id = "" } = useParams();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [chapters, setChapters] = useState<ChapterSummary[]>([]);
+  const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [charOpen, setCharOpen] = useState(false);
+  const [chapterView, setChapterView] = useState<"board" | "outline">("board");
 
   const load = useCallback(() => {
     api.project(id).then(setProject).catch((e) => setError(String(e)));
     api.chapters(id).then(setChapters).catch((e) => setError(String(e)));
+    api.characters(id).then(setCharacters).catch(() => setCharacters([]));
   }, [id]);
 
   useEffect(() => {
@@ -84,9 +95,6 @@ export default function ProjectDashboard() {
                   busy={runningStage === "plan_chapter"} disabled={isRunning}>
             Plan Chapter {nextChapter}
           </Action>
-          <Action variant="ghost" onClick={() => setCharOpen(true)} disabled={isRunning}>
-            Add Character
-          </Action>
           <a
             href={api.exportUrl(id)}
             download={`${id}.md`}
@@ -103,10 +111,56 @@ export default function ProjectDashboard() {
         </div>
       </header>
 
-      <h2 className="mb-5 font-display text-[22px] font-semibold tracking-tight text-ink-text">
-        Chapters
-      </h2>
-      <ChapterBoard chapters={chapters} />
+      <div className="mb-5 flex items-center justify-between">
+        <h2 className="font-display text-[22px] font-semibold tracking-tight text-ink-text">
+          Chapters
+        </h2>
+        <div className="flex overflow-hidden rounded-lg border border-paper-line">
+          {(["board", "outline"] as const).map((v) => (
+            <button key={v} onClick={() => setChapterView(v)}
+                    className={`px-3.5 py-1.5 text-[12.5px] font-medium capitalize transition-colors ${
+                      chapterView === v ? "bg-ink text-on-ink" : "text-ink-muted hover:bg-ink/5"}`}>
+              {v === "outline" ? "Outliner" : "Board"}
+            </button>
+          ))}
+        </div>
+      </div>
+      {chapterView === "board"
+        ? <ChapterBoard chapters={chapters} />
+        : chapters.length > 0
+          ? <Outliner id={id} chapters={chapters} />
+          : <ChapterBoard chapters={chapters} />}
+
+      {/* Codex — cast */}
+      <div className="mt-12 mb-5 flex items-center justify-between">
+        <h2 className="font-display text-[22px] font-semibold tracking-tight text-ink-text">
+          Cast
+        </h2>
+        <button onClick={() => setCharOpen(true)}
+                className="rounded-lg border border-paper-line px-4 py-2 text-[13px] font-semibold text-ink-text transition-colors hover:bg-ink/5">
+          + Add Character
+        </button>
+      </div>
+      {characters.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-paper-line bg-paper-card/60 px-8 py-10 text-center text-[13.5px] text-ink-muted">
+          No characters yet. Add your protagonist to begin the codex.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {characters.map((ch) => (
+            <div key={ch.id} className="flex items-center gap-3 rounded-xl border border-paper-line bg-paper-card p-4 shadow-[var(--shadow-paper)]">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-[15px] font-semibold text-on-ink"
+                    style={{ backgroundColor: ROLE_COLOR[ch.role] ?? "var(--color-ink-muted)" }}>
+                {ch.full_name.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-display text-[15px] font-medium text-ink-text">{ch.full_name}</p>
+                <p className="text-[12px] capitalize text-ink-muted">{ch.role}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <AddCharacterModal id={id} open={charOpen} onClose={() => setCharOpen(false)} onAdded={load} />
     </div>
