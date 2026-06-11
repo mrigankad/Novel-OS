@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
   api,
@@ -9,6 +9,9 @@ import {
 } from "../api/client";
 import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
+import { useToast } from "../components/Toaster";
+
+const STAGE_KEYS: StageKey[] = ["outline", "draft", "revised", "final"];
 
 function firstPresent(s: ChapterStages): StageKey {
   if (s.final != null) return "final";
@@ -20,18 +23,42 @@ function firstPresent(s: ChapterStages): StageKey {
 export default function ChapterView() {
   const { id = "", n = "0" } = useParams();
   const num = Number(n);
+  const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [meta, setMeta] = useState<ChapterDetail | null>(null);
   const [stages, setStages] = useState<ChapterStages | null>(null);
   const [siblings, setSiblings] = useState<ChapterSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<StageKey>("outline");
 
-  // editable Final buffer
   const [finalText, setFinalText] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [mode, setMode] = useState<"write" | "preview">("write");
   const [busy, setBusy] = useState<null | "saving" | "promoting">(null);
-  const [notice, setNotice] = useState<string | null>(null);
+
+  // refs so the unmount/unload handlers see the latest values
+  const dirtyRef = useRef(false);
+  const textRef = useRef("");
+  dirtyRef.current = dirty;
+  textRef.current = finalText;
+
+  const stageParam = searchParams.get("stage") as StageKey | null;
+  const selected: StageKey =
+    stageParam && STAGE_KEYS.includes(stageParam)
+      ? stageParam
+      : stages
+        ? firstPresent(stages)
+        : "outline";
+
+  function selectStage(s: StageKey) {
+    setSearchParams(
+      (prev) => {
+        prev.set("stage", s);
+        return prev;
+      },
+      { replace: true },
+    );
+  }
 
   useEffect(() => {
     setError(null);
@@ -41,11 +68,27 @@ export default function ChapterView() {
       .stages(id, num)
       .then((s) => {
         setStages(s);
-        setSelected(firstPresent(s));
         setFinalText(s.final ?? "");
         setDirty(false);
       })
       .catch((e) => setError(String(e)));
+  }, [id, num]);
+
+  // Warn on tab close / refresh with unsaved edits
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      // best-effort flush if navigating away mid-edit
+      if (dirtyRef.current) api.saveFinal(id, num, textRef.current).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, num]);
 
   const wordCount = useMemo(
@@ -65,15 +108,15 @@ export default function ChapterView() {
 
   async function promote() {
     setBusy("promoting");
-    setNotice(null);
     try {
       const r = await api.promoteFinal(id, num);
       setFinalText(r.final);
       setDirty(false);
       setStages((s) => (s ? { ...s, final: r.final } : s));
-      setSelected("final");
+      selectStage("final");
+      toast("Promoted to Final", "success");
     } catch (e) {
-      setNotice(String(e instanceof Error ? e.message : e));
+      toast(e instanceof Error ? e.message : String(e), "error");
     } finally {
       setBusy(null);
     }
@@ -81,15 +124,13 @@ export default function ChapterView() {
 
   async function save() {
     setBusy("saving");
-    setNotice(null);
     try {
-      const r = await api.saveFinal(id, num, finalText);
+      const r = await api.saveFinal(id, num, textRef.current);
       setStages((s) => (s ? { ...s, final: r.final } : s));
       setDirty(false);
-      setNotice("Saved");
-      setTimeout(() => setNotice(null), 1800);
+      toast("Saved", "success");
     } catch (e) {
-      setNotice(String(e instanceof Error ? e.message : e));
+      toast(e instanceof Error ? e.message : String(e), "error");
     } finally {
       setBusy(null);
     }
@@ -124,7 +165,7 @@ export default function ChapterView() {
                   : "text-ink-muted hover:bg-ink/5"
               }`}
             >
-              <span className="font-mono text-[11px] text-paper-muted">{c.number}</span>
+              <span className="nums font-mono text-[11px] text-paper-muted">{c.number}</span>
               <span className="truncate">{c.title || "Untitled"}</span>
             </Link>
           ))}
@@ -140,7 +181,7 @@ export default function ChapterView() {
                 <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-amber-deep">
                   Chapter {num}
                 </p>
-                <h1 className="font-display text-[24px] font-semibold tracking-tight text-ink-text">
+                <h1 className="font-display text-[24px] font-semibold tracking-tight text-ink-text text-balance">
                   {meta?.title || stages.status}
                 </h1>
               </div>
@@ -149,7 +190,7 @@ export default function ChapterView() {
                 {meta?.pov && <span>POV {meta.pov}</span>}
               </div>
             </div>
-            <PipelineFlow stages={stages} selected={selected} onSelect={setSelected} />
+            <PipelineFlow stages={stages} selected={selected} onSelect={selectStage} />
           </div>
         </div>
 
@@ -169,8 +210,9 @@ export default function ChapterView() {
                 onPromote={promote}
                 dirty={dirty}
                 busy={busy}
-                notice={notice}
                 wordCount={wordCount}
+                mode={mode}
+                setMode={setMode}
               />
             ) : (
               <ProvenancePane stage={selected} text={stages[selected]} />
@@ -219,10 +261,12 @@ function FinalPane(props: {
   onPromote: () => void;
   dirty: boolean;
   busy: null | "saving" | "promoting";
-  notice: string | null;
   wordCount: number;
+  mode: "write" | "preview";
+  setMode: (m: "write" | "preview") => void;
 }) {
-  const { hasFinal, canPromote, promoteFrom, text, onChange, onSave, onPromote, dirty, busy, notice, wordCount } = props;
+  const { hasFinal, canPromote, promoteFrom, text, onChange, onSave, onPromote,
+    dirty, busy, wordCount, mode, setMode } = props;
 
   if (!hasFinal) {
     return (
@@ -237,24 +281,44 @@ function FinalPane(props: {
           disabled={!canPromote || busy != null}
           className="mt-6 inline-flex items-center rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-paper transition-colors hover:bg-ink-800 disabled:opacity-40"
         >
-          {busy === "promoting" ? "Promoting…" : canPromote ? `Promote ${promoteFrom} → Final` : "Nothing to promote yet"}
+          {busy === "promoting" ? "Promoting…" : canPromote ? `Promote ${promoteFrom} → Final` : "Nothing to Promote Yet"}
         </button>
-        {notice && <p className="mt-3 text-[12.5px] text-red-600">{notice}</p>}
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-deep">
           <span className="h-1.5 w-1.5 rounded-full bg-amber-deep" />
-          Final · editable
+          Final · {mode === "write" ? "editing" : "preview"}
         </div>
         <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
-          <span>{wordCount.toLocaleString()} words</span>
-          {dirty && <span className="text-amber-deep">● unsaved</span>}
-          {notice && <span className={notice === "Saved" ? "text-st-approved" : "text-red-600"}>{notice}</span>}
+          <span className="nums">{wordCount.toLocaleString()} words</span>
+          <span aria-live="polite" className="min-w-[64px] text-right">
+            {busy === "saving" ? (
+              <span className="text-paper-muted">Saving…</span>
+            ) : dirty ? (
+              <span className="text-amber-deep">● Unsaved</span>
+            ) : (
+              <span className="text-st-approved">● Saved</span>
+            )}
+          </span>
+          {/* Write / Preview segmented control */}
+          <div className="flex overflow-hidden rounded-lg border border-paper-line">
+            {(["write", "preview"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1 text-[12.5px] font-medium capitalize transition-colors ${
+                  mode === m ? "bg-ink text-paper" : "text-ink-muted hover:bg-ink/5"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
           <button
             onClick={onSave}
             disabled={!dirty || busy != null}
@@ -264,12 +328,24 @@ function FinalPane(props: {
           </button>
         </div>
       </div>
-      <textarea
-        value={text}
-        onChange={(e) => onChange(e.target.value)}
-        spellCheck
-        className="prose-manuscript min-h-[60vh] w-full resize-y rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line outline-none focus:ring-amber/60"
-      />
+
+      {mode === "write" ? (
+        <label className="block">
+          <span className="sr-only">Final chapter text</span>
+          <textarea
+            value={text}
+            onChange={(e) => onChange(e.target.value)}
+            spellCheck
+            className="prose-manuscript min-h-[60vh] w-full resize-y rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line"
+          />
+        </label>
+      ) : (
+        <article className="min-h-[60vh] rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
+          <div className="prose-manuscript">
+            <ReactMarkdown>{text || "*Nothing to preview yet.*"}</ReactMarkdown>
+          </div>
+        </article>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ export default function ProjectCard({ p }: { p: ProjectSummary }) {
   return (
     <Link
       to={`/projects/${p.id}`}
-      className="group relative flex flex-col overflow-hidden rounded-xl border border-paper-line bg-paper-card shadow-[var(--shadow-paper)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[var(--shadow-lift)]"
+      className="group relative flex flex-col overflow-hidden rounded-xl border border-paper-line bg-paper-card shadow-[var(--shadow-paper)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-1 hover:shadow-[var(--shadow-lift)]"
     >
       {/* book spine */}
       <span className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-amber to-amber-deep" />
@@ -18,7 +18,7 @@ export default function ProjectCard({ p }: { p: ProjectSummary }) {
           {p.title}
         </h3>
         <div className="mt-auto flex items-center justify-between pt-6">
-          <span className="text-[13px] font-medium text-ink-muted">{p.chapter_count} chapters</span>
+          <span className="nums text-[13px] font-medium text-ink-muted">{p.chapter_count} chapters</span>
           <StatusPill status={p.status} />
         </div>
       </div>

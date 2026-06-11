@@ -22,7 +22,7 @@ export default function ChapterBoard({ chapters }: { chapters: ChapterSummary[] 
         <Link
           key={c.number}
           to={`/projects/${id}/chapters/${c.number}`}
-          className="group relative flex flex-col rounded-xl border border-paper-line bg-paper-card p-5 shadow-[var(--shadow-paper)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]"
+          className="group relative flex flex-col rounded-xl border border-paper-line bg-paper-card p-5 shadow-[var(--shadow-paper)] transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-lift)]"
         >
           <div className="flex items-start justify-between">
             <span className="font-display text-[13px] font-semibold uppercase tracking-[0.12em] text-amber-deep">
@@ -34,7 +34,7 @@ export default function ChapterBoard({ chapters }: { chapters: ChapterSummary[] 
             {c.title || "Untitled"}
           </span>
           <div className="mt-5 flex items-center gap-3 text-[12.5px] text-ink-muted">
-            <span>{c.word_count.toLocaleString()} words</span>
+            <span className="nums">{c.word_count.toLocaleString()} words</span>
             {c.pov && (
               <>
                 <span className="text-paper-muted">·</span>

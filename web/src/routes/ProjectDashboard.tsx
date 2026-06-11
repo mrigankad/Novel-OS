@@ -63,7 +63,7 @@ export default function ProjectDashboard() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-display text-[26px] font-semibold leading-none text-ink-text">
+      <div className="nums font-display text-[26px] font-semibold leading-none text-ink-text">
         {value}
       </div>
       <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">

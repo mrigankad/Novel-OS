@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { api, type ProjectSummary } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
+
+const grid = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
+const card = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const } },
+};
 
 export default function ProjectsList() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -46,11 +53,18 @@ export default function ProjectsList() {
       )}
 
       {projects && projects.length > 0 && (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <motion.div
+          variants={grid}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+        >
           {projects.map((p) => (
-            <ProjectCard key={p.id} p={p} />
+            <motion.div key={p.id} variants={card}>
+              <ProjectCard p={p} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

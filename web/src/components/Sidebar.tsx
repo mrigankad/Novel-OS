@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 
 function OwlMark() {
   return (
@@ -17,16 +18,19 @@ function OwlMark() {
 export default function Sidebar() {
   return (
     <aside className="flex w-[244px] shrink-0 flex-col bg-ink text-[#c8cedd]">
-      <div className="flex items-center gap-2.5 px-5 pt-6 pb-5">
-        <OwlMark />
-        <div className="leading-tight">
-          <div className="font-display text-[19px] font-semibold tracking-tight text-white">
-            Novel OS
-          </div>
-          <div className="text-[10.5px] uppercase tracking-[0.18em] text-amber/80">
-            Manuscript Desk
+      <div className="flex items-center justify-between px-5 pt-6 pb-5">
+        <div className="flex items-center gap-2.5">
+          <OwlMark />
+          <div className="leading-tight">
+            <div className="font-display text-[19px] font-semibold tracking-tight text-white">
+              Novel OS
+            </div>
+            <div className="text-[10.5px] uppercase tracking-[0.18em] text-amber/90">
+              Manuscript Desk
+            </div>
           </div>
         </div>
+        <ThemeToggle />
       </div>
 
       <div className="mx-5 mb-4 h-px bg-ink-line" />
@@ -41,7 +45,7 @@ export default function Sidebar() {
             “Write novels like a build pipeline.”
           </p>
         </div>
-        <p className="mt-3 text-[10.5px] tracking-wide text-[#566079]">
+        <p className="mt-3 text-[10.5px] tracking-wide text-[#8b93a8]">
           v0.2.0 · local
         </p>
       </div>
@@ -61,7 +65,7 @@ function SideLink({ to, label, hint }: { to: string; label: string; hint: string
       }
     >
       <span className="text-[13.5px] font-medium">{label}</span>
-      <span className="text-[11px] text-[#717b94]">{hint}</span>
+      <span className="text-[11px] text-[#9aa3b8]">{hint}</span>
     </NavLink>
   );
 }
