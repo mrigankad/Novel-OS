@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
+import FinalEditor from "../components/FinalEditor";
 import { useToast } from "../components/Toaster";
 import { useRunPhase } from "../hooks/useRunPhase";
 
@@ -34,14 +35,17 @@ export default function ChapterView() {
 
   const [finalText, setFinalText] = useState("");
   const [dirty, setDirty] = useState(false);
-  const [mode, setMode] = useState<"write" | "preview">("write");
   const [busy, setBusy] = useState<null | "saving" | "promoting">(null);
+  const [focus, setFocus] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  // refs so the unmount/unload handlers see the latest values
+  // refs so the unmount/unload/autosave handlers see the latest values
   const dirtyRef = useRef(false);
   const textRef = useRef("");
+  const busyRef = useRef<typeof busy>(null);
   dirtyRef.current = dirty;
   textRef.current = finalText;
+  busyRef.current = busy;
 
   const stageParam = searchParams.get("stage") as StageKey | null;
   const selected: StageKey =
@@ -102,10 +106,15 @@ export default function ChapterView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, num]);
 
-  const wordCount = useMemo(
-    () => (finalText.trim() ? finalText.trim().split(/\s+/).length : 0),
-    [finalText],
-  );
+  // Debounced autosave — the dirty guard is just a backstop now.
+  const saveRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => {
+      if (dirtyRef.current && busyRef.current == null) saveRef.current();
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [finalText, dirty]);
 
   if (error)
     return (
@@ -139,13 +148,14 @@ export default function ChapterView() {
       const r = await api.saveFinal(id, num, textRef.current);
       setStages((s) => (s ? { ...s, final: r.final } : s));
       setDirty(false);
-      toast("Saved", "success");
+      setLastSaved("just now");
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), "error");
     } finally {
       setBusy(null);
     }
   }
+  saveRef.current = save;
 
   const canPromote = stages.revised != null || stages.draft != null;
   const promoteFrom = stages.revised != null ? "Revised" : "Draft";
@@ -153,7 +163,7 @@ export default function ChapterView() {
   return (
     <div className="flex h-full">
       {/* Binder */}
-      <nav className="hidden w-[210px] shrink-0 flex-col border-r border-paper-line bg-paper-card/40 lg:flex">
+      <nav className={`hidden w-[210px] shrink-0 flex-col border-r border-paper-line bg-paper-card/40 ${focus ? "" : "lg:flex"}`}>
         <div className="px-5 pb-3 pt-6">
           <Link
             to={`/projects/${id}`}
@@ -185,6 +195,7 @@ export default function ChapterView() {
 
       {/* Pipeline editor */}
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {!focus && (
         <div className="border-b border-paper-line bg-paper-card/30 px-8 py-5">
           <div className="mx-auto max-w-[760px]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -223,11 +234,12 @@ export default function ChapterView() {
             </div>
           </div>
         </div>
+        )}
 
-        <div className="px-8 py-10">
-          <div className="mx-auto max-w-[760px]">
+        <div className={focus ? "px-6 py-8" : "px-8 py-10"}>
+          <div className={`mx-auto ${selected === "final" ? "max-w-[960px]" : "max-w-[760px]"}`}>
             {selected === "final" ? (
-              <FinalPane
+              <FinalEditor
                 hasFinal={stages.final != null}
                 canPromote={canPromote}
                 promoteFrom={promoteFrom}
@@ -240,9 +252,9 @@ export default function ChapterView() {
                 onPromote={promote}
                 dirty={dirty}
                 busy={busy}
-                wordCount={wordCount}
-                mode={mode}
-                setMode={setMode}
+                lastSaved={lastSaved}
+                focus={focus}
+                onToggleFocus={() => setFocus((f) => !f)}
               />
             ) : (
               <ProvenancePane stage={selected} text={stages[selected]} />
@@ -278,105 +290,6 @@ function ProvenancePane({ stage, text }: { stage: StageKey; text: string | null 
         <ReactMarkdown>{text}</ReactMarkdown>
       </div>
     </article>
-  );
-}
-
-function FinalPane(props: {
-  hasFinal: boolean;
-  canPromote: boolean;
-  promoteFrom: string;
-  text: string;
-  onChange: (v: string) => void;
-  onSave: () => void;
-  onPromote: () => void;
-  dirty: boolean;
-  busy: null | "saving" | "promoting";
-  wordCount: number;
-  mode: "write" | "preview";
-  setMode: (m: "write" | "preview") => void;
-}) {
-  const { hasFinal, canPromote, promoteFrom, text, onChange, onSave, onPromote,
-    dirty, busy, wordCount, mode, setMode } = props;
-
-  if (!hasFinal) {
-    return (
-      <div className="rounded-md bg-paper-card px-11 py-14 text-center shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
-        <p className="font-display text-[20px] text-ink-text">No Final yet</p>
-        <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ink-muted">
-          The Final is the human-reviewed, canonical chapter. Promote the latest AI stage to
-          start reviewing — your drafts stay untouched as provenance.
-        </p>
-        <button
-          onClick={onPromote}
-          disabled={!canPromote || busy != null}
-          className="mt-6 inline-flex items-center rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-on-ink transition-colors hover:bg-ink-800 disabled:opacity-40"
-        >
-          {busy === "promoting" ? "Promoting…" : canPromote ? `Promote ${promoteFrom} → Final` : "Nothing to Promote Yet"}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-deep">
-          <span className="h-1.5 w-1.5 rounded-full bg-amber-deep" />
-          Final · {mode === "write" ? "editing" : "preview"}
-        </div>
-        <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
-          <span className="nums">{wordCount.toLocaleString()} words</span>
-          <span aria-live="polite" className="min-w-[64px] text-right">
-            {busy === "saving" ? (
-              <span className="text-paper-muted">Saving…</span>
-            ) : dirty ? (
-              <span className="text-amber-deep">● Unsaved</span>
-            ) : (
-              <span className="text-st-approved">● Saved</span>
-            )}
-          </span>
-          {/* Write / Preview segmented control */}
-          <div className="flex overflow-hidden rounded-lg border border-paper-line">
-            {(["write", "preview"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={`px-3 py-1 text-[12.5px] font-medium capitalize transition-colors ${
-                  mode === m ? "bg-ink text-on-ink" : "text-ink-muted hover:bg-ink/5"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={onSave}
-            disabled={!dirty || busy != null}
-            className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-semibold text-on-ink transition-colors hover:bg-ink-800 disabled:opacity-40"
-          >
-            {busy === "saving" ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-
-      {mode === "write" ? (
-        <label className="block">
-          <span className="sr-only">Final chapter text</span>
-          <textarea
-            value={text}
-            onChange={(e) => onChange(e.target.value)}
-            spellCheck
-            className="prose-manuscript min-h-[60vh] w-full resize-y rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line"
-          />
-        </label>
-      ) : (
-        <article className="min-h-[60vh] rounded-md bg-paper-card px-11 py-12 shadow-[var(--shadow-paper)] ring-1 ring-paper-line">
-          <div className="prose-manuscript">
-            <ReactMarkdown>{text || "*Nothing to preview yet.*"}</ReactMarkdown>
-          </div>
-        </article>
-      )}
-    </div>
   );
 }
 

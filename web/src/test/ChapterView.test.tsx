@@ -2,6 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { vi } from "vitest";
+
+// CodeMirror doesn't render meaningfully in jsdom — swap it for a plain textarea.
+vi.mock("../components/MarkdownEditor", () => ({
+  default: (props: { value: string; onChange: (v: string) => void }) => (
+    <textarea value={props.value} onChange={(e) => props.onChange(e.target.value)} />
+  ),
+}));
+
 import ChapterView from "../routes/ChapterView";
 import * as client from "../api/client";
 

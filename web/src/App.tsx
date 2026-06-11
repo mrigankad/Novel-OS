@@ -1,10 +1,13 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Sidebar from "./components/Sidebar";
 import { ToastProvider } from "./components/Toaster";
-import ProjectsList from "./routes/ProjectsList";
-import ProjectDashboard from "./routes/ProjectDashboard";
-import ChapterView from "./routes/ChapterView";
+
+// Code-split routes so the CodeMirror editor only loads on the chapter view.
+const ProjectsList = lazy(() => import("./routes/ProjectsList"));
+const ProjectDashboard = lazy(() => import("./routes/ProjectDashboard"));
+const ChapterView = lazy(() => import("./routes/ChapterView"));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -18,11 +21,13 @@ function AnimatedRoutes() {
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         className="h-full"
       >
-        <Routes location={location}>
-          <Route path="/" element={<ProjectsList />} />
-          <Route path="/projects/:id" element={<ProjectDashboard />} />
-          <Route path="/projects/:id/chapters/:n" element={<ChapterView />} />
-        </Routes>
+        <Suspense fallback={<div className="px-10 py-12 text-ink-muted">Loading…</div>}>
+          <Routes location={location}>
+            <Route path="/" element={<ProjectsList />} />
+            <Route path="/projects/:id" element={<ProjectDashboard />} />
+            <Route path="/projects/:id/chapters/:n" element={<ChapterView />} />
+          </Routes>
+        </Suspense>
       </motion.div>
     </AnimatePresence>
   );
