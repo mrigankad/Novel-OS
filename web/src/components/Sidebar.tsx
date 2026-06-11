@@ -36,6 +36,13 @@ export default function Sidebar() {
       <div className="mx-5 mb-4 h-px bg-ink-line" />
 
       <nav className="flex flex-col gap-0.5 px-3">
+        <button
+          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+          className="mb-1 flex items-center justify-between rounded-lg px-3 py-2 text-[13px] text-[#aab2c4] transition-colors hover:bg-ink-800"
+        >
+          <span>Search…</span>
+          <kbd className="rounded border border-ink-line px-1.5 py-0.5 text-[10px] text-[#9aa3b8]">⌘K</kbd>
+        </button>
         <SideLink to="/" label="Library" hint="All projects" />
       </nav>
 

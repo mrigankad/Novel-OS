@@ -11,6 +11,7 @@ import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
 import FinalEditor from "../components/FinalEditor";
 import Inspector from "../components/Inspector";
+import Breadcrumbs from "../components/Breadcrumbs";
 import { useToast } from "../components/Toaster";
 import { useRunPhase } from "../hooks/useRunPhase";
 
@@ -203,6 +204,11 @@ export default function ChapterView() {
         {!focus && (
         <div className="border-b border-paper-line bg-paper-card/30 px-8 py-5">
           <div className="mx-auto max-w-[760px]">
+            <Breadcrumbs items={[
+              { label: "Library", to: "/" },
+              { label: id.replace(/-/g, " "), to: `/projects/${id}` },
+              { label: `Chapter ${num}` },
+            ]} />
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-amber-deep">

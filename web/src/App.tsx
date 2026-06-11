@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import Sidebar from "./components/Sidebar";
+import CommandPalette from "./components/CommandPalette";
 import { ToastProvider } from "./components/Toaster";
 
 // Code-split routes so the CodeMirror editor only loads on the chapter view.
@@ -39,6 +40,7 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <ToastProvider>
           <a href="#main" className="skip-link">Skip to content</a>
+          <CommandPalette />
           <div className="flex h-full">
             <Sidebar />
             <main id="main" className="h-full flex-1 overflow-y-auto">
