@@ -56,3 +56,28 @@ class FinalSave(BaseModel):
 class FinalResult(BaseModel):
     final: str
     word_count: int
+
+
+class CreateProject(BaseModel):
+    title: str
+    genre: str = ""
+    author: str = ""
+
+
+class AddCharacter(BaseModel):
+    name: str
+    role: str = "supporting"
+
+
+class RunPhase(BaseModel):
+    stage: str
+    params: dict = {}
+
+
+class Job(BaseModel):
+    job_id: str
+    kind: str
+    status: str
+    error: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None

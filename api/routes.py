@@ -3,12 +3,15 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from fastapi.responses import PlainTextResponse
+
+from .jobs import runner
 from .models import (
-    ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
-    FinalResult, FinalSave, ProjectDetail, ProjectSummary,
+    AddCharacter, ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
+    CreateProject, FinalResult, FinalSave, Job, ProjectDetail, ProjectSummary, RunPhase,
 )
 from .services import (
-    ChapterNotFound, NoSourceArtifact, ProjectNotFound, ProjectService,
+    BadRequest, ChapterNotFound, NoSourceArtifact, ProjectNotFound, ProjectService,
 )
 
 router = APIRouter(prefix="/api")
@@ -27,6 +30,52 @@ def health() -> dict:
 @router.get("/projects", response_model=list[ProjectSummary])
 def list_projects(svc: ProjectService = Depends(get_service)):
     return svc.list_projects()
+
+
+@router.post("/projects", response_model=ProjectSummary, status_code=201)
+def create_project(body: CreateProject, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.create_project(body.title, body.genre, body.author)
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/projects/{project_id}/characters", response_model=list[CharacterSummary], status_code=201)
+def add_character(project_id: str, body: AddCharacter, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.add_character(project_id, body.name, body.role)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/projects/{project_id}/run", response_model=Job, status_code=202)
+def run_phase(project_id: str, body: RunPhase, svc: ProjectService = Depends(get_service)):
+    try:
+        fn = svc.make_phase_job(project_id, body.stage, body.params)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    job_id = runner.submit(body.stage, fn, meta={"project_id": project_id})
+    return runner.get(job_id)
+
+
+@router.get("/jobs/{job_id}", response_model=Job)
+def get_job(job_id: str):
+    job = runner.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.get("/projects/{project_id}/export", response_class=PlainTextResponse)
+def export_markdown(project_id: str, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.export_markdown(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
 
 @router.get("/projects/{project_id}", response_model=ProjectDetail)

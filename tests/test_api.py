@@ -197,3 +197,97 @@ def test_save_final_404_for_missing_chapter(tmp_path):
     _seed_project(tmp_path, "p", "P", "Drama")
     assert _client(tmp_path).put("/api/projects/p/chapters/9/final",
                                  json={"text": "x"}).status_code == 404
+
+
+# --- Tier 0: create / run / export -------------------------------------------
+
+import time
+
+import api.services as services
+
+
+def test_create_project_then_lists(tmp_path):
+    c = _client(tmp_path)
+    resp = c.post("/api/projects", json={"title": "The Drowned City", "genre": "Fantasy"})
+    assert resp.status_code == 201
+    assert resp.json()["id"] == "the-drowned-city"
+    ids = [p["id"] for p in c.get("/api/projects").json()]
+    assert "the-drowned-city" in ids
+
+
+def test_create_project_requires_title(tmp_path):
+    assert _client(tmp_path).post("/api/projects", json={"title": "  "}).status_code == 400
+
+
+def test_add_character(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    resp = _client(tmp_path).post("/api/projects/p/characters",
+                                  json={"name": "Mara Vale", "role": "protagonist"})
+    assert resp.status_code == 201
+    assert any(c["full_name"] == "Mara Vale" for c in resp.json())
+
+
+def _wait_job(client, job_id, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        j = client.get(f"/api/jobs/{job_id}").json()
+        if j["status"] != "running":
+            return j
+        time.sleep(0.03)
+    return client.get(f"/api/jobs/{job_id}").json()
+
+
+class _FakeOrch:
+    calls: list = []
+
+    def __init__(self, _dir):
+        pass
+
+    def write_chapter(self, n):
+        _FakeOrch.calls.append(("write", n))
+
+
+def test_run_phase_job_lifecycle(tmp_path, monkeypatch):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    _FakeOrch.calls = []
+    monkeypatch.setattr(services, "build_orchestrator", lambda d: _FakeOrch(d))
+    c = _client(tmp_path)
+    resp = c.post("/api/projects/p/run", json={"stage": "write", "params": {"number": 1}})
+    assert resp.status_code == 202
+    job = _wait_job(c, resp.json()["job_id"])
+    assert job["status"] == "done"
+    assert _FakeOrch.calls == [("write", 1)]
+
+
+def test_run_unknown_stage_400(tmp_path):
+    _seed_project(tmp_path, "p", "P", "Drama")
+    assert _client(tmp_path).post("/api/projects/p/run",
+                                  json={"stage": "nope", "params": {}}).status_code == 400
+
+
+def test_run_job_captures_error(tmp_path, monkeypatch):
+    _seed_project(tmp_path, "p", "P", "Drama")
+
+    def boom(_dir):
+        class O:
+            def write_chapter(self, n):
+                raise RuntimeError("LLM exploded")
+        return O()
+
+    monkeypatch.setattr(services, "build_orchestrator", boom)
+    c = _client(tmp_path)
+    job_id = c.post("/api/projects/p/run", json={"stage": "write", "params": {"number": 1}}).json()["job_id"]
+    job = _wait_job(c, job_id)
+    assert job["status"] == "error"
+    assert "LLM exploded" in job["error"]
+
+
+def test_export_prefers_final(tmp_path):
+    chapters = {"1": {"number": 1, "title": "One", "status": "complete",
+                      "word_count": 2, "pov_character": ""}}
+    _seed_project(tmp_path, "p", "Compiled Tale", "Drama", chapters=chapters)
+    _seed_chapter_files(tmp_path, "p", 1, draft="DRAFT body", final="FINAL body")
+    text = _client(tmp_path).get("/api/projects/p/export").text
+    assert "Compiled Tale" in text
+    assert "FINAL body" in text
+    assert "DRAFT body" not in text

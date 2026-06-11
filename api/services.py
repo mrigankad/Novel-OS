@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from .models import (
     ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
@@ -27,6 +28,34 @@ class ChapterNotFound(Exception):
 class NoSourceArtifact(Exception):
     """Raised when promoting to Final but no draft/revised exists to promote."""
     pass
+
+
+class BadRequest(Exception):
+    pass
+
+
+def build_orchestrator(project_dir: str):
+    """Construct a NovelOrchestrator for a project folder. Patchable in tests."""
+    from orchestrator import NovelOrchestrator  # noqa: E402 (lazy: heavy import)
+    return NovelOrchestrator(project_dir)
+
+
+# stage -> how to invoke it on an orchestrator with the given params
+PHASES: dict[str, Callable[[object, dict], object]] = {
+    "plan_outline": lambda o, p: o.plan_outline(int(p.get("chapters", 12)), int(p.get("words", 24000))),
+    "plan_chapter": lambda o, p: o.plan_chapter(int(p["number"]), p.get("summary", ""), p.get("pov", "")),
+    "write": lambda o, p: o.write_chapter(int(p["number"])),
+    "edit": lambda o, p: o.edit_chapter(int(p["number"]), p.get("mode", "line")),
+    "validate": lambda o, p: o.validate_chapter(int(p["number"])),
+    "approve": lambda o, p: o.approve_chapter(int(p["number"])),
+}
+
+
+def _slugify(text: str) -> str:
+    out = "".join(c.lower() if c.isalnum() else "-" for c in text.strip())
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out.strip("-") or "untitled"
 
 
 def _read(path: Path) -> str | None:
@@ -189,3 +218,60 @@ class ProjectService:
 
     def save_final(self, project_id: str, number: int, text: str) -> int:
         return self._commit_final(project_id, number, text)
+
+    # ----- Tier 0: create / edit the world
+
+    def create_project(self, title: str, genre: str, author: str = "") -> ProjectSummary:
+        title = title.strip()
+        if not title:
+            raise BadRequest("Title is required.")
+        slug = _slugify(title)
+        folder = self.root / slug
+        n = 2
+        while (folder / "outputs" / "state" / "story_state.json").exists():
+            folder = self.root / f"{slug}-{n}"
+            n += 1
+        folder.mkdir(parents=True, exist_ok=True)
+        build_orchestrator(str(folder)).init_project(title, genre, author)
+        return ProjectSummary(
+            id=folder.name, title=title, genre=genre, chapter_count=0, status="in_progress",
+        )
+
+    def add_character(self, project_id: str, name: str, role: str) -> list[CharacterSummary]:
+        self._project_dir(project_id)  # 404 if missing
+        if not name.strip():
+            raise BadRequest("Character name is required.")
+        build_orchestrator(str(self.root / project_id)).add_character(name.strip(), role)
+        return self.list_characters(project_id)
+
+    def make_phase_job(self, project_id: str, stage: str, params: dict) -> Callable[[], None]:
+        """Validate inputs and return a 0-arg callable the JobRunner can run."""
+        self._project_dir(project_id)  # 404 if missing
+        if stage not in PHASES:
+            raise BadRequest(f"Unknown stage '{stage}'. Expected one of {sorted(PHASES)}.")
+        project_dir = str(self.root / project_id)
+
+        def fn() -> None:
+            orch = build_orchestrator(project_dir)
+            PHASES[stage](orch, params)
+
+        return fn
+
+    def export_markdown(self, project_id: str) -> str:
+        """Compile the manuscript, preferring the human-reviewed Final per chapter."""
+        s = self._load(project_id)
+        lines = [
+            f"# {s.metadata.get('title', 'Untitled')}",
+            "",
+            f"*{s.metadata.get('genre', 'Fiction')}*",
+            "",
+            "---",
+            "",
+        ]
+        for c in sorted(s.chapters.values(), key=lambda c: c.number):
+            p = self._stage_paths(project_id, c.number)
+            text = _read(p["final"]) or _read(p["revised"]) or _read(p["draft"])
+            if text:
+                lines.append(text)
+                lines.append("\n\n---\n\n")
+        return "\n".join(lines)
