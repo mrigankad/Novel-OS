@@ -17,6 +17,9 @@
   --color-ink-muted: #574f3c;    /* ~6:1   (was #6b6657, failed) */
   --color-paper-muted: #756b53;  /* ~4.7:1 (was #9c9684, failed) */
 
+  /* Text that always sits on a dark (ink) surface — stays light in BOTH themes */
+  --color-on-ink: #f6f1e7;
+
   /* Accent */
   --color-amber: #f4b740;
   --color-amber-deep: #9a6a12;   /* darkened so it passes as small text (~4.8:1) */
@@ -56,6 +59,11 @@
   --color-paper-muted: #8b8270;
   --color-amber-deep: #e0a13a;
   --color-focus: #6aa0e0;
+  /* brighter status hues so pills read on dark cards */
+  --color-st-drafted: #6aa0e0;
+  --color-st-planned: #d3a44e;
+  --color-st-approved: #5fb784;
+  --color-st-edited: #a98fd0;
 }
 
 @layer base {
@@ -107,12 +115,21 @@
 
 @layer components {
   .skip-link {
-    @apply absolute left-3 top-3 z-50 -translate-y-16 rounded-md bg-ink px-4 py-2 text-[13px] font-semibold text-paper transition-transform focus-visible:translate-y-0;
+    @apply absolute left-3 top-3 z-50 -translate-y-16 rounded-md bg-ink px-4 py-2 text-[13px] font-semibold text-on-ink transition-transform focus-visible:translate-y-0;
   }
   .status-pill {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider;
+    --pill: var(--color-ink-muted);
+    color: var(--pill);
+    background: color-mix(in srgb, var(--pill) 18%, transparent);
   }
   .status-pill::before { content: ""; @apply h-1.5 w-1.5 rounded-full bg-current; }
+  .status-pill[data-status="planned"] { --pill: var(--color-st-planned); }
+  .status-pill[data-status="drafted"] { --pill: var(--color-st-drafted); }
+  .status-pill[data-status="editing"], .status-pill[data-status="edited"] { --pill: var(--color-st-edited); }
+  .status-pill[data-status="validated"],
+  .status-pill[data-status="complete"],
+  .status-pill[data-status="approved"] { --pill: var(--color-st-approved); }
 
   .prose-manuscript { font-family: var(--font-prose); font-size: 1.075rem; line-height: 1.85; color: var(--color-ink-text); }
   .prose-manuscript p { margin: 0 0 1.1em; text-align: justify; hyphens: auto; }

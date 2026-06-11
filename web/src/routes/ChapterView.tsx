@@ -279,7 +279,7 @@ function FinalPane(props: {
         <button
           onClick={onPromote}
           disabled={!canPromote || busy != null}
-          className="mt-6 inline-flex items-center rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-paper transition-colors hover:bg-ink-800 disabled:opacity-40"
+          className="mt-6 inline-flex items-center rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-on-ink transition-colors hover:bg-ink-800 disabled:opacity-40"
         >
           {busy === "promoting" ? "Promoting…" : canPromote ? `Promote ${promoteFrom} → Final` : "Nothing to Promote Yet"}
         </button>
@@ -312,7 +312,7 @@ function FinalPane(props: {
                 key={m}
                 onClick={() => setMode(m)}
                 className={`px-3 py-1 text-[12.5px] font-medium capitalize transition-colors ${
-                  mode === m ? "bg-ink text-paper" : "text-ink-muted hover:bg-ink/5"
+                  mode === m ? "bg-ink text-on-ink" : "text-ink-muted hover:bg-ink/5"
                 }`}
               >
                 {m}
@@ -322,7 +322,7 @@ function FinalPane(props: {
           <button
             onClick={onSave}
             disabled={!dirty || busy != null}
-            className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-semibold text-paper transition-colors hover:bg-ink-800 disabled:opacity-40"
+            className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-semibold text-on-ink transition-colors hover:bg-ink-800 disabled:opacity-40"
           >
             {busy === "saving" ? "Saving…" : "Save"}
           </button>
