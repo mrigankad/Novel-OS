@@ -24,6 +24,8 @@ from llm_client import LLMClient, LLMError
 from state_parser import ingest_agent_output
 from continuity_engine import run_all as run_continuity_checks, summarize as summarize_findings, to_context_block
 
+_REVISE_STATUSES = frozenset({"drafted", "editing", "edited", "validated"})
+
 
 class NovelOrchestrator:
     """
@@ -437,9 +439,8 @@ later expand into prose. This is a PLANNING artifact.
                 prompt += f"emotion: {char.emotional_state or 'Unknown'}, "
                 prompt += f"arc: {char.arc_stage} ({char.arc_progress}%)\n"
 
-        prompt += "\n### Active Plot Threads\n"
-        for thread in active_threads[:5]:
-            prompt += f"- **{thread.name}**: {thread.description[:100]}...\n"
+        from plot_prompts import format_plot_threads_block  # noqa: WPS433
+        prompt += "\n" + format_plot_threads_block(active_threads, max_threads=8)
 
         prompt += f"""
 ## Required Output Format
@@ -499,10 +500,9 @@ Write the beat-sheet now. Outline only — no prose.
                 prompt += f"- Emotional State: {char.emotional_state or 'Unknown'}\n"
                 prompt += f"- Arc Stage: {char.arc_stage} ({char.arc_progress}%)\n"
         
-        prompt += "\n### Active Plot Threads\n"
-        for thread in active_threads[:5]:  # Top 5 active threads
-            prompt += f"- **{thread.name}**: {thread.description[:100]}...\n"
-        
+        from plot_prompts import format_plot_threads_block  # noqa: WPS433
+        prompt += "\n" + format_plot_threads_block(active_threads, max_threads=8)
+
         prompt += f"""
 ### Previous Chapter Recap
 [Summary of Chapter {chapter.number - 1}]
@@ -599,8 +599,10 @@ Write the beat-sheet now. Outline only — no prose.
         print(f"   Next: Run 'edit chapter --number {chapter_number}'")
     
     # ===== Editing Phase =====
-    
-    def edit_chapter(self, chapter_number: int, mode: str = "line", dry_run: bool = False):
+
+    def edit_chapter(
+        self, chapter_number: int, mode: str = "line", instructions: str = "", dry_run: bool = False,
+    ):
         """Call the Editor agent to revise the chapter."""
         print(f"\n🔍 EDITING Chapter {chapter_number} (Mode: {mode})")
 
@@ -608,19 +610,29 @@ Write the beat-sheet now. Outline only — no prose.
         if not chapter:
             print(f"❌ Chapter {chapter_number} not found.")
             return
-        if chapter.status not in ['drafted', 'editing', 'edited']:
-            print(f"❌ Chapter {chapter_number} has no draft to edit.")
+        if chapter.status not in _REVISE_STATUSES:
+            print(f"❌ Chapter {chapter_number} is not ready to revise (status: {chapter.status}).")
+            print("   Reopen for revision if approved, or ensure a draft/revised exists.")
             return
 
-        draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
-        if not draft_path.exists():
-            print(f"❌ Draft file not found: {draft_path}")
-            return
-
-        draft_text = draft_path.read_text(encoding='utf-8')
-        edit_prompt = self._generate_edit_prompt(chapter, draft_text, mode)
-        edit_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_edit_prompt.md"
         revised_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_revised.md"
+        draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
+        if revised_path.exists():
+            source_path = revised_path
+            source_label = "revised"
+        elif draft_path.exists():
+            source_path = draft_path
+            source_label = "draft"
+        else:
+            print(f"❌ No draft or revised file found for chapter {chapter_number}.")
+            return
+
+        source_text = source_path.read_text(encoding='utf-8')
+        edit_prompt = self._generate_edit_prompt(
+            chapter, source_text, mode, source_label=source_label, instructions=instructions,
+        )
+        edit_prompt_path = self.feedback_dir / f"chapter_{chapter_number:03d}_edit_prompt.md"
+        output_path = revised_path
 
         chapter.status = 'editing'
         self.state.save_state()
@@ -629,7 +641,7 @@ Write the beat-sheet now. Outline only — no prose.
             agent_name="editor",
             user_prompt=edit_prompt,
             prompt_path=edit_prompt_path,
-            output_path=revised_path,
+            output_path=output_path,
             dry_run=dry_run,
             label=f"Editor revising ({mode})",
             chapter_number=chapter_number,
@@ -639,8 +651,23 @@ Write the beat-sheet now. Outline only — no prose.
             chapter.status = 'edited'
             self.state.save_state()
     
-    def _generate_edit_prompt(self, chapter: ChapterState, draft_text: str, mode: str) -> str:
+    def _generate_edit_prompt(
+        self,
+        chapter: ChapterState,
+        draft_text: str,
+        mode: str,
+        *,
+        source_label: str = "draft",
+        instructions: str = "",
+    ) -> str:
         """Generate an editing prompt."""
+        label = source_label.capitalize()
+        author_notes = ""
+        if instructions.strip():
+            author_notes = f"""
+### Author revision notes (apply these)
+{instructions.strip()}
+"""
         return f"""# EDITOR PROMPT: Chapter {chapter.number}
 
 ## Editing Mode: {mode.upper()}
@@ -651,7 +678,7 @@ Write the beat-sheet now. Outline only — no prose.
 - **Current Word Count**: {chapter.word_count}
 - **Target**: {chapter.target_word_count}
 
-## Original Draft
+## Source Text ({label})
 
 ```markdown
 {draft_text}
@@ -696,7 +723,7 @@ Write the beat-sheet now. Outline only — no prose.
 - Create anticipation
 - Deepen conflict
 """
-        }.get(mode, "- General line editing") + f"""
+        }.get(mode, "- General line editing") + author_notes + f"""
 
 ## Style Profile to Maintain
 - Tone: {self.state.style_profile.tone}
@@ -1020,6 +1047,7 @@ Examples:
   %(prog)s approve --chapter 1
   %(prog)s status
   %(prog)s export --format markdown
+  %(prog)s import story --chapters-dir ~/my-novel/chapters --title "My Novel" --genre Fiction
         """
     )
     
@@ -1107,10 +1135,44 @@ Examples:
     # Setup wizard — configure which LLM Novel OS talks to.
     subparsers.add_parser('setup', help='Configure your LLM provider (interactive)')
 
+    # Import existing manuscript
+    import_parser = subparsers.add_parser('import', help='Import an existing manuscript')
+    import_sub = import_parser.add_subparsers(dest='import_command')
+
+    import_story = import_sub.add_parser(
+        'story',
+        help='Import .txt chapters and extract characters, plot, and story bible data',
+    )
+    import_story.add_argument(
+        '--chapters-dir', required=True,
+        help='Folder of chapter files (.txt), sorted by filename',
+    )
+    import_story.add_argument('--project-dir', default='.',
+                              help='Novel OS project directory (default: current)')
+    import_story.add_argument('--title', default='', help='Required when creating a new project')
+    import_story.add_argument('--genre', default='', help='Required when creating a new project')
+    import_story.add_argument('--author', default='', help='Author name for new projects')
+    import_story.add_argument('--from-chapter', type=int, default=None,
+                              help='Only import from this chapter number')
+    import_story.add_argument('--to-chapter', type=int, default=None,
+                              help='Only import through this chapter number')
+    import_story.add_argument('--no-extract', action='store_true',
+                              help='Copy text only; skip LLM extraction')
+    import_story.add_argument('--dry-run', action='store_true',
+                              help='Save prompts only; do not call the LLM')
+    import_story.add_argument('--synthesize', action='store_true',
+                              help='After import, generate outputs/outline.json from extracted state')
+    import_story.add_argument('--no-profiles', action='store_true',
+                              help='Skip writing outputs/characters/*.md profiles')
+
     args = parser.parse_args()
 
     if not args.command:
         parser.print_help()
+        return
+
+    if args.command == 'import' and not getattr(args, 'import_command', None):
+        import_parser.print_help()
         return
 
     # Setup wizard runs without an orchestrator (it configures the LLM itself).
@@ -1119,21 +1181,26 @@ Examples:
         sys.exit(run_wizard())
 
     # Commands that need a working LLM. If none resolves, offer the wizard first.
-    _LLM_COMMANDS = {'plan', 'write', 'edit', 'validate'}
-    if args.command in _LLM_COMMANDS and not _is_dry_run(args):
-        if not _provider_configured():
-            print("No LLM provider is configured yet.")
-            answer = input("Run the setup wizard now? [Y/n]: ").strip().lower() or "y"
-            if answer == "y":
-                from setup_wizard import run_wizard
-                if run_wizard() != 0:
-                    sys.exit(1)
-            else:
-                print("You can configure later with: python -m core.orchestrator setup")
+    _LLM_COMMANDS = {'plan', 'write', 'edit', 'validate', 'import'}
+    needs_llm = args.command in _LLM_COMMANDS and not _is_dry_run(args)
+    if args.command == 'import' and getattr(args, 'import_command', None) == 'story':
+        if getattr(args, 'no_extract', False):
+            needs_llm = bool(getattr(args, 'synthesize', False)) and not getattr(args, 'dry_run', False)
+        else:
+            needs_llm = not getattr(args, 'dry_run', False)
+    if needs_llm and not _provider_configured():
+        print("No LLM provider is configured yet.")
+        answer = input("Run the setup wizard now? [Y/n]: ").strip().lower() or "y"
+        if answer == "y":
+            from setup_wizard import run_wizard
+            if run_wizard() != 0:
                 sys.exit(1)
+        else:
+            print("You can configure later with: python -m core.orchestrator setup")
+            sys.exit(1)
 
-    # Initialize orchestrator
-    orchestrator = NovelOrchestrator()
+    project_dir = getattr(args, 'project_dir', '.')
+    orchestrator = NovelOrchestrator(project_dir)
 
     # Route commands
     if args.command == 'init':
@@ -1190,6 +1257,40 @@ Examples:
     
     elif args.command == 'export':
         orchestrator.export(args.format)
+
+    elif args.command == 'import':
+        if args.import_command == 'story':
+            from import_pipeline import ImportPipeline
+
+            proj = Path(project_dir)
+            state_file = proj / "outputs" / "state" / "story_state.json"
+            if not state_file.exists():
+                if not args.title or not args.genre:
+                    print("❌ New project requires --title and --genre")
+                    sys.exit(1)
+                proj.mkdir(parents=True, exist_ok=True)
+                orchestrator.init_project(args.title, args.genre, args.author)
+
+            pipe = ImportPipeline(str(proj))
+            pipe.import_directory(
+                Path(args.chapters_dir),
+                chapter_from=args.from_chapter,
+                chapter_to=args.to_chapter,
+                extract=not args.no_extract,
+                dry_run=args.dry_run,
+                on_progress=lambda msg: print(msg, flush=True),
+            )
+            if args.synthesize:
+                pipe.synthesize_structure(
+                    dry_run=args.dry_run,
+                    on_progress=lambda msg: print(msg, flush=True),
+                )
+            if not args.no_profiles:
+                n = pipe.write_character_profiles()
+                print(f"📝 Wrote {n} character profile(s) to outputs/characters/", flush=True)
+            print(f"\n✅ Import complete. Open project in Novel-OS UI or run: status", flush=True)
+        else:
+            import_parser.print_help()
 
 
 if __name__ == '__main__':

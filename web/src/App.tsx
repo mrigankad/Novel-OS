@@ -7,6 +7,7 @@ import ShortcutsHelp from "./components/ShortcutsHelp";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toaster";
 import { ConfirmProvider } from "./components/Confirm";
+import { LayoutPrefsProvider, useLayoutPrefs } from "./context/LayoutPrefs";
 
 // Code-split routes so the CodeMirror editor only loads on the chapter view.
 const ProjectsList = lazy(() => import("./routes/ProjectsList"));
@@ -43,20 +44,31 @@ export default function App() {
       <MotionConfig reducedMotion="user">
         <ToastProvider>
           <ConfirmProvider>
-            <a href="#main" className="skip-link">Skip to content</a>
-            <CommandPalette />
-            <ShortcutsHelp />
-            <div className="flex h-full">
-              <Sidebar />
-              <main id="main" className="h-full flex-1 overflow-y-auto">
-                <ErrorBoundary>
-                  <AnimatedRoutes />
-                </ErrorBoundary>
-              </main>
-            </div>
+            <LayoutPrefsProvider>
+              <AppShell />
+            </LayoutPrefsProvider>
           </ConfirmProvider>
         </ToastProvider>
       </MotionConfig>
     </BrowserRouter>
+  );
+}
+
+function AppShell() {
+  const { showLibrary } = useLayoutPrefs();
+  return (
+    <>
+      <a href="#main" className="skip-link">Skip to content</a>
+      <CommandPalette />
+      <ShortcutsHelp />
+      <div className="flex h-full">
+        {showLibrary && <Sidebar />}
+        <main id="main" className="h-full flex-1 overflow-y-auto">
+          <ErrorBoundary>
+            <AnimatedRoutes />
+          </ErrorBoundary>
+        </main>
+      </div>
+    </>
   );
 }

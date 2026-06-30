@@ -27,7 +27,10 @@ export default function PipelineFlow({
         return (
           <div key={s.key} className="flex flex-1 items-center">
             <button
+              type="button"
               onClick={() => onSelect(s.key)}
+              aria-label={`${s.label} stage${present ? "" : ", not run"}`}
+              aria-current={isSel ? "step" : undefined}
               className={`group flex w-full flex-col items-start rounded-lg border px-3.5 py-2.5 text-left transition-all ${
                 isSel
                   ? isFinal
