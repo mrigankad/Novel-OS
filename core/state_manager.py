@@ -7,10 +7,24 @@ Maintains story bible, character database, plot tracker, timeline, and style pro
 
 import json
 import os
+import threading
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Any
 from pathlib import Path
+
+
+_project_locks: dict[str, threading.Lock] = {}
+_project_locks_guard = threading.Lock()
+
+
+def project_state_lock(project_path: str) -> threading.Lock:
+    """Serialize load/apply/save for one project (parallel miners, extractors, etc.)."""
+    key = str(Path(project_path).resolve())
+    with _project_locks_guard:
+        if key not in _project_locks:
+            _project_locks[key] = threading.Lock()
+        return _project_locks[key]
 
 
 @dataclass
@@ -36,13 +50,24 @@ class Character:
     emotional_state: str = ""
     last_appearance_chapter: int = 0
     notes: str = ""
+    aliases: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Character':
-        return cls(**data)
+        from dataclasses import fields
+        valid = {f.name for f in fields(cls)}
+        kwargs = {k: v for k, v in data.items() if k in valid}
+        kwargs.setdefault("aliases", [])
+        return cls(**kwargs)
+    
+    def all_names(self) -> List[str]:
+        """Canonical name plus registered aliases."""
+        names = [self.full_name]
+        names.extend(a for a in self.aliases if a.strip())
+        return names
 
 
 @dataclass
@@ -54,6 +79,8 @@ class PlotThread:
     thread_type: str  # main, subplot, character_arc, mystery
     status: str = "active"  # active, resolved, abandoned, foreshadowed
     priority: int = 1  # 1-5, 5 being highest
+    sort_order: int = 0
+    subplots: List[str] = field(default_factory=list)
     start_chapter: int = 0
     target_resolution_chapter: Optional[int] = None
     related_characters: List[str] = field(default_factory=list)
@@ -67,7 +94,12 @@ class PlotThread:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'PlotThread':
-        return cls(**data)
+        from dataclasses import fields
+        valid = {f.name for f in fields(cls)}
+        kwargs = {k: v for k, v in data.items() if k in valid}
+        kwargs.setdefault("subplots", [])
+        kwargs.setdefault("sort_order", 0)
+        return cls(**kwargs)
 
 
 @dataclass
@@ -258,11 +290,34 @@ class StoryState:
         return self.characters.get(character_id)
     
     def get_character_by_name(self, name: str) -> Optional[Character]:
-        """Find a character by full name."""
+        """Find a character by full name or alias (case-insensitive)."""
+        needle = name.strip().lower()
+        if not needle:
+            return None
         for char in self.characters.values():
-            if char.full_name.lower() == name.lower():
+            if char.full_name.lower() == needle:
                 return char
+            for alias in char.aliases:
+                if alias.strip().lower() == needle:
+                    return char
         return None
+
+    def add_character_alias(self, character_id: str, alias: str) -> bool:
+        """Register an alternate name for a character."""
+        alias = alias.strip()
+        if not alias:
+            return False
+        char = self.characters.get(character_id)
+        if char is None:
+            return False
+        if alias.lower() == char.full_name.lower():
+            return False
+        known = {char.full_name.lower(), *(a.lower() for a in char.aliases)}
+        if alias.lower() in known:
+            return False
+        char.aliases.append(alias)
+        self._log_action('character_alias_added', {'character_id': character_id, 'alias': alias})
+        return True
     
     def get_all_characters(self) -> List[Character]:
         """Get all characters as a list."""
@@ -281,14 +336,53 @@ class StoryState:
             char = self.characters[character_id]
             char.arc_stage = new_stage
             char.arc_progress = max(0, min(100, progress))
+
+    def delete_character(self, character_id: str) -> bool:
+        """Remove a character and scrub references from plot threads and timeline."""
+        char = self.characters.pop(character_id, None)
+        if char is None:
+            return False
+        for thread in self.plot_threads.values():
+            thread.related_characters = [
+                cid for cid in thread.related_characters if cid != character_id
+            ]
+        self.timeline = [
+            e for e in self.timeline if character_id not in e.characters_present
+        ]
+        self._log_action('character_deleted', {
+            'character_id': character_id,
+            'name': char.full_name,
+        })
+        return True
     
     # ===== Plot Thread Management =====
     
+    def _plot_thread_sort_key(self, thread: PlotThread) -> tuple:
+        return (thread.sort_order, -thread.priority, thread.name.lower())
+
+    def get_ordered_plot_threads(self) -> List[PlotThread]:
+        """All plot threads in display / prompt order."""
+        threads = list(self.plot_threads.values())
+        if threads and len({t.sort_order for t in threads}) == 1:
+            threads.sort(key=lambda t: (-t.priority, t.name.lower()))
+        else:
+            threads.sort(key=self._plot_thread_sort_key)
+        return threads
+
     def add_plot_thread(self, thread: PlotThread) -> str:
         """Add a new plot thread."""
+        if self.plot_threads and thread.sort_order == 0:
+            thread.sort_order = max(t.sort_order for t in self.plot_threads.values()) + 1
         self.plot_threads[thread.id] = thread
         self._log_action('plot_thread_added', {'thread_id': thread.id})
         return thread.id
+
+    def reorder_plot_threads(self, ordered_ids: List[str]) -> None:
+        """Persist drag-and-drop order."""
+        for i, tid in enumerate(ordered_ids):
+            if tid in self.plot_threads:
+                self.plot_threads[tid].sort_order = i
+        self._log_action('plot_threads_reordered', {'order': ordered_ids})
     
     def update_plot_thread(self, thread_id: str, updates: Dict[str, Any]):
         """Update plot thread fields."""
@@ -303,8 +397,8 @@ class StoryState:
         return self.plot_threads.get(thread_id)
     
     def get_active_plot_threads(self) -> List[PlotThread]:
-        """Get all active plot threads."""
-        return [t for t in self.plot_threads.values() if t.status == 'active']
+        """Active plot threads in sort order (for prompts)."""
+        return [t for t in self.get_ordered_plot_threads() if t.status == 'active']
     
     def get_unresolved_threads(self) -> List[PlotThread]:
         """Get threads that need resolution."""
@@ -331,6 +425,13 @@ class StoryState:
             thread = self.plot_threads[thread_id]
             thread.status = 'resolved'
             self.add_milestone_to_thread(thread_id, 'Thread resolved', chapter)
+
+    def delete_plot_thread(self, thread_id: str) -> bool:
+        """Remove a plot thread."""
+        if self.plot_threads.pop(thread_id, None) is None:
+            return False
+        self._log_action('plot_thread_deleted', {'thread_id': thread_id})
+        return True
     
     # ===== Chapter Management =====
     
@@ -364,6 +465,100 @@ class StoryState:
             c for c in self.chapters.values()
             if c.status == 'complete'
         ]
+
+    def delete_chapter(self, number: int) -> bool:
+        """Remove a chapter from state and scrub its timeline events."""
+        if self.chapters.pop(number, None) is None:
+            return False
+        self.timeline = [e for e in self.timeline if e.chapter != number]
+        self._log_action('chapter_deleted', {'chapter': number})
+        return True
+
+    def reassign_chapter(self, from_number: int, to_number: int) -> str:
+        """Move a chapter to a new number, or swap with an existing chapter."""
+        if from_number not in self.chapters:
+            raise ValueError(f"Chapter {from_number} not found")
+        if from_number == to_number:
+            return "unchanged"
+        if to_number in self.chapters:
+            self._swap_chapter_numbers(from_number, to_number)
+            self._log_action('chapter_swapped', {'a': from_number, 'b': to_number})
+            return "swapped"
+        ch = self.chapters.pop(from_number)
+        ch.number = to_number
+        self.chapters[to_number] = ch
+        self._remap_chapter_number(from_number, to_number)
+        self._log_action('chapter_reassigned', {'from': from_number, 'to': to_number})
+        return "moved"
+
+    def _remap_chapter_number(self, old: int, new: int) -> None:
+        for event in self.timeline:
+            if event.chapter == old:
+                event.chapter = new
+        for char in self.characters.values():
+            if char.last_appearance_chapter == old:
+                char.last_appearance_chapter = new
+        for thread in self.plot_threads.values():
+            if thread.start_chapter == old:
+                thread.start_chapter = new
+            if thread.last_updated_chapter == old:
+                thread.last_updated_chapter = new
+            if thread.target_resolution_chapter == old:
+                thread.target_resolution_chapter = new
+            thread.foreshadowing_planted = [
+                new if ch == old else ch for ch in thread.foreshadowing_planted
+            ]
+            for ms in thread.milestones:
+                if ms.get("chapter") == old:
+                    ms["chapter"] = new
+
+    def _swap_chapter_numbers(self, a: int, b: int) -> None:
+        ch_a = self.chapters[a]
+        ch_b = self.chapters[b]
+        ch_a.number = b
+        ch_b.number = a
+        self.chapters[b] = ch_a
+        self.chapters[a] = ch_b
+        sentinel = -(max(a, b) + 100000)
+        for event in self.timeline:
+            if event.chapter == a:
+                event.chapter = sentinel
+            elif event.chapter == b:
+                event.chapter = a
+        for event in self.timeline:
+            if event.chapter == sentinel:
+                event.chapter = b
+        for char in self.characters.values():
+            if char.last_appearance_chapter == a:
+                char.last_appearance_chapter = sentinel
+            elif char.last_appearance_chapter == b:
+                char.last_appearance_chapter = a
+        for char in self.characters.values():
+            if char.last_appearance_chapter == sentinel:
+                char.last_appearance_chapter = b
+        for thread in self.plot_threads.values():
+            for field in ("start_chapter", "last_updated_chapter", "target_resolution_chapter"):
+                val = getattr(thread, field)
+                if val == a:
+                    setattr(thread, field, sentinel)
+                elif val == b:
+                    setattr(thread, field, a)
+            thread.foreshadowing_planted = [
+                sentinel if ch == a else (a if ch == b else ch)
+                for ch in thread.foreshadowing_planted
+            ]
+            thread.foreshadowing_planted = [
+                b if ch == sentinel else ch for ch in thread.foreshadowing_planted
+            ]
+            for ms in thread.milestones:
+                ch_num = ms.get("chapter")
+                if ch_num == a:
+                    ms["chapter"] = sentinel
+                elif ch_num == b:
+                    ms["chapter"] = a
+            for ms in thread.milestones:
+                if ms.get("chapter") == sentinel:
+                    ms["chapter"] = b
     
     # ===== Timeline Management =====
     

@@ -1,9 +1,5 @@
-# Install only what you actually use — each backend is optional.
-# NOTE: the claude_cli backend needs NO Python package — just the Claude Code CLI
-#       on your PATH (https://docs.claude.com/claude-code) and `claude login`.
-anthropic>=0.40.0           # for provider=anthropic
-openai>=1.50.0              # for openai, azure, kimi, groq, together, openrouter, deepseek, mistral, fireworks, ollama, lmstudio, openai_compatible
-google-genai>=0.3.0         # for provider=gemini
+# Local LLM only (LM Studio / Ollama via OpenAI-compatible API).
+openai>=1.50.0
 python-dotenv>=1.0.0        # optional, for .env loading
 
 # Web UI backend (optional — only needed to run the dashboard)

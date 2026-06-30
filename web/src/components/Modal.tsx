@@ -1,16 +1,24 @@
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
+
+const SIZE_CLASS = {
+  default: "max-w-md",
+  wide: "max-w-2xl",
+} as const;
 
 export default function Modal({
   open,
   onClose,
   title,
   children,
+  size = "default",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  size?: keyof typeof SIZE_CLASS;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -19,11 +27,22 @@ export default function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  return (
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -41,7 +60,7 @@ export default function Modal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="relative w-full max-w-md rounded-2xl border border-paper-line bg-paper-card p-7 shadow-[var(--shadow-lift)]"
+            className={`relative w-full ${SIZE_CLASS[size]} rounded-2xl border border-paper-line bg-paper-card p-7 shadow-[var(--shadow-lift)]`}
           >
             <h2 className="mb-5 font-display text-[22px] font-semibold tracking-tight text-ink-text">
               {title}
@@ -50,7 +69,8 @@ export default function Modal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

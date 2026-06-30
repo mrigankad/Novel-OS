@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
+import SystemSettingsPanel from "./SystemSettingsPanel";
 
 function OwlMark() {
   return (
@@ -47,7 +48,8 @@ export default function Sidebar() {
       </nav>
 
       <div className="mt-auto px-5 pb-5 pt-6">
-        <div className="rounded-lg border border-ink-line/70 bg-ink-800/60 p-3.5">
+        <SystemSettingsPanel />
+        <div className="mt-4 rounded-lg border border-ink-line/70 bg-ink-800/60 p-3.5">
           <p className="font-display text-[13px] italic text-[#aeb6c8]">
             “Write novels like a build pipeline.”
           </p>

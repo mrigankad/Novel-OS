@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { api, type ProjectSummary } from "../api/client";
 import ProjectCard from "../components/ProjectCard";
 import Modal, { Field, fieldClass } from "../components/Modal";
 import { useToast } from "../components/Toaster";
+import PanelToggle from "../components/PanelToggle";
+import { useLayoutPrefs } from "../context/LayoutPrefs";
 
 const grid = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const card = {
@@ -16,13 +18,57 @@ export default function ProjectsList() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { showLibrary, toggleLibrary } = useLayoutPrefs();
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     api.projects().then(setProjects).catch((e) => setError(String(e)));
   }, []);
 
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  async function deleteProject(p: ProjectSummary) {
+    try {
+      await api.deleteProject(p.id);
+      toast(`Deleted "${p.title}"`, "success");
+      reload();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), "error");
+    }
+  }
+
+  async function importProject(file: File) {
+    setImporting(true);
+    try {
+      const p = await api.importProjectPackage(file);
+      toast(`Imported "${p.title}"`, "success");
+      reload();
+      navigate(`/projects/${p.id}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), "error");
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-10 py-12">
+      <input
+        ref={importRef}
+        type="file"
+        accept=".zip,application/zip"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void importProject(file);
+        }}
+      />
       <header className="mb-10 flex items-end justify-between gap-4">
         <div>
           <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.2em] text-amber-deep">
@@ -36,12 +82,25 @@ export default function ProjectsList() {
             orchestrated by your agent pipeline.
           </p>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="shrink-0 rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-on-ink transition-colors hover:bg-ink-800"
-        >
-          + New Manuscript
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex overflow-hidden rounded-lg border border-paper-line">
+            <PanelToggle on={showLibrary} onClick={toggleLibrary} label="Library" />
+          </div>
+          <button
+            type="button"
+            onClick={() => importRef.current?.click()}
+            disabled={importing}
+            className="rounded-lg border border-paper-line px-5 py-2.5 text-[13.5px] font-semibold text-ink-text transition-colors hover:bg-ink/5 disabled:opacity-40"
+          >
+            {importing ? "Importing…" : "Import project"}
+          </button>
+          <button
+            onClick={() => setOpen(true)}
+            className="rounded-lg bg-ink px-5 py-2.5 text-[13.5px] font-semibold text-on-ink transition-colors hover:bg-ink-800"
+          >
+            + New Manuscript
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -56,7 +115,7 @@ export default function ProjectsList() {
         <div className="rounded-xl border border-dashed border-paper-line bg-paper-card/60 px-8 py-14 text-center">
           <p className="font-display text-[20px] text-ink-text">No manuscripts yet</p>
           <p className="mt-2 text-[14px] text-ink-muted">
-            Start your first one — it takes a title and a genre.
+            Create a manuscript, then paste chapters or use Generic Importer for cast and worldbuilding.
           </p>
           <button
             onClick={() => setOpen(true)}
@@ -76,7 +135,7 @@ export default function ProjectsList() {
         >
           {projects.map((p) => (
             <motion.div key={p.id} variants={card}>
-              <ProjectCard p={p} />
+              <ProjectCard p={p} onDelete={deleteProject} />
             </motion.div>
           ))}
         </motion.div>

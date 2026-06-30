@@ -12,14 +12,17 @@ vi.mock("../components/MarkdownEditor", () => ({
 
 import ChapterView from "../routes/ChapterView";
 import * as client from "../api/client";
+import { TestProviders } from "./TestProviders";
 
 function renderAt(path = "/projects/p/chapters/1") {
   render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/projects/:id/chapters/:n" element={<ChapterView />} />
-      </Routes>
-    </MemoryRouter>,
+    <TestProviders>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/projects/:id/chapters/:n" element={<ChapterView />} />
+        </Routes>
+      </MemoryRouter>
+    </TestProviders>,
   );
 }
 
@@ -44,7 +47,8 @@ test("shows the pipeline flow and renders the selected stage", async () => {
   expect(await screen.findByText("Beats")).toBeInTheDocument();
 });
 
-test("Final pane offers to promote when no final exists, and saves edits", async () => {
+test("Final pane offers to promote when no final exists, and autosaves edits", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.spyOn(client.api, "chapter").mockResolvedValue(META);
   vi.spyOn(client.api, "chapters").mockResolvedValue([]);
   vi.spyOn(client.api, "stages").mockResolvedValue({
@@ -58,18 +62,17 @@ test("Final pane offers to promote when no final exists, and saves edits", async
     .spyOn(client.api, "saveFinal")
     .mockResolvedValue({ final: "Revised prose edited", word_count: 3 });
 
-  const user = userEvent.setup();
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   renderAt();
 
-  // open the Final stage
-  await user.click(await screen.findByText("Final"));
+  await user.click(await screen.findByRole("button", { name: "Final stage, not run" }));
   const promoteBtn = await screen.findByRole("button", { name: /Promote Revised → Final/i });
   await user.click(promoteBtn);
   expect(promote).toHaveBeenCalledWith("p", 1);
 
-  // editor now shows the promoted text; edit + save
   const editor = await screen.findByDisplayValue("Revised prose");
   await user.type(editor, " edited");
-  await user.click(screen.getByRole("button", { name: /^Save$/i }));
+  await vi.advanceTimersByTimeAsync(1600);
   expect(saveFinal).toHaveBeenCalled();
+  vi.useRealTimers();
 });

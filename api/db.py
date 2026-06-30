@@ -10,6 +10,7 @@ single-user local app.
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -188,6 +189,14 @@ def upsert_artifact(project_id: str, chapter: int, stage: str, text: str) -> Non
         s.commit()
 
 
+def delete_artifact(project_id: str, chapter: int, stage: str) -> None:
+    with _session() as s:
+        art = _get_artifact(s, project_id, chapter, stage)
+        if art is not None:
+            s.delete(art)
+            s.commit()
+
+
 def get_artifact_text(project_id: str, chapter: int, stage: str) -> Optional[str]:
     with _session() as s:
         art = _get_artifact(s, project_id, chapter, stage)
@@ -277,6 +286,155 @@ def comment_delete(project_id: str, chapter: int, cid: str) -> bool:
         s.delete(c)
         s.commit()
         return True
+
+
+def chapter_delete_all(project_id: str, number: int) -> None:
+    """Remove DB rows for one chapter (artifacts, snapshots, comments, chapter row)."""
+    with _session() as s:
+        s.exec(delete(Artifact).where(
+            Artifact.project_id == project_id, Artifact.chapter == number,
+        ))
+        s.exec(delete(Snapshot).where(
+            Snapshot.project_id == project_id, Snapshot.chapter == number,
+        ))
+        s.exec(delete(Comment).where(
+            Comment.project_id == project_id, Comment.chapter == number,
+        ))
+        s.exec(delete(Chapter).where(
+            Chapter.project_id == project_id, Chapter.number == number,
+        ))
+        s.commit()
+
+
+def _set_chapter_number(s: Session, project_id: str, from_num: int, to_num: int) -> None:
+    for model in (Artifact, Snapshot, Comment):
+        rows = s.exec(
+            select(model).where(model.project_id == project_id, model.chapter == from_num)
+        ).all()
+        for row in rows:
+            row.chapter = to_num
+            s.add(row)
+    ch_row = s.exec(
+        select(Chapter).where(Chapter.project_id == project_id, Chapter.number == from_num)
+    ).first()
+    if ch_row is not None:
+        ch_row.number = to_num
+        s.add(ch_row)
+
+
+def chapter_reassign(project_id: str, from_num: int, to_num: int, *, swap: bool = False) -> None:
+    """Update DB rows when a chapter number changes (move or swap)."""
+    with _session() as s:
+        if swap:
+            sentinel = -(max(from_num, to_num) + 100000)
+            _set_chapter_number(s, project_id, from_num, sentinel)
+            _set_chapter_number(s, project_id, to_num, from_num)
+            _set_chapter_number(s, project_id, sentinel, to_num)
+        else:
+            _set_chapter_number(s, project_id, from_num, to_num)
+        s.commit()
+
+
+def project_delete(project_id: str) -> None:
+    """Remove all DB rows for a project."""
+    with _session() as s:
+        s.exec(delete(Artifact).where(Artifact.project_id == project_id))
+        s.exec(delete(Snapshot).where(Snapshot.project_id == project_id))
+        s.exec(delete(Comment).where(Comment.project_id == project_id))
+        s.exec(delete(Chapter).where(Chapter.project_id == project_id))
+        s.exec(delete(Project).where(Project.id == project_id))
+        s.commit()
+
+
+def export_project_data(project_id: str) -> dict:
+    """Serialize all DB rows for a project (for backup archives)."""
+    with _session() as s:
+        proj = s.get(Project, project_id)
+        if proj is None:
+            return {"version": 1, "project_id": project_id, "project": None,
+                    "chapters": [], "artifacts": [], "snapshots": [], "comments": []}
+        chapters = list(s.exec(select(Chapter).where(Chapter.project_id == project_id)).all())
+        artifacts = list(s.exec(select(Artifact).where(Artifact.project_id == project_id)).all())
+        snapshots = list(s.exec(select(Snapshot).where(Snapshot.project_id == project_id)).all())
+        comments = list(s.exec(select(Comment).where(Comment.project_id == project_id)).all())
+        return {
+            "version": 1,
+            "project_id": project_id,
+            "project": proj.model_dump(),
+            "chapters": [c.model_dump() for c in chapters],
+            "artifacts": [a.model_dump() for a in artifacts],
+            "snapshots": [sn.model_dump() for sn in snapshots],
+            "comments": [c.model_dump() for c in comments],
+        }
+
+
+def import_project_data(
+    project_id: str,
+    data: dict,
+    *,
+    allow_id_mismatch: bool = False,
+    remap_ids: bool = False,
+) -> None:
+    """Replace all DB rows for a project from a backup export."""
+    if (
+        not allow_id_mismatch
+        and data.get("project_id")
+        and data["project_id"] != project_id
+    ):
+        raise ValueError(
+            f"Backup belongs to project {data['project_id']!r}, not {project_id!r}"
+        )
+    with _session() as s:
+        s.exec(delete(Artifact).where(Artifact.project_id == project_id))
+        s.exec(delete(Snapshot).where(Snapshot.project_id == project_id))
+        s.exec(delete(Comment).where(Comment.project_id == project_id))
+        s.exec(delete(Chapter).where(Chapter.project_id == project_id))
+        s.exec(delete(Project).where(Project.id == project_id))
+
+        proj_data = data.get("project")
+        if proj_data:
+            proj = Project(**proj_data)
+            proj.id = project_id
+            s.add(proj)
+
+        for row in data.get("chapters", []):
+            ch = Chapter(**row)
+            if remap_ids:
+                ch.id = _new_id()
+            ch.project_id = project_id
+            s.add(ch)
+        for row in data.get("artifacts", []):
+            art = Artifact(**row)
+            if remap_ids:
+                art.id = _new_id()
+            art.project_id = project_id
+            s.add(art)
+        for row in data.get("snapshots", []):
+            snap = Snapshot(**row)
+            if remap_ids:
+                snap.id = _new_id()
+            snap.project_id = project_id
+            s.add(snap)
+        for row in data.get("comments", []):
+            com = Comment(**row)
+            if remap_ids:
+                com.id = _new_id()
+            com.project_id = project_id
+            s.add(com)
+        s.commit()
+
+
+def sync_artifacts_to_files(root: Path, project_id: str) -> None:
+    """Write DB artifact text back to stage files on disk."""
+    project_dir = root / project_id
+    with _session() as s:
+        arts = list(s.exec(select(Artifact).where(Artifact.project_id == project_id)).all())
+    for art in arts:
+        path = _stage_file(project_dir, art.chapter, art.stage)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(art.text, encoding="utf-8")
+        os.replace(tmp, path)
 
 
 def _clear_all() -> None:

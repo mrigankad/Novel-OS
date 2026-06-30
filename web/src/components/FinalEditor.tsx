@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { openSearchPanel } from "@codemirror/search";
 import MarkdownEditor from "./MarkdownEditor";
 import { surround, prefixLine, insertBlock } from "./editorCommands";
+import { SaveStatus } from "./EditorSaveBar";
 
 const SIZES = [0.95, 1.075, 1.2, 1.35];
 const MEASURES: Record<string, string> = { narrow: "34rem", normal: "42rem", wide: "52rem" };
@@ -23,17 +24,18 @@ export default function FinalEditor(props: {
   promoteFrom: string;
   text: string;
   onChange: (v: string) => void;
-  onSave: () => void;
   onPromote: () => void;
+  onReopen?: () => void;
+  canReopen?: boolean;
   dirty: boolean;
-  busy: null | "saving" | "promoting";
+  busy: null | "saving" | "promoting" | "reopening";
   lastSaved: string | null;
   focus: boolean;
   onToggleFocus: () => void;
 }) {
   const {
-    hasFinal, canPromote, promoteFrom, text, onChange, onSave, onPromote,
-    dirty, busy, lastSaved, focus, onToggleFocus,
+    hasFinal, canPromote, promoteFrom, text, onChange, onPromote,
+    onReopen, canReopen, dirty, busy, lastSaved, focus, onToggleFocus,
   } = props;
 
   const cm = useRef<ReactCodeMirrorRef>(null);
@@ -88,13 +90,9 @@ export default function FinalEditor(props: {
 
         <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
           <span className="nums">{words.toLocaleString()} words</span>
-          <span aria-live="polite" className="min-w-[78px] text-right">
-            {busy === "saving" ? <span className="text-paper-muted">Saving…</span>
-              : dirty ? <span className="text-amber-deep">● Unsaved</span>
-              : <span className="text-st-approved">● {lastSaved ? `Saved ${lastSaved}` : "Saved"}</span>}
-          </span>
+          <SaveStatus dirty={dirty} saving={busy === "saving"} lastSaved={lastSaved} />
+          <span className="hidden text-[11px] text-ink-muted lg:inline">Autosaves after you stop typing</span>
 
-          {/* Reading controls */}
           <div className="flex items-center overflow-hidden rounded-lg border border-paper-line">
             <button onClick={() => setSizeIdx(Math.max(0, sizeIdx - 1))}
                     className="px-2 py-1 text-ink-muted hover:bg-ink/5" aria-label="Smaller text">A−</button>
@@ -114,10 +112,12 @@ export default function FinalEditor(props: {
               </button>
             ))}
           </div>
-          <button onClick={onSave} disabled={!dirty || busy != null}
-                  className="rounded-lg bg-ink px-4 py-1.5 text-[13px] font-semibold text-on-ink transition-colors hover:bg-ink-800 disabled:opacity-40">
-            {busy === "saving" ? "Saving…" : "Save"}
-          </button>
+          {canReopen && onReopen && (
+            <button onClick={onReopen} disabled={busy != null}
+                    className="rounded-lg border border-paper-line px-4 py-1.5 text-[13px] font-semibold text-ink-text transition-colors hover:bg-ink/5 disabled:opacity-40">
+              {busy === "reopening" ? "Reopening…" : "Reopen for revision"}
+            </button>
+          )}
         </div>
       </div>
 

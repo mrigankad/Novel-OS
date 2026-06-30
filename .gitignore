@@ -56,3 +56,11 @@ ChatGPT Image *.png
 # --- Local SQLite database ---
 novel_os*.db
 *.db
+
+# --- Dedup / mining caches (per-project user data under outputs/) ---
+outputs/dedup/
+
+# --- Install/runtime (when developing from full NOVEL_OS_HOME layout) ---
+run/
+*.pid
+config/app_config.json

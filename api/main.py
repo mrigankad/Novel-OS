@@ -16,7 +16,10 @@ def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = Non
     app = FastAPI(title="Novel OS API", version="0.2.0")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
         allow_methods=["*"],
         allow_headers=["*"],
     )
