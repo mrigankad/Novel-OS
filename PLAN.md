@@ -12,7 +12,7 @@
 
 | Phase | Name | State |
 |---|---|---|
-| P0 | Rails — typography, media, document tree, tenancy | ☐ Not started |
+| P0 | Rails — typography, media, document tree, tenancy | ◐ In progress — P0.1 ✅ P0.2 ✅ P0.3–P0.5 ☐ |
 | P1 | Surface — ProseMirror, inline images, anchored comments | ☐ Not started |
 | P2 | Moat A — continuity surfacing, Codex, portraits | ☐ Not started |
 | P3 | Moat B — consequence preview, provenance, review | ☐ Not started |
