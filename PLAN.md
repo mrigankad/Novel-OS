@@ -12,7 +12,7 @@
 
 | Phase | Name | State |
 |---|---|---|
-| P0 | Rails — typography, media, document tree, tenancy | ◐ In progress — P0.1 ✅ P0.2 ✅ P0.3–P0.5 ☐ |
+| P0 | Rails — typography, media, document tree, tenancy | ◐ In progress — P0.1–P0.4 ✅ · P0.5 ☐ |
 | P1 | Surface — ProseMirror, inline images, anchored comments | ☐ Not started |
 | P2 | Moat A — continuity surfacing, Codex, portraits | ☐ Not started |
 | P3 | Moat B — consequence preview, provenance, review | ☐ Not started |
@@ -58,16 +58,17 @@ Foundations everything else sits on. Two of these are the explicitly requested t
 - Persist per user alongside existing reading controls; apply to the manuscript canvas only, never to chrome.
 - Extend the existing reading-controls surface in `ChapterView.tsx`; add a Vitest case asserting the token switches and persists.
 
-### P0.3 Media storage
+### P0.3 Media storage ✅
 - Storage abstraction: local filesystem in dev, S3-compatible in prod.
 - Image records table; upload endpoint with type/size validation and path-traversal guards.
 - Serve with content-addressed URLs so images are cacheable and de-duplicated.
 
-### P0.4 Document tree migration
-- Model ordered typed nodes: `part` / `chapter` / `scene` / `folder`. Scene becomes the atomic writable unit.
-- Migrate flat `chapters{int → ChapterState}` to `part:Manuscript → chapter → single scene`.
-- **Golden-file migration tests land before any UI depends on the tree.** This is the riskiest change in the plan.
-- Expose a tree read API; leave existing flat endpoints working throughout.
+### P0.4 Document tree migration ✅
+- Ordered typed nodes (`part` / `chapter` / `scene` / `folder`) in `core/document_tree.py`, stored flat with `parent_id` + `order` so reorders are local edits rather than rewrites.
+- Flat `chapters{int → ChapterState}` migrates to `part:Manuscript → chapter → scenes` on load; `save_state()` re-syncs so the two representations cannot drift. User renames and reordering are preserved — only engine-owned facts (word count, POV, status) are mirrored.
+- **Golden-file migration test** (`tests/golden/binder_migration.json`) pins the migrated shape; migration ids are deterministic (`ch-001-s01`) so the file is readable and stable.
+- Tree read API at `GET /api/projects/{id}/binder`; flat chapter endpoints untouched.
+- **Deferred:** scenes are modelled but the writing path stays chapter-level. Making a scene the atomic writable unit is a separate change that lands with the binder UI in P4 — doing it here would have broken the agent pipeline, which writes `chapter_NNN_*.md`.
 
 ### P0.5 Tenancy data model
 - Postgres for users, workspaces, project ownership, sessions. Per-project files stay canonical (see spec §4.1).

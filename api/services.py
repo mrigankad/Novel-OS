@@ -160,6 +160,15 @@ class ProjectService:
             for c in s.get_all_characters()
         ]
 
+    def binder_tree(self, project_id: str) -> list[dict]:
+        """The document tree, nested (PLAN.md P0.4).
+
+        Read-only for now. Projects predating the binder migrate on load, so
+        this works for every project without a backfill step; the flat chapter
+        endpoints stay authoritative for the writing path.
+        """
+        return self._load(project_id).binder.to_tree()
+
     def raw_state(self, project_id: str) -> dict:
         import json as _json
         sf = self._project_dir(project_id) / "outputs" / "state" / "story_state.json"

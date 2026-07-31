@@ -180,6 +180,16 @@ def delete_comment(project_id: str, number: int, cid: str,
     return Response(status_code=204)
 
 
+@router.get("/projects/{project_id}/binder")
+def binder_tree(project_id: str, svc: ProjectService = Depends(get_service)):
+    """Nested document tree. Read-only in P0.4; the flat chapter endpoints
+    remain the writing path."""
+    try:
+        return svc.binder_tree(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
 # --------------------------------------------------------------------------- media
 
 def _media_out(m: db.Media) -> MediaOut:

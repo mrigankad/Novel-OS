@@ -12,6 +12,13 @@ from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 
+# core/ is on sys.path rather than being a package, so siblings import by
+# top-level name (see the header of api/services.py).
+from document_tree import (
+    CHAPTER, MANUSCRIPT_ID, PART, SCENE, Binder, DocumentNode,
+    build_from_chapters, chapter_id, migrate_status, scene_id,
+)
+
 
 @dataclass
 class Character:
@@ -172,6 +179,9 @@ class StoryState:
         self.chapters: Dict[int, ChapterState] = {}
         self.timeline: List[TimelineEvent] = []
         self.style_profile: StyleProfile = StyleProfile()
+        # Document tree. Sits beside `chapters` rather than replacing it, so the
+        # agents and continuity engine are unaffected. See core/document_tree.py.
+        self.binder: Binder = Binder()
         
         # Session tracking
         self.session_log: List[Dict[str, Any]] = []
@@ -210,15 +220,63 @@ class StoryState:
                     data.get('style_profile', {})
                 )
                 self.session_log = data.get('session_log', [])
-    
+                self.binder = Binder.from_list(data.get('binder', []))
+
+        # A project written before the binder existed has no tree. Build one
+        # from the flat chapters on first load; it is persisted on next save.
+        if len(self.binder) == 0 and self.chapters:
+            self.binder = build_from_chapters(self.chapters)
+
+    def sync_binder(self) -> None:
+        """Reconcile the tree with `chapters` after chapters are added or edited.
+
+        `chapters` stays authoritative for chapter-level data while the writing
+        path is chapter-level; this mirrors it forward. Nodes the user created
+        or reordered are left alone titles and structure are theirs to own.
+        """
+        if len(self.binder) == 0:
+            self.binder = build_from_chapters(self.chapters)
+            return
+
+        part = self.binder.get(MANUSCRIPT_ID)
+        if part is None:
+            part = self.binder.add(
+                DocumentNode(id=MANUSCRIPT_ID, type=PART, title="Manuscript")
+            )
+
+        for number in sorted(self.chapters):
+            ch = self.chapters[number]
+            node = self.binder.chapter_node(number)
+            if node is None:
+                node = self.binder.add(
+                    DocumentNode(
+                        id=chapter_id(number), type=CHAPTER,
+                        title=ch.title or f"Chapter {number}", chapter_number=number,
+                    ),
+                    part.id,
+                )
+                self.binder.add(
+                    DocumentNode(id=scene_id(number, 1), type=SCENE, title="Scene 1"),
+                    node.id,
+                )
+            # Mirror engine-owned facts; leave user-owned title/order alone.
+            node.word_count = int(ch.word_count or 0)
+            node.pov = ch.pov_character or node.pov
+            node.status = migrate_status(ch.status)
+
+
     def save_state(self):
         """Save current state to disk."""
+        # Keep the tree in step with the flat chapters on every write, so the
+        # two representations can never drift.
+        self.sync_binder()
         data = {
             'metadata': self.metadata,
             'story_bible': self.story_bible,
             'characters': {k: v.to_dict() for k, v in self.characters.items()},
             'plot_threads': {k: v.to_dict() for k, v in self.plot_threads.items()},
             'chapters': {k: v.to_dict() for k, v in self.chapters.items()},
+            'binder': self.binder.to_list(),
             'timeline': [e.to_dict() for e in self.timeline],
             'style_profile': self.style_profile.to_dict(),
             'session_log': self.session_log,
