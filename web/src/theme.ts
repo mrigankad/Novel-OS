@@ -1,4 +1,4 @@
-// Theme bootstrap — runs at import time (before React renders) to avoid a flash.
+// Theme bootstrap runs at import time (before React renders) to avoid a flash.
 
 export type Theme = "light" | "dark";
 
@@ -26,5 +26,32 @@ export function setTheme(theme: Theme): void {
   applyTheme(theme);
 }
 
+// --- Reader font (manuscript canvas only; chrome always stays on --font-sans) ---
+
+export type ReaderFont = "sans" | "serif" | "mono";
+
+export const READER_FONTS: { value: ReaderFont; label: string }[] = [
+  { value: "sans", label: "Google Sans" },
+  { value: "serif", label: "Newsreader" },
+  { value: "mono", label: "Google Sans Code" },
+];
+
+const FONT_KEY = "novel-os-reader-font";
+
+export function getReaderFont(): ReaderFont {
+  const saved = localStorage.getItem(FONT_KEY) as ReaderFont | null;
+  return saved === "serif" || saved === "mono" || saved === "sans" ? saved : "sans";
+}
+
+export function applyReaderFont(font: ReaderFont): void {
+  document.documentElement.dataset.readerFont = font;
+}
+
+export function setReaderFont(font: ReaderFont): void {
+  localStorage.setItem(FONT_KEY, font);
+  applyReaderFont(font);
+}
+
 // Apply immediately on first import.
 applyTheme(getTheme());
+applyReaderFont(getReaderFont());

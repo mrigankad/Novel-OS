@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { openSearchPanel } from "@codemirror/search";
 import MarkdownEditor from "./MarkdownEditor";
 import { surround, prefixLine, insertBlock } from "./editorCommands";
+import { READER_FONTS, getReaderFont, setReaderFont, type ReaderFont } from "../theme";
 
 const SIZES = [0.95, 1.075, 1.2, 1.35];
 const MEASURES: Record<string, string> = { narrow: "34rem", normal: "42rem", wide: "52rem" };
@@ -40,6 +41,10 @@ export default function FinalEditor(props: {
   const [mode, setMode] = useState<"write" | "preview">("write");
   const [sizeIdx, setSizeIdx] = usePersisted("novelos-editor-size", 1);
   const [measure, setMeasure] = usePersisted<Measure>("novelos-editor-measure", "normal");
+  // Reader font lives on <html data-reader-font> so it applies to the manuscript
+  // canvas only; local state just keeps the control in sync.
+  const [readerFont, setReaderFontState] = useState<ReaderFont>(getReaderFont);
+  const chooseFont = (f: ReaderFont) => { setReaderFont(f); setReaderFontState(f); };
 
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const size = SIZES[Math.max(0, Math.min(SIZES.length - 1, sizeIdx))];
@@ -50,7 +55,7 @@ export default function FinalEditor(props: {
         <p className="font-display text-[20px] text-ink-text">No Final yet</p>
         <p className="mx-auto mt-2 max-w-md text-[14px] leading-relaxed text-ink-muted">
           The Final is the human-reviewed, canonical chapter. Promote the latest AI stage to
-          start reviewing — your drafts stay untouched as provenance.
+          start reviewing your drafts stay untouched as provenance.
         </p>
         <button
           onClick={onPromote}
@@ -103,6 +108,15 @@ export default function FinalEditor(props: {
             <button onClick={() => setMeasure(measure === "wide" ? "narrow" : measure === "narrow" ? "normal" : "wide")}
                     className="border-l border-paper-line px-2.5 py-1 text-[11px] font-semibold uppercase text-ink-muted hover:bg-ink/5"
                     title="Reading width">{measure}</button>
+            <label className="sr-only" htmlFor="reader-font">Reading font</label>
+            <select id="reader-font" value={readerFont}
+                    onChange={(e) => chooseFont(e.target.value as ReaderFont)}
+                    title="Reading font"
+                    className="border-l border-paper-line bg-transparent px-2 py-1 text-[11px] font-semibold text-ink-muted hover:bg-ink/5">
+              {READER_FONTS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex overflow-hidden rounded-lg border border-paper-line">

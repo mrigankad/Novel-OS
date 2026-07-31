@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  /* Ink — the binder / chrome */
+  /* Ink the binder / chrome */
   --color-ink: #0e1320;
   --color-ink-800: #161d2e;
   --color-ink-700: #202a40;
   --color-ink-line: #2b3650;
 
-  /* Paper — the manuscript canvas */
+  /* Paper the manuscript canvas */
   --color-paper: #f3ecdd;
   --color-paper-card: #fffdf7;
   --color-paper-line: #e4dcc8;
 
-  /* Text — contrast-audited for WCAG AA on paper */
+  /* Text contrast-audited for WCAG AA on paper */
   --color-ink-text: #1b2233;     /* ~12:1  */
   --color-ink-muted: #574f3c;    /* ~6:1   (was #6b6657, failed) */
   --color-paper-muted: #756b53;  /* ~4.7:1 (was #9c9684, failed) */
 
-  /* Text that always sits on a dark (ink) surface — stays light in BOTH themes */
+  /* Text that always sits on a dark (ink) surface stays light in BOTH themes */
   --color-on-ink: #f6f1e7;
 
   /* Accent */
@@ -33,9 +33,17 @@
   /* Focus ring */
   --color-focus: #2f6aa8;
 
-  --font-display: "Fraunces Variable", Georgia, serif;
-  --font-prose: "Newsreader", Georgia, serif;
-  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Google Sans Flex / Code (OFL). "Google Sans" proper is Google-restricted. */
+  --font-sans: "Google Sans Flex Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Google Sans Flex Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Google Sans Code Variable", ui-monospace, SFMono-Regular, monospace;
+
+  /* Reader font options for the manuscript canvas. --font-prose points at one
+     of these; the picker rebinds it on <html data-reader-font>. */
+  --font-reader-sans: "Google Sans Flex Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-reader-serif: "Newsreader", Georgia, serif;
+  --font-reader-mono: "Google Sans Code Variable", ui-monospace, SFMono-Regular, monospace;
+  --font-prose: var(--font-reader-sans);
 
   --shadow-paper: 0 1px 2px rgba(20, 16, 8, 0.05), 0 8px 24px -12px rgba(20, 16, 8, 0.2);
   --shadow-lift: 0 2px 4px rgba(20, 16, 8, 0.07), 0 18px 40px -18px rgba(20, 16, 8, 0.3);
@@ -65,6 +73,11 @@
   --color-st-approved: #5fb784;
   --color-st-edited: #a98fd0;
 }
+
+/* Reader font picker — set on <html> by theme.ts. Manuscript canvas only;
+   chrome always stays on --font-sans. */
+[data-reader-font="serif"] { --font-prose: var(--font-reader-serif); }
+[data-reader-font="mono"]  { --font-prose: var(--font-reader-mono); }
 
 @layer base {
   * {
@@ -133,12 +146,16 @@
 
   .prose-manuscript { font-family: var(--font-prose); font-size: 1.075rem; line-height: 1.85; color: var(--color-ink-text); }
   .prose-manuscript p { margin: 0 0 1.1em; text-align: justify; hyphens: auto; }
+  /* Drop cap follows the reader's font choice, and is re-proportioned for
+     Google Sans Flex — a sans has a larger cap-height per em than Fraunces did,
+     so the old 3.1em/0.82 overshot the three-line drop. */
   .prose-manuscript > p:first-of-type::first-letter {
-    font-family: var(--font-display); font-weight: 600; float: left;
-    font-size: 3.1em; line-height: 0.82; padding: 0.04em 0.08em 0 0; color: var(--color-amber-deep);
+    font-family: var(--font-prose); font-weight: 700; float: left;
+    font-size: 2.85em; line-height: 0.88; padding: 0.06em 0.09em 0 0; color: var(--color-amber-deep);
   }
   .prose-manuscript h1, .prose-manuscript h2, .prose-manuscript h3 {
-    font-family: var(--font-display); font-weight: 600; line-height: 1.2; margin: 1.4em 0 0.5em; text-wrap: balance;
+    font-family: var(--font-display); font-weight: 600; line-height: 1.25;
+    letter-spacing: -0.012em; margin: 1.4em 0 0.5em; text-wrap: balance;
   }
   .prose-manuscript h1 { font-size: 1.5rem; }
   .prose-manuscript em { font-style: italic; }
