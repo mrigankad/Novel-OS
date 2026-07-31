@@ -1,9 +1,9 @@
-"""Database layer — SQLite via SQLModel.
+"""Database layer SQLite via SQLModel.
 
 The agent engine (core/) stays file-based; this DB is the API's system-of-record.
 Engine-produced files are mirrored in via `ingest_project`; human-owned content
 (Final text, snapshots, comments) is written here directly. All helpers open a
-short-lived session from the process-wide engine — fine for a single-process,
+short-lived session from the process-wide engine fine for a single-process,
 single-user local app.
 """
 
@@ -83,6 +83,25 @@ class Comment(SQLModel, table=True):
     body: str = ""
     quote: str = ""
     resolved: bool = False
+    created_at: str = Field(default_factory=_now)
+
+
+class Media(SQLModel, table=True):
+    """Metadata for an uploaded image. The bytes live in a MediaStore,
+    addressed by `sha`; this row is the only thing that knows the original
+    filename. `kind` marks what the image is for (codex portrait, research
+    moodboard, inline manuscript image) so views can filter without a join."""
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    project_id: str = Field(index=True)
+    sha: str = Field(index=True)
+    ext: str = ""
+    filename: str = ""
+    content_type: str = ""
+    size: int = 0
+    width: int = 0
+    height: int = 0
+    kind: str = Field(default="general", index=True)
+    alt: str = ""
     created_at: str = Field(default_factory=_now)
 
 
@@ -279,9 +298,65 @@ def comment_delete(project_id: str, chapter: int, cid: str) -> bool:
         return True
 
 
-def _clear_all() -> None:
-    """Test helper — wipe every table."""
+# --------------------------------------------------------------------------- media
+
+def media_list(project_id: str, kind: Optional[str] = None) -> list[Media]:
     with _session() as s:
-        for model in (Artifact, Snapshot, Comment, Chapter, Project):
+        q = select(Media).where(Media.project_id == project_id)
+        if kind:
+            q = q.where(Media.kind == kind)
+        rows = s.exec(q.order_by(Media.created_at.desc())).all()
+        return list(rows)
+
+
+def media_by_sha(project_id: str, sha: str) -> Optional[Media]:
+    with _session() as s:
+        return s.exec(
+            select(Media).where(Media.project_id == project_id, Media.sha == sha)
+        ).first()
+
+
+def media_add(project_id: str, sha: str, ext: str, filename: str, content_type: str,
+              size: int, width: int, height: int, kind: str, alt: str = "") -> Media:
+    """Insert, or return the existing row for identical bytes.
+
+    Content-addressing makes re-upload idempotent: the same image in the same
+    project is one row and one blob, however many times it is dropped in."""
+    existing = media_by_sha(project_id, sha)
+    if existing is not None:
+        return existing
+    with _session() as s:
+        m = Media(
+            project_id=project_id, sha=sha, ext=ext, filename=filename,
+            content_type=content_type, size=size, width=width, height=height,
+            kind=kind, alt=alt,
+        )
+        s.add(m)
+        s.commit()
+        s.refresh(m)
+        return m
+
+
+def media_get(project_id: str, media_id: str) -> Optional[Media]:
+    with _session() as s:
+        m = s.get(Media, media_id)
+        return m if m and m.project_id == project_id else None
+
+
+def media_delete(project_id: str, media_id: str) -> Optional[Media]:
+    """Remove the row and hand it back so the caller can drop the blob."""
+    with _session() as s:
+        m = s.get(Media, media_id)
+        if not m or m.project_id != project_id:
+            return None
+        s.delete(m)
+        s.commit()
+        return m
+
+
+def _clear_all() -> None:
+    """Test helper wipe every table."""
+    with _session() as s:
+        for model in (Artifact, Snapshot, Comment, Media, Chapter, Project):
             s.exec(delete(model))
         s.commit()

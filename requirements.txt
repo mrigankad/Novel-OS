@@ -1,12 +1,13 @@
-# Install only what you actually use — each backend is optional.
-# NOTE: the claude_cli backend needs NO Python package — just the Claude Code CLI
+# Install only what you actually use each backend is optional.
+# NOTE: the claude_cli backend needs NO Python package just the Claude Code CLI
 #       on your PATH (https://docs.claude.com/claude-code) and `claude login`.
 anthropic>=0.40.0           # for provider=anthropic
 openai>=1.50.0              # for openai, azure, kimi, groq, together, openrouter, deepseek, mistral, fireworks, ollama, lmstudio, openai_compatible
 google-genai>=0.3.0         # for provider=gemini
 python-dotenv>=1.0.0        # optional, for .env loading
 
-# Web UI backend (optional — only needed to run the dashboard)
+# Web UI backend (optional only needed to run the dashboard)
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 sqlmodel>=0.0.38             # SQLite persistence layer for the API
+python-multipart>=0.0.9      # image uploads (media storage)

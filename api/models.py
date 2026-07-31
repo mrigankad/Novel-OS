@@ -112,5 +112,19 @@ class AddComment(BaseModel):
     quote: str = ""
 
 
+class MediaOut(BaseModel):
+    id: str
+    project_id: str
+    filename: str
+    content_type: str
+    size: int
+    width: int
+    height: int
+    kind: str
+    alt: str
+    url: str
+    created_at: str
+
+
 class UpdateComment(BaseModel):
     resolved: bool

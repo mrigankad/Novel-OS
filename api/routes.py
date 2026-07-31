@@ -1,16 +1,16 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from fastapi import Response
 from fastapi.responses import PlainTextResponse
 
-from . import db
+from . import db, media as media_lib
 from .jobs import runner
 from .models import (
     AddCharacter, AddComment, ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
-    Comment, CreateProject, CreateSnapshot, FinalResult, FinalSave, Job, ProjectDetail,
+    Comment, CreateProject, CreateSnapshot, FinalResult, FinalSave, Job, MediaOut, ProjectDetail,
     ProjectSummary, RunPhase, SnapshotMeta, SnapshotText, UpdateComment,
 )
 from .services import (
@@ -23,6 +23,11 @@ router = APIRouter(prefix="/api")
 def get_service() -> ProjectService:
     root = Path(os.environ.get("NOVEL_OS_PROJECTS_DIR", "./projects"))
     return ProjectService(root)
+
+
+def get_media_store() -> media_lib.MediaStore:
+    root = Path(os.environ.get("NOVEL_OS_MEDIA_DIR", "./media"))
+    return media_lib.LocalMediaStore(root)
 
 
 @router.get("/health")
@@ -81,7 +86,7 @@ def export_markdown(project_id: str, svc: ProjectService = Depends(get_service))
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
 
-# ----- Tier 1: snapshots (version history) — DB-backed
+# ----- Tier 1: snapshots (version history) DB-backed
 
 def _ensure_chapter_or_404(svc: ProjectService, project_id: str, number: int):
     try:
@@ -139,7 +144,7 @@ def delete_snapshot(project_id: str, number: int, snap_id: str,
     return Response(status_code=204)
 
 
-# ----- Tier 1: comments / annotations — DB-backed
+# ----- Tier 1: comments / annotations DB-backed
 
 @router.get("/projects/{project_id}/chapters/{number}/comments", response_model=list[Comment])
 def list_comments(project_id: str, number: int, svc: ProjectService = Depends(get_service)):
@@ -172,6 +177,86 @@ def delete_comment(project_id: str, number: int, cid: str,
     _ensure_chapter_or_404(svc, project_id, number)
     if not db.comment_delete(project_id, number, cid):
         raise HTTPException(status_code=404, detail="Comment not found")
+    return Response(status_code=204)
+
+
+# --------------------------------------------------------------------------- media
+
+def _media_out(m: db.Media) -> MediaOut:
+    return MediaOut(
+        id=m.id, project_id=m.project_id, filename=m.filename,
+        content_type=m.content_type, size=m.size, width=m.width, height=m.height,
+        kind=m.kind, alt=m.alt, url=f"/api/projects/{m.project_id}/media/{m.id}/raw",
+        created_at=m.created_at,
+    )
+
+
+def _ensure_project_or_404(svc: ProjectService, project_id: str) -> None:
+    try:
+        svc.project_detail(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.get("/projects/{project_id}/media", response_model=list[MediaOut])
+def list_media(project_id: str, kind: str | None = None,
+               svc: ProjectService = Depends(get_service)):
+    _ensure_project_or_404(svc, project_id)
+    return [_media_out(m) for m in db.media_list(project_id, kind)]
+
+
+@router.post("/projects/{project_id}/media", response_model=MediaOut, status_code=201)
+async def upload_media(project_id: str,
+                       file: UploadFile = File(...),
+                       kind: str = Form("general"),
+                       alt: str = Form(""),
+                       svc: ProjectService = Depends(get_service),
+                       store: media_lib.MediaStore = Depends(get_media_store)):
+    _ensure_project_or_404(svc, project_id)
+    data = await file.read()
+    try:
+        ext = media_lib.validate(data, file.content_type or "")
+    except media_lib.MediaError as e:
+        raise HTTPException(status_code=e.status, detail=str(e))
+
+    sha = media_lib.digest(data)
+    width, height = media_lib.dimensions(data)
+    store.put(project_id, sha, ext, data)
+    row = db.media_add(
+        project_id=project_id, sha=sha, ext=ext,
+        filename=media_lib.clean_filename(file.filename or ""),
+        content_type=file.content_type or "", size=len(data),
+        width=width, height=height, kind=kind, alt=alt,
+    )
+    return _media_out(row)
+
+
+@router.get("/projects/{project_id}/media/{media_id}/raw")
+def get_media_raw(project_id: str, media_id: str,
+                  store: media_lib.MediaStore = Depends(get_media_store)):
+    m = db.media_get(project_id, media_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Media not found")
+    data = store.read(project_id, m.sha, m.ext)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Media blob missing")
+    # Content-addressed, so the bytes at this id can never change.
+    return Response(
+        content=data,
+        media_type=m.content_type or "application/octet-stream",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
+@router.delete("/projects/{project_id}/media/{media_id}", status_code=204)
+def delete_media(project_id: str, media_id: str,
+                 svc: ProjectService = Depends(get_service),
+                 store: media_lib.MediaStore = Depends(get_media_store)):
+    _ensure_project_or_404(svc, project_id)
+    m = db.media_delete(project_id, media_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="Media not found")
+    store.delete(project_id, m.sha, m.ext)
     return Response(status_code=204)
 
 
@@ -244,7 +329,7 @@ def promote_final(project_id: str, number: int, force: bool = False,
     except NoSourceArtifact:
         raise HTTPException(
             status_code=409,
-            detail="Nothing to promote — no draft or revised text exists yet.",
+            detail="Nothing to promote no draft or revised text exists yet.",
         )
 
 

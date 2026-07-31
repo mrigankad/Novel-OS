@@ -6,11 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import db
-from .routes import router, get_service
+from .media import LocalMediaStore
+from .routes import router, get_media_store, get_service
 from .services import ProjectService
 
 
-def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = None) -> FastAPI:
+def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = None,
+               media_root: Optional[Path] = None) -> FastAPI:
     db.configure(db_url or os.environ.get("NOVEL_OS_DB") or "sqlite:///./novel_os.db")
 
     app = FastAPI(title="Novel OS API", version="0.2.0")
@@ -23,6 +25,8 @@ def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = Non
     app.include_router(router)
     if projects_root is not None:
         app.dependency_overrides[get_service] = lambda: ProjectService(projects_root)
+    if media_root is not None:
+        app.dependency_overrides[get_media_store] = lambda: LocalMediaStore(media_root)
     return app
 
 

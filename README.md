@@ -5,7 +5,7 @@
 <div align="center">
 <h3>A Production-Grade Multi-Agent Fiction Writing Framework</h3>
 
-<p><em>Write novels like a professional author — with an entire editorial team at your command.</em></p>
+<p><em>Write novels like a professional author with an entire editorial team at your command.</em></p>
 
 <br/>
 
@@ -23,7 +23,7 @@
 ║   "The difference between an amateur and a professional          ║
 ║    writer is a systematic process."                              ║
 ║                                                                  ║
-║                              — Novel OS Philosophy               ║
+║                              Novel OS Philosophy               ║
 ╚══════════════════════════════════════════════════════════════════╝
 ```
 
@@ -33,18 +33,18 @@
 
 ## 🌟 What is Novel OS?
 
-**Novel OS** is a complete **editorial infrastructure** for producing professional-quality novels using multiple specialized AI agents working in concert — with any LLM you choose (Claude, GPT, Gemini, Llama, Kimi, local models, anything OpenAI-compatible).
+**Novel OS** is a complete **editorial infrastructure** for producing professional-quality novels using multiple specialized AI agents working in concert with any LLM you choose (Claude, GPT, Gemini, Llama, Kimi, local models, anything OpenAI-compatible).
 
 Traditional AI writing generates one response and forgets everything. Novel OS is different:
 
-- 🧠 **Persistent memory** — agent outputs are parsed and merged into a central state file. Characters, locations, plot threads, foreshadowing, and quality scores accumulate chapter by chapter.
-- 🤝 **Agents collaborate** — Architect → Scribe → Editor → Guardian → Curator, each handing off to the next with full context.
-- 🛡️ **Deterministic + LLM validation** — a free local continuity engine catches dormant threads, unresolved foreshadowing, and timeline drift *before* the LLM Guardian runs.
-- 🔌 **Provider-agnostic** — Anthropic, OpenAI, Azure, Gemini, NVIDIA NIM, Kimi, Groq, Together, OpenRouter, DeepSeek, Mistral, Fireworks, Ollama, LM Studio, or any OpenAI-compatible endpoint.
+- 🧠 **Persistent memory** agent outputs are parsed and merged into a central state file. Characters, locations, plot threads, foreshadowing, and quality scores accumulate chapter by chapter.
+- 🤝 **Agents collaborate** Architect → Scribe → Editor → Guardian → Curator, each handing off to the next with full context.
+- 🛡️ **Deterministic + LLM validation** a free local continuity engine catches dormant threads, unresolved foreshadowing, and timeline drift *before* the LLM Guardian runs.
+- 🔌 **Provider-agnostic** Anthropic, OpenAI, Azure, Gemini, NVIDIA NIM, Kimi, Groq, Together, OpenRouter, DeepSeek, Mistral, Fireworks, Ollama, LM Studio, or any OpenAI-compatible endpoint.
 
-> Think of it as hiring a **full-time editorial team** — story architect, prose craftsman, line editor, fact-checker, voice coach — all working on your novel around the clock, on infrastructure that actually remembers what happened in chapter 3.
+> Think of it as hiring a **full-time editorial team** story architect, prose craftsman, line editor, fact-checker, voice coach all working on your novel around the clock, on infrastructure that actually remembers what happened in chapter 3.
 
-<p align="center"><img src="assets/architecture_hero.png" alt="Novel OS architecture — five agents around the StoryState brain" width="900"></p>
+<p align="center"><img src="assets/architecture_hero.png" alt="Novel OS architecture five agents around the StoryState brain" width="900"></p>
 
 ---
 
@@ -93,13 +93,13 @@ graph TB
 
 | # | Agent | Role | Outputs |
 |---|---|---|---|
-| 1 | 🏗️ **Architect** | Story planner — designs 3-act structure, character arcs, beats | `outline.json`, expanded `chapter_NNN_outline.md` |
-| 2 | ✍️ **Scribe** | Prose drafter — writes the chapter in deep POV | `chapter_NNN_draft.md` + `[SCRIBE_STATE_UPDATE]` block |
-| 3 | 🔍 **Editor** | Line surgeon — 5 modes: line / developmental / pacing / dialogue / tension | `chapter_NNN_revised.md` + `[EDITOR_STATE_UPDATE]` with before/after scores |
-| 4 | 🛡️ **Guardian** | Forensic fact-checker — character, timeline, world, plot continuity | `chapter_NNN_continuity_report.md` with `Status: PASS/WARNING/FAIL` |
-| 5 | 🎨 **Curator** | Voice stylist — locks tone, prose rhythm, genre conventions | `[STYLE_STATE_UPDATE]` with consistency / genre / voice scores |
+| 1 | 🏗️ **Architect** | Story planner designs 3-act structure, character arcs, beats | `outline.json`, expanded `chapter_NNN_outline.md` |
+| 2 | ✍️ **Scribe** | Prose drafter writes the chapter in deep POV | `chapter_NNN_draft.md` + `[SCRIBE_STATE_UPDATE]` block |
+| 3 | 🔍 **Editor** | Line surgeon 5 modes: line / developmental / pacing / dialogue / tension | `chapter_NNN_revised.md` + `[EDITOR_STATE_UPDATE]` with before/after scores |
+| 4 | 🛡️ **Guardian** | Forensic fact-checker character, timeline, world, plot continuity | `chapter_NNN_continuity_report.md` with `Status: PASS/WARNING/FAIL` |
+| 5 | 🎨 **Curator** | Voice stylist locks tone, prose rhythm, genre conventions | `[STYLE_STATE_UPDATE]` with consistency / genre / voice scores |
 
-Every agent prompt now includes a strict **OUTPUT CONTRACT** that forces the LLM to emit machine-parseable update blocks — verified working with frontier models (Claude, GPT) and open-weight models (Llama 3.3 70B).
+Every agent prompt now includes a strict **OUTPUT CONTRACT** that forces the LLM to emit machine-parseable update blocks verified working with frontier models (Claude, GPT) and open-weight models (Llama 3.3 70B).
 
 ---
 
@@ -128,13 +128,13 @@ flowchart LR
     style Px3 fill:#2a3441,stroke:#06b6d4,color:#fff
 ```
 
-**Quality gates** — a chapter cannot be approved while `Status: FAIL` is on file. Resolve the issue and re-validate.
+**Quality gates** a chapter cannot be approved while `Status: FAIL` is on file. Resolve the issue and re-validate.
 
-<p align="center"><img src="assets/pipeline_flow.png" alt="Chapter pipeline — six stations feeding StoryState" width="950"></p>
+<p align="center"><img src="assets/pipeline_flow.png" alt="Chapter pipeline six stations feeding StoryState" width="950"></p>
 
 ---
 
-## 🧠 Persistent Memory — How State Actually Lives
+## 🧠 Persistent Memory How State Actually Lives
 
 The defining feature: **every agent's structured output is parsed and merged into a central JSON state**, so subsequent agents see what came before.
 
@@ -161,7 +161,7 @@ Captured per chapter: character locations, emotional states, last-appearance ind
 
 ## 🔬 The Continuity Engine
 
-Deterministic, free, instant — runs before the LLM Guardian on every `validate`, and on demand via `check`.
+Deterministic, free, instant runs before the LLM Guardian on every `validate`, and on demand via `check`.
 
 | Check | Severity | Catches |
 |---|---|---|
@@ -180,17 +180,17 @@ python core/orchestrator.py check                 # check whole project
 python core/orchestrator.py check --chapter 12    # check as-of a specific chapter
 ```
 
-Findings are also injected into the LLM Guardian's prompt as context — the Guardian gets a head start instead of rediscovering obvious issues, and you don't spend tokens on them.
+Findings are also injected into the LLM Guardian's prompt as context the Guardian gets a head start instead of rediscovering obvious issues, and you don't spend tokens on them.
 
 ---
 
 ## 🔌 Provider-Agnostic LLM Layer
 
-Pick any of these — auto-detected from whichever API key is present:
+Pick any of these auto-detected from whichever API key is present:
 
 | Provider | `NOVEL_OS_LLM_PROVIDER` | Key env var |
 |---|---|---|
-| **Claude Code CLI (no API key — free with your subscription)** | `claude_cli` | — (just `claude login`) |
+| **Claude Code CLI (no API key free with your subscription)** | `claude_cli` | (just `claude login`) |
 | Anthropic Claude | `anthropic` | `ANTHROPIC_API_KEY` |
 | OpenAI | `openai` | `OPENAI_API_KEY` |
 | Azure OpenAI | `azure` | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` |
@@ -203,8 +203,8 @@ Pick any of these — auto-detected from whichever API key is present:
 | DeepSeek | `deepseek` | `DEEPSEEK_API_KEY` |
 | Mistral | `mistral` | `MISTRAL_API_KEY` |
 | Fireworks | `fireworks` | `FIREWORKS_API_KEY` |
-| Ollama (local) | `ollama` | — |
-| LM Studio (local) | `lmstudio` | — |
+| Ollama (local) | `ollama` | |
+| LM Studio (local) | `lmstudio` | |
 | **Any OpenAI-compatible endpoint** | `openai_compatible` | `NOVEL_OS_API_KEY` + `NOVEL_OS_BASE_URL` |
 
 ```mermaid
@@ -234,10 +234,10 @@ cd Novel-OS
 pip install -r requirements.txt   # install only the SDKs you need
 ```
 
-### 0 — Configure your LLM (one command)
+### 0 Configure your LLM (one command)
 
-Let the setup wizard detect what you already have — the Claude Code CLI, any API
-key, or a local model server — test the connection, and write your `.env` for you:
+Let the setup wizard detect what you already have the Claude Code CLI, any API
+key, or a local model server test the connection, and write your `.env` for you:
 
 ```bash
 python core/orchestrator.py setup        # or: python -m core.setup_wizard
@@ -250,27 +250,27 @@ python core/orchestrator.py setup        # or: python -m core.setup_wizard
 Prefer to configure by hand? `cp .env.example .env` and set your key(s). If you run a
 writing command with nothing configured, Novel OS offers the wizard automatically.
 
-### 1 — Initialize
+### 1 Initialize
 
 ```bash
 python core/orchestrator.py init --title "The Last Signal" --genre "Sci-Fi Thriller"
 ```
 
-### 2 — Cast
+### 2 Cast
 
 ```bash
 python core/orchestrator.py character add --name "Lena Vasquez" --role protagonist
 python core/orchestrator.py character add --name "Director Malk" --role antagonist
 ```
 
-### 3 — Plan
+### 3 Plan
 
 ```bash
 python core/orchestrator.py plan outline --chapters 32
 python core/orchestrator.py plan chapter --number 1 --pov "Lena Vasquez"
 ```
 
-### 4 — Write, edit, validate
+### 4 Write, edit, validate
 
 ```bash
 python core/orchestrator.py write --chapter 1                     # Scribe drafts
@@ -280,9 +280,9 @@ python core/orchestrator.py validate --chapter 1                  # Guardian val
 python core/orchestrator.py approve  --chapter 1                  # gates on FAIL
 ```
 
-Every phase command also accepts `--dry-run` to emit the prompt without calling the LLM — useful for hand-running in a chat UI.
+Every phase command also accepts `--dry-run` to emit the prompt without calling the LLM useful for hand-running in a chat UI.
 
-### 5 — Track & export
+### 5 Track & export
 
 ```bash
 python core/orchestrator.py status
@@ -294,12 +294,13 @@ python core/orchestrator.py export --format markdown
 ## 🖥️ Web UI (local)
 
 A browser dashboard to view your projects, chapters, outlines, and drafts. Two
-processes — the API and the React dev server:
+processes the API and the React dev server:
 
 ```bash
 # 1. Backend (from repo root)
 pip install -r requirements.txt
 export NOVEL_OS_PROJECTS_DIR=./projects   # folder of project dirs
+export NOVEL_OS_MEDIA_DIR=./media         # optional uploaded images (default ./media)
 uvicorn api.main:app --reload --port 8000
 
 # 2. Frontend (in another terminal)
@@ -371,7 +372,7 @@ novel-os/
 
 ## 💡 Why Novel OS Works
 
-Great novels are not written — they are **engineered**. Professional authors use editors, fact-checkers, and style guides. They maintain character bibles, plot trackers, and timelines. Novel OS gives every writer that infrastructure, automated and systematic, **with state that actually accumulates** rather than dissolving between sessions.
+Great novels are not written they are **engineered**. Professional authors use editors, fact-checkers, and style guides. They maintain character bibles, plot trackers, and timelines. Novel OS gives every writer that infrastructure, automated and systematic, **with state that actually accumulates** rather than dissolving between sessions.
 
 | ❌ Without Novel OS | ✅ With Novel OS |
 |---|---|
@@ -397,7 +398,7 @@ Great novels are not written — they are **engineered**. Professional authors u
 
 <div align="center">
 
-**Novel OS** — *Write novels like a professional author, with an entire editorial team at your command.*
+**Novel OS** *Write novels like a professional author, with an entire editorial team at your command.*
 
 *v1.1 | Production-Ready Fiction Framework | MIT License*
 

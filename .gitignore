@@ -56,3 +56,6 @@ ChatGPT Image *.png
 # --- Local SQLite database ---
 novel_os*.db
 *.db
+
+# --- Uploaded media blobs (user data, not source) ---
+/media/

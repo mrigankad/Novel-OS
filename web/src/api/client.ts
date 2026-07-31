@@ -37,6 +37,15 @@ export interface CharacterSummary {
   id: string; full_name: string; role: string;
 }
 
+/** What an image is for. Lets Codex/research/manuscript views filter server-side. */
+export type MediaKind = "general" | "portrait" | "location" | "research" | "inline" | "cover";
+
+export interface MediaItem {
+  id: string; project_id: string; filename: string; content_type: string;
+  size: number; width: number; height: number;
+  kind: MediaKind; alt: string; url: string; created_at: string;
+}
+
 async function get<T>(path: string): Promise<T> {
   const resp = await fetch(`${BASE}${path}`);
   if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
@@ -63,6 +72,21 @@ async function send<T>(path: string, method: "POST" | "PUT" | "PATCH", body?: un
 async function del(path: string): Promise<void> {
   const resp = await fetch(`${BASE}${path}`, { method: "DELETE" });
   if (!resp.ok && resp.status !== 204) throw new Error(`${resp.status} ${resp.statusText}`);
+}
+
+// Multipart upload. The browser must set its own Content-Type (it has to append
+// the multipart boundary), so no headers are passed here.
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  const resp = await fetch(`${BASE}${path}`, { method: "POST", body: form });
+  if (!resp.ok) {
+    let detail = `${resp.status} ${resp.statusText}`;
+    try {
+      const j = await resp.json();
+      if (j?.detail) detail = j.detail;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
+  return resp.json() as Promise<T>;
 }
 
 export const api = {
@@ -104,5 +128,18 @@ export const api = {
     send<CommentItem>(`/api/projects/${id}/chapters/${n}/comments/${cid}`, "PATCH", { resolved }),
   deleteComment: (id: string, n: number, cid: string) =>
     del(`/api/projects/${id}/chapters/${n}/comments/${cid}`),
+  // media
+  media: (id: string, kind?: MediaKind) =>
+    get<MediaItem[]>(`/api/projects/${id}/media${kind ? `?kind=${kind}` : ""}`),
+  uploadMedia: (id: string, file: File, kind: MediaKind = "general", alt = "") => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", kind);
+    form.append("alt", alt);
+    return upload<MediaItem>(`/api/projects/${id}/media`, form);
+  },
+  deleteMedia: (id: string, mediaId: string) => del(`/api/projects/${id}/media/${mediaId}`),
+  // Media URLs come back root-relative; absolutise for <img src>.
+  mediaUrl: (item: MediaItem) => `${BASE}${item.url}`,
 };
 
