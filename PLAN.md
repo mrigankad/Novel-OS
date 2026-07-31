@@ -12,7 +12,7 @@
 
 | Phase | Name | State |
 |---|---|---|
-| P0 | Rails — typography, media, document tree, tenancy | ◐ In progress — P0.1–P0.4 ✅ · P0.5 ☐ |
+| P0 | Rails — typography, media, document tree, tenancy | ✅ **Complete** |
 | P1 | Surface — ProseMirror, inline images, anchored comments | ☐ Not started |
 | P2 | Moat A — continuity surfacing, Codex, portraits | ☐ Not started |
 | P3 | Moat B — consequence preview, provenance, review | ☐ Not started |
@@ -46,14 +46,14 @@
 
 Foundations everything else sits on. Two of these are the explicitly requested typography and media work.
 
-### P0.1 Google Sans typography
+### P0.1 Google Sans typography ✅
 - Add `@fontsource-variable/google-sans-flex` and `@fontsource-variable/google-sans-code`; drop `@fontsource-variable/hanken-grotesk` and `@fontsource-variable/fraunces`. Keep `@fontsource/newsreader` — it becomes a reader option, not a default.
 - Retarget `@theme` tokens in `web/src/index.css`: `--font-sans` and `--font-display` → Google Sans Flex; add `--font-mono` → Google Sans Code.
 - Re-tune `.prose-manuscript`'s drop-cap (`::first-letter`) and `hr::before` ornament for Google Sans Flex metrics — they are currently proportioned for Fraunces.
 - Point `MarkdownEditor.tsx`'s CodeMirror `.cm-scroller` / content theme at the new prose token.
 - Verify contrast still passes WCAG AA against the audited ink/paper palette; Google Sans Flex has a different x-height than Hanken Grotesk.
 
-### P0.2 Reader font picker
+### P0.2 Reader font picker ✅
 - Introduce `--font-prose` as a user-controlled token with three options: Google Sans Flex (default), Newsreader (serif), Google Sans Code (mono).
 - Persist per user alongside existing reading controls; apply to the manuscript canvas only, never to chrome.
 - Extend the existing reading-controls surface in `ChapterView.tsx`; add a Vitest case asserting the token switches and persists.
@@ -70,12 +70,14 @@ Foundations everything else sits on. Two of these are the explicitly requested t
 - Tree read API at `GET /api/projects/{id}/binder`; flat chapter endpoints untouched.
 - **Deferred:** scenes are modelled but the writing path stays chapter-level. Making a scene the atomic writable unit is a separate change that lands with the binder UI in P4 — doing it here would have broken the agent pipeline, which writes `chapter_NNN_*.md`.
 
-### P0.5 Tenancy data model
-- Postgres for users, workspaces, project ownership, sessions. Per-project files stay canonical (see spec §4.1).
-- Namespaced per-tenant volumes; no cross-tenant path reachability.
-- No auth UI yet — P0 lays the schema so P7 doesn't force a rewrite.
+### P0.5 Tenancy data model ✅
+- `Workspace`, `User`, `Membership` (owner > editor > viewer), `ProjectOwnership`, `AuthSession` tables in `api/db.py`; helpers in `api/tenancy.py`. Per-project files stay canonical (see spec §4.1) — these tables record *who may see* a project, never the story.
+- `ProjectService` takes an optional workspace. The default workspace maps to the flat `<root>/<project>` layout, so **an existing local install needs no migration and no moved folders**; other workspaces are namespaced under `ws-<slug>/`.
+- Project ids are pattern-validated before any path is built, so `..`, separators, absolute paths and drive letters cannot escape a workspace. A traversing id is reported as 404, indistinguishable from a missing project.
+- Creating a project claims it for the caller's workspace, so ownership is recorded rather than inferred from where a folder happens to sit.
+- **Deferred:** Postgres itself. The schema is SQLModel, which runs on SQLite today and Postgres by changing the URL — adopting Postgres before there is a hosted deployment would add an ops dependency with no consumer. No auth UI; P7 adds sign-in on these tables.
 
-**Done when:** the app is entirely on Google Sans with a working reader font picker, images upload and serve, the tree migration passes golden tests, and tenancy schema exists. All suites green.
+**Done when:** ✅ the app is entirely on Google Sans with a working reader font picker, images upload and serve, the tree migration passes golden tests, and tenancy schema exists. All suites green.
 
 ---
 

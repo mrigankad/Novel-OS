@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-from . import db
+from . import db, tenancy
 from .models import (
     ChapterDetail, ChapterStages, ChapterSummary, CharacterSummary,
     ProjectDetail, ProjectSummary,
@@ -74,12 +74,24 @@ def _atomic_write(path: Path, text: str) -> None:
 class ProjectService:
     """Reads Novel OS projects (folders containing outputs/state/story_state.json)."""
 
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, workspace: "db.Workspace | None" = None):
         self.root = Path(root)
+        # None means the default workspace, whose projects live directly under
+        # root exactly as they did before tenancy existed (PLAN.md P0.5).
+        self.workspace = workspace
+
+    @property
+    def base_dir(self) -> Path:
+        return tenancy.workspace_dir(self.root, self.workspace)
 
     # --- discovery
     def _project_dir(self, project_id: str) -> Path:
-        d = self.root / project_id
+        try:
+            d = tenancy.project_dir(self.root, project_id, self.workspace)
+        except tenancy.TenancyError:
+            # A malformed or escaping id is indistinguishable from a missing
+            # project as far as a caller is concerned and leaks less.
+            raise ProjectNotFound(project_id)
         if not (d / "outputs" / "state" / "story_state.json").exists():
             raise ProjectNotFound(project_id)
         return d
@@ -89,9 +101,10 @@ class ProjectService:
 
     def list_projects(self) -> list[ProjectSummary]:
         out: list[ProjectSummary] = []
-        if not self.root.exists():
+        base = self.base_dir
+        if not base.exists():
             return out
-        for child in sorted(self.root.iterdir()):
+        for child in sorted(base.iterdir()):
             state_file = child / "outputs" / "state" / "story_state.json"
             if not state_file.exists():
                 continue
@@ -202,7 +215,7 @@ class ProjectService:
             raise ChapterNotFound(number)
         # keep the DB mirror fresh with whatever the engine produced
         try:
-            db.ingest_project(self.root, project_id)
+            db.ingest_project(self.base_dir, project_id)
         except Exception:  # noqa: BLE001 - ingest is best-effort
             pass
         p = self._stage_paths(project_id, number)
@@ -255,13 +268,18 @@ class ProjectService:
         if not title:
             raise BadRequest("Title is required.")
         slug = _slugify(title)
-        folder = self.root / slug
+        base = self.base_dir
+        folder = base / slug
         n = 2
         while (folder / "outputs" / "state" / "story_state.json").exists():
-            folder = self.root / f"{slug}-{n}"
+            folder = base / f"{slug}-{n}"
             n += 1
         folder.mkdir(parents=True, exist_ok=True)
         build_orchestrator(str(folder)).init_project(title, genre, author)
+        # Record which workspace owns the directory, so ownership is never
+        # inferred from where a folder happens to sit.
+        db.project_claim(folder.name, self.workspace.id if self.workspace
+                         else tenancy.DEFAULT_WORKSPACE_ID)
         return ProjectSummary(
             id=folder.name, title=title, genre=genre, chapter_count=0, status="in_progress",
         )
@@ -270,7 +288,7 @@ class ProjectService:
         self._project_dir(project_id)  # 404 if missing
         if not name.strip():
             raise BadRequest("Character name is required.")
-        build_orchestrator(str(self.root / project_id)).add_character(name.strip(), role)
+        build_orchestrator(str(self._project_dir(project_id))).add_character(name.strip(), role)
         return self.list_characters(project_id)
 
     def make_phase_job(self, project_id: str, stage: str, params: dict) -> Callable[[], None]:
@@ -278,7 +296,7 @@ class ProjectService:
         self._project_dir(project_id)  # 404 if missing
         if stage not in PHASES:
             raise BadRequest(f"Unknown stage '{stage}'. Expected one of {sorted(PHASES)}.")
-        project_dir = str(self.root / project_id)
+        project_dir = str(self._project_dir(project_id))
 
         def fn() -> None:
             orch = build_orchestrator(project_dir)

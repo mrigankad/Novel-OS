@@ -105,6 +105,49 @@ class Media(SQLModel, table=True):
     created_at: str = Field(default_factory=_now)
 
 
+# ----------------------------------------------------------------- tenancy tables
+# Schema only P7 adds auth on top. Defined now so features are not built
+# against a single-tenant assumption that would later have to be unpicked.
+# These tables record who may see a project; the story itself stays in files.
+
+class Workspace(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    name: str = ""
+    slug: str = Field(default="", index=True)
+    created_at: str = Field(default_factory=_now)
+
+
+class User(SQLModel, table=True):
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    email: str = Field(default="", index=True)
+    display_name: str = ""
+    created_at: str = Field(default_factory=_now)
+
+
+class Membership(SQLModel, table=True):
+    """A user's role in a workspace. owner > editor > viewer."""
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    user_id: str = Field(index=True)
+    workspace_id: str = Field(index=True)
+    role: str = "owner"
+    created_at: str = Field(default_factory=_now)
+
+
+class ProjectOwnership(SQLModel, table=True):
+    """Binds a project directory to the workspace that owns it."""
+    project_id: str = Field(primary_key=True)
+    workspace_id: str = Field(index=True)
+    created_at: str = Field(default_factory=_now)
+
+
+class AuthSession(SQLModel, table=True):
+    """Placeholder for P7. Present so session lookup has a home from the start."""
+    token: str = Field(primary_key=True)
+    user_id: str = Field(index=True)
+    expires_at: str = ""
+    created_at: str = Field(default_factory=_now)
+
+
 # --------------------------------------------------------------------------- engine
 
 _engine = None
@@ -354,9 +397,102 @@ def media_delete(project_id: str, media_id: str) -> Optional[Media]:
         return m
 
 
+# --------------------------------------------------------------------------- tenancy
+
+def workspace_get(workspace_id: str) -> Optional[Workspace]:
+    with _session() as s:
+        return s.get(Workspace, workspace_id)
+
+
+def workspace_create(id: str, name: str, slug: str) -> Workspace:
+    with _session() as s:
+        ws = Workspace(id=id, name=name, slug=slug)
+        s.add(ws)
+        s.commit()
+        s.refresh(ws)
+        return ws
+
+
+def workspaces_list() -> list[Workspace]:
+    with _session() as s:
+        return list(s.exec(select(Workspace).order_by(Workspace.created_at)).all())
+
+
+def user_create(email: str, display_name: str = "") -> User:
+    with _session() as s:
+        u = User(email=email, display_name=display_name)
+        s.add(u)
+        s.commit()
+        s.refresh(u)
+        return u
+
+
+def user_by_email(email: str) -> Optional[User]:
+    with _session() as s:
+        return s.exec(select(User).where(User.email == email)).first()
+
+
+def membership_add(user_id: str, workspace_id: str, role: str = "owner") -> Membership:
+    with _session() as s:
+        existing = s.exec(
+            select(Membership).where(
+                Membership.user_id == user_id, Membership.workspace_id == workspace_id
+            )
+        ).first()
+        if existing is not None:
+            existing.role = role
+            s.add(existing)
+            s.commit()
+            s.refresh(existing)
+            return existing
+        m = Membership(user_id=user_id, workspace_id=workspace_id, role=role)
+        s.add(m)
+        s.commit()
+        s.refresh(m)
+        return m
+
+
+def membership_get(user_id: str, workspace_id: str) -> Optional[Membership]:
+    with _session() as s:
+        return s.exec(
+            select(Membership).where(
+                Membership.user_id == user_id, Membership.workspace_id == workspace_id
+            )
+        ).first()
+
+
+def project_claim(project_id: str, workspace_id: str) -> ProjectOwnership:
+    """Record which workspace owns a project directory (idempotent)."""
+    with _session() as s:
+        row = s.get(ProjectOwnership, project_id)
+        if row is None:
+            row = ProjectOwnership(project_id=project_id, workspace_id=workspace_id)
+        else:
+            row.workspace_id = workspace_id
+        s.add(row)
+        s.commit()
+        s.refresh(row)
+        return row
+
+
+def project_workspace(project_id: str) -> Optional[str]:
+    with _session() as s:
+        row = s.get(ProjectOwnership, project_id)
+        return row.workspace_id if row else None
+
+
+def projects_for_workspace(workspace_id: str) -> list[str]:
+    with _session() as s:
+        rows = s.exec(
+            select(ProjectOwnership).where(ProjectOwnership.workspace_id == workspace_id)
+        ).all()
+        return [r.project_id for r in rows]
+
+
 def _clear_all() -> None:
     """Test helper wipe every table."""
     with _session() as s:
-        for model in (Artifact, Snapshot, Comment, Media, Chapter, Project):
+        for model in (Artifact, Snapshot, Comment, Media, Chapter, Project,
+                      AuthSession, Membership, ProjectOwnership, User, Workspace):
             s.exec(delete(model))
         s.commit()

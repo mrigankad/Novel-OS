@@ -2,7 +2,7 @@
 
 Agent phases (write/edit/validate…) call the LLM and take 30–90s, so they must
 never run inline in a request. We run them on a daemon thread and expose status
-for the UI to poll. Single-process, single-user — no external queue needed.
+for the UI to poll. Single-process, single-user no external queue needed.
 """
 
 from __future__ import annotations
