@@ -17,14 +17,19 @@
 | UI | Flagship glass (Approach B, SF Pro) | ✅ Shipped |
 | Assets | Lucide icons + Novel OS mark (self-hosted) | ✅ Staged |
 | UX | Library cards + Studio Settings + first-run | ✅ Shipped |
-| P2 | Moat A continuity surfacing, Codex, portraits | ◐ Health + Codex UI + Guardian injection; **context packs**; **R4 relationship checks** (since/contradiction/dead co-presence); auto-extract proposals later |
+| P2 | Moat A continuity surfacing, Codex, portraits | ◐ Health + Codex UI + Guardian injection + **context packs** + **R4 relationship checks** all shipped (11 checks in `ALL_CHECKS`); **Codex auto-extract proposals** is the only item left |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
 | P5 | Word parity track changes, styles, AI images | ☐ Not started |
 | P6 | Publishing DOCX / EPUB / PDF / HTML | ☐ Not started |
 | P7 | Commercial auth, billing, onboarding, marketing | ☐ Not started |
 
-**Pre-flight:** the working tree carries an uncommitted repo-wide em-dash strip (35 files, 286/286). Commit or discard before P0 starts.
+**Storage + layer architecture:** [`docs/superpowers/plans/2026-08-08-full-stack-architecture-and-buildout.md`](docs/superpowers/plans/2026-08-08-full-stack-architecture-and-buildout.md)
+— where every byte lives, what belongs in the system, and what deliberately does not.
+
+**State as of 2026-08-08 (`27b7865`):** the P1–P4 buildout is committed and all four
+suites are green (pytest 226 · vitest 13 · `npm run build` · `eslint`). Next up is
+P5, gated on the note in §6 of the architecture doc: styles must land before P6.
 
 ---
 

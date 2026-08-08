@@ -22,7 +22,9 @@ Categories of checks:
 
 from __future__ import annotations
 
+import inspect
 from dataclasses import dataclass, field, asdict
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional, Set, TYPE_CHECKING
 
@@ -459,15 +461,24 @@ ALL_CHECKS = (
 )
 
 
+@lru_cache(maxsize=None)
+def _takes_as_of_chapter(check) -> bool:
+    """True when `check` accepts the as_of_chapter argument."""
+    return "as_of_chapter" in inspect.signature(check).parameters
+
+
 def run_all(state: "StoryState", project_path: Optional[Path] = None,
             as_of_chapter: Optional[int] = None) -> List[Finding]:
     """Run every check that applies. project_path enables file-consistency checks."""
     out: List[Finding] = []
     for check in ALL_CHECKS:
-        # check_* functions that take only `state` won't accept as_of_chapter handle both
-        try:
+        # Some checks take only `state`. Decide from the signature rather than
+        # by catching TypeError: a TypeError raised *inside* a two-arg check
+        # would otherwise silently re-run it against the default chapter and
+        # report findings for the wrong point in the story.
+        if _takes_as_of_chapter(check):
             out.extend(check(state, as_of_chapter))  # type: ignore[arg-type]
-        except TypeError:
+        else:
             out.extend(check(state))  # type: ignore[arg-type]
     if project_path is not None:
         out.extend(check_chapter_file_consistency(state, project_path))

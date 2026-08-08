@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 _CORE = Path(__file__).resolve().parents[1] / "core"
 if str(_CORE) not in sys.path:
     sys.path.insert(0, str(_CORE))
@@ -139,3 +141,46 @@ def test_run_all_includes_relationship_checks(tmp_path):
     )
     findings = run_all(s)
     assert any(f.category == "relationship_orphan" for f in findings)
+
+
+def test_run_all_honours_as_of_chapter_for_every_check_that_takes_it(tmp_path):
+    """A check that accepts as_of_chapter must actually receive it.
+
+    run_all used to pick the arity by catching TypeError, so a TypeError raised
+    inside a two-arg check silently re-ran it against the default chapter and
+    reported findings for the wrong point in the story.
+    """
+    import continuity_engine as ce
+
+    s = _state(tmp_path)
+    seen: list[object] = []
+
+    def check_records_chapter(state, as_of_chapter=None):
+        seen.append(as_of_chapter)
+        return []
+
+    original = ce.ALL_CHECKS
+    ce.ALL_CHECKS = (check_records_chapter,)
+    try:
+        ce.run_all(s, as_of_chapter=7)
+    finally:
+        ce.ALL_CHECKS = original
+
+    assert seen == [7]
+
+
+def test_run_all_does_not_swallow_a_typeerror_raised_inside_a_check(tmp_path):
+    import continuity_engine as ce
+
+    s = _state(tmp_path)
+
+    def check_explodes(state, as_of_chapter=None):
+        raise TypeError("boom from inside the check")
+
+    original = ce.ALL_CHECKS
+    ce.ALL_CHECKS = (check_explodes,)
+    try:
+        with pytest.raises(TypeError, match="boom from inside"):
+            ce.run_all(s, as_of_chapter=3)
+    finally:
+        ce.ALL_CHECKS = original
