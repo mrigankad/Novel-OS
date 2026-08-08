@@ -13,11 +13,11 @@ function when(iso: string) {
   });
 }
 
-type Tab = "versions" | "comments" | "continuity";
+export type Tab = "versions" | "comments" | "continuity";
 
 export default function Inspector({
   id, num, currentText, flush, onRestored, pendingComment, onPendingCommentConsumed, onClose,
-  onCommentsChange, onJumpToComment,
+  onCommentsChange, onJumpToComment, requestedTab,
 }: {
   id: string; num: number; currentText: string;
   flush: () => Promise<void>; onRestored: (finalText?: string) => void;
@@ -26,8 +26,20 @@ export default function Inspector({
   onClose?: () => void;
   onCommentsChange?: (comments: CommentItem[]) => void;
   onJumpToComment?: (c: CommentItem) => void;
+  /** Studio mode asks for a tab; the writer can still switch away afterwards. */
+  requestedTab?: Tab;
 }) {
-  const [tab, setTab] = useState<Tab>(pendingComment ? "comments" : "versions");
+  const [tab, setTab] = useState<Tab>(
+    pendingComment ? "comments" : requestedTab ?? "versions",
+  );
+
+  // Honour a new request from the mode switch, but only when it changes - this
+  // is a suggestion about where to start, not a lock on the tab.
+  const [lastRequested, setLastRequested] = useState(requestedTab);
+  if (requestedTab !== lastRequested) {
+    setLastRequested(requestedTab);
+    if (requestedTab) setTab(requestedTab);
+  }
   // A new pending comment pulls the rail to the Comments tab. Adjusted during
   // render so the tab is already correct on the frame the selection lands.
   const [lastPending, setLastPending] = useState(pendingComment);

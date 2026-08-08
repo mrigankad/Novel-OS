@@ -13,7 +13,7 @@ import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
 import FinalEditor from "../components/FinalEditor";
 import ContinueChat from "../components/ContinueChat";
-import Inspector from "../components/Inspector";
+import Inspector, { type Tab as InspectorTab } from "../components/Inspector";
 import BinderNav from "../components/BinderNav";
 import Breadcrumbs from "../components/Breadcrumbs";
 import Scene from "../components/Scene";
@@ -21,6 +21,9 @@ import { useToast } from "../components/toastContext";
 import { useRunPhase } from "../hooks/useRunPhase";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useLatestRef } from "../hooks/useLatestRef";
+import { useStudioMode } from "../hooks/useStudioMode";
+import { chapterLayoutFor, getStudioMode } from "../lib/studioMode";
+import ModeSwitch from "../components/ModeSwitch";
 import type { CommentAnchor } from "../components/RichTextEditor";
 import { EMPTY_DOC, type PMDoc } from "../lib/richText";
 
@@ -71,6 +74,23 @@ export default function ChapterView() {
       setShowBinder(false);
       setShowInspector(false);
     }
+  }
+
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>(
+    () => chapterLayoutFor(getStudioMode()).inspectorTab,
+  );
+
+  // Switching mode re-lays out the surface: Write clears the rails so the
+  // manuscript is the page, Revise opens the Inspector on continuity. Applied
+  // on change only, so a writer who then toggles a rail by hand keeps it.
+  const [mode] = useStudioMode();
+  const [lastMode, setLastMode] = useState(mode);
+  if (mode !== lastMode) {
+    setLastMode(mode);
+    const layout = chapterLayoutFor(mode);
+    setShowBinder(layout.binder && !compact);
+    setShowInspector(layout.inspector && !compact);
+    setInspectorTab(layout.inspectorTab);
   }
   const [pendingComment, setPendingComment] = useState<{
     from: number; to: number; quote: string;
@@ -371,6 +391,7 @@ export default function ChapterView() {
                 </h1>
               </div>
               <div className="flex items-center gap-3 text-[12.5px] text-ink-muted">
+                <ModeSwitch />
                 {meta?.pov && <span>POV {meta.pov}</span>}
                 <StatusPill status={stages.status} />
                 <Link
@@ -522,6 +543,7 @@ export default function ChapterView() {
                 onPendingCommentConsumed={() => setPendingComment(null)}
                 onClose={() => setShowInspector(false)}
                 onCommentsChange={setComments}
+                requestedTab={inspectorTab}
                 onJumpToComment={(c) => {
                   if (c.from_pos == null || c.to_pos == null) return;
                   selectStage("final");

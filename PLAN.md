@@ -17,7 +17,8 @@
 | UI | Flagship glass (Approach B, SF Pro) | ✅ Shipped |
 | Assets | Lucide icons + Novel OS mark (self-hosted) | ✅ Staged |
 | UX | Library cards + Studio Settings + first-run | ✅ Shipped |
-| P2 | Moat A continuity surfacing, Codex, portraits | ✅ **Complete** — health, Codex UI, Guardian injection, context packs, R4 relationship checks (11 in `ALL_CHECKS`), **auto-extract proposals**, **intentional-dismissal with memory** |
+| P2 | Moat A continuity surfacing, Codex, portraits | ✅ **Complete** — health, Codex UI, Guardian injection, context packs, R4 relationship checks, **auto-extract proposals**, **intentional-dismissal with memory**, **stall detector** (12 in `ALL_CHECKS`) |
+| UX | Plan / Write / Revise modes; shape-of-the-book strip | ✅ Shipped — the stage pipeline is provenance now, not a workflow |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
 | P5 | Word parity track changes, styles, AI images | ◐ **Track changes shipped** (suggest mode, accept/reject, reject-all projection); styles / spellcheck / AI images not started |
@@ -45,6 +46,12 @@ P5, gated on the note in §6 of the architecture doc: styles must land before P6
 | Sudowrite | Best raw prose (Muse); Describe/Dialogue tools | No persistent memory across sessions |
 | NovelCrafter | Codex with auto context injection, scene beats, BYO keys | Setup friction; chat can't see scene content; reported data loss; rigid structure |
 | Word / Docs | Track changes, comments, styles, images | No story model |
+
+**Workflow + UX research:** [`docs/superpowers/specs/2026-08-08-authors-workflow-and-ux-flow.md`](docs/superpowers/specs/2026-08-08-authors-workflow-and-ux-flow.md)
+— the 35 jobs writing a novel involves, where writers actually stall, and the
+interaction design that follows. Note its uncomfortable finding: authors use AI
+for research, marketing, outlining and editing far more than for drafting prose,
+which is also the output they judge hardest.
 
 **The six unfilled gaps Novel OS targets:** deterministic continuity checking · pipeline provenance · reliability as a wedge · consequence preview · zero marginal token cost via the Claude Code CLI · spanning structure + editing + AI in one product.
 

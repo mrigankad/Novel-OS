@@ -23,6 +23,10 @@ import AddRelationshipModal from "../components/AddRelationshipModal";
 import Icon from "../components/Icon";
 import CodexImageButton from "../components/CodexImageButton";
 import CodexProposals from "../components/CodexProposals";
+import ModeSwitch from "../components/ModeSwitch";
+import BookShape from "../components/BookShape";
+import { useStudioMode } from "../hooks/useStudioMode";
+import { getStudioMode } from "../lib/studioMode";
 import { useToast } from "../components/toastContext";
 import { useRunPhase } from "../hooks/useRunPhase";
 import type { IconName } from "../icons/registry";
@@ -62,7 +66,21 @@ export default function ProjectDashboard() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSource, setLinkSource] = useState<string | undefined>();
   const [codexFilter, setCodexFilter] = useState<"all" | CodexEntryType>("all");
-  const [chapterView, setChapterView] = useState<"board" | "outline">("board");
+  // Plan mode is about structure, so it opens on the Outliner rather than the
+  // corkboard. Switching mode re-picks the default; picking a view by hand wins.
+  const [mode] = useStudioMode();
+  const [chapterView, setChapterView] = useState<"board" | "outline">(
+    () => (getStudioMode() === "plan" ? "outline" : "board"),
+  );
+  const [lastMode, setLastMode] = useState(mode);
+  if (mode !== lastMode) {
+    setLastMode(mode);
+    setChapterView(mode === "plan" ? "outline" : "board");
+  }
+
+  const refreshContinuity = useCallback(() => {
+    api.continuity(id).then(setContinuity).catch(() => setContinuity(null));
+  }, [id]);
 
   const load = useCallback(() => {
     api.project(id).then(setProject).catch((e) => setError(String(e)));
@@ -164,6 +182,10 @@ export default function ProjectDashboard() {
                 </p>
               ) : null}
 
+              <div className="mt-6">
+                <ModeSwitch />
+              </div>
+
               <div className="mt-7 flex flex-wrap gap-8">
                 <Stat label="Chapters" value={String(project.chapter_count)} />
                 <Stat label="Written" value={`${drafted}/${project.chapter_count || 0}`} />
@@ -210,18 +232,35 @@ export default function ProjectDashboard() {
               </div>
             </header>
 
-            <WritingTargets
-              projectId={id}
-              project={project}
-              wordCount={words}
-              onUpdated={setProject}
-            />
+            {/* Revise leads with the state of the book; Plan and Write lead
+                with where you are against your targets. */}
+            {/* Structure is what Plan and Revise are for; Write keeps the
+                dashboard quiet so the writer goes to the manuscript. */}
+            {mode !== "write" && <BookShape projectId={id} />}
 
-            <ManuscriptStats projectId={id} />
-
-            <ContinuityHealth report={continuity} onRefresh={() => {
-              api.continuity(id).then(setContinuity).catch(() => setContinuity(null));
-            }} />
+            {mode === "revise" ? (
+              <>
+                <ContinuityHealth report={continuity} onRefresh={refreshContinuity} />
+                <ManuscriptStats projectId={id} />
+                <WritingTargets
+                  projectId={id}
+                  project={project}
+                  wordCount={words}
+                  onUpdated={setProject}
+                />
+              </>
+            ) : (
+              <>
+                <WritingTargets
+                  projectId={id}
+                  project={project}
+                  wordCount={words}
+                  onUpdated={setProject}
+                />
+                <ManuscriptStats projectId={id} />
+                <ContinuityHealth report={continuity} onRefresh={refreshContinuity} />
+              </>
+            )}
 
             <div className="mt-6">
               <CollectionsPanel projectId={id} />

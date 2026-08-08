@@ -154,6 +154,35 @@ class AddCodexEntry(BaseModel):
     tags: list[str] = []
 
 
+class ChapterActivity(BaseModel):
+    """What measurably changed in one chapter - the shape strip's unit."""
+    number: int
+    title: str = ""
+    pov: str = ""
+    written: bool = False
+    plot_advances: int = 0
+    character_development: int = 0
+    emotional_beats: int = 0
+    new_information: int = 0
+    threads_touched: int = 0
+    word_count: int = 0
+    movement: int = 0
+    flat: bool = False
+
+
+class StallRun(BaseModel):
+    start: int
+    end: int
+    reason: str = ""
+    chapters: list[int] = []
+    length: int = 0
+
+
+class BookShape(BaseModel):
+    chapters: list[ChapterActivity] = []
+    stalls: list[StallRun] = []
+
+
 class ExemptFinding(BaseModel):
     """Mark a continuity finding intentional. `key` identifies the fact."""
     key: str

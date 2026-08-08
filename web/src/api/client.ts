@@ -49,6 +49,35 @@ export interface ContinuityFinding {
   key: string;
 }
 
+/** One chapter's measurable movement — the shape strip's unit (§4.3). */
+export interface ChapterActivity {
+  number: number;
+  title: string;
+  pov: string;
+  written: boolean;
+  plot_advances: number;
+  character_development: number;
+  emotional_beats: number;
+  new_information: number;
+  threads_touched: number;
+  word_count: number;
+  movement: number;
+  flat: boolean;
+}
+
+export interface StallRun {
+  start: number;
+  end: number;
+  reason: string;
+  chapters: number[];
+  length: number;
+}
+
+export interface BookShapeReport {
+  chapters: ChapterActivity[];
+  stalls: StallRun[];
+}
+
 export interface ContinuityExemption {
   key: string;
   reason: string;
@@ -318,6 +347,7 @@ export const api = {
     api_key?: string; base_url?: string; onboarding_completed?: boolean;
   }) => send<StudioLlmStatus>("/api/studio/llm", "PUT", body),
   continuity: (id: string) => get<ContinuityReport>(`/api/projects/${id}/continuity`),
+  bookShape: (id: string) => get<BookShapeReport>(`/api/projects/${id}/shape`),
   exemptions: (id: string) =>
     get<ContinuityExemption[]>(`/api/projects/${id}/continuity/exemptions`),
   exemptFinding: (id: string, key: string, reason: string) =>

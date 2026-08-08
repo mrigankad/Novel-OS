@@ -1630,6 +1630,20 @@ Foreshadowing_Planted: …
             findings = [f for f in findings if f.chapter is None or f.chapter == chapter]
         return [f.to_dict() for f in findings]
 
+    def book_shape(self, project_id: str) -> dict:
+        """Per-chapter movement plus any sagging runs (design spec §4.3).
+
+        Deterministic: the engine measures what changed, it does not ask a model
+        whether the book drags.
+        """
+        from stall_detector import book_shape, find_stalls  # noqa: E402
+
+        s = self._load(project_id)
+        return {
+            "chapters": [a.to_dict() for a in book_shape(s)],
+            "stalls": [r.to_dict() for r in find_stalls(s)],
+        }
+
     def exempt_finding(self, project_id: str, key: str, reason: str = "") -> dict:
         """Mark a finding intentional (PLAN.md P2.1).
 

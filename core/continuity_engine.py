@@ -457,6 +457,15 @@ def check_dead_bonded_co_presence(
 
 # --------------------------------------------------------------------- runners
 
+def _check_stalled_middle(state: "StoryState",
+                          as_of_chapter: Optional[int] = None) -> List[Finding]:
+    """Sagging-middle detection (design spec §4.3). Thin delegate so the
+    detector can be developed and tested on its own."""
+    from stall_detector import check_stalled_middle
+
+    return check_stalled_middle(state, as_of_chapter)
+
+
 ALL_CHECKS = (
     check_dormant_threads,
     check_overdue_threads,
@@ -469,6 +478,7 @@ ALL_CHECKS = (
     check_relationship_since_anachronism,
     check_contradictory_relationships,
     check_dead_bonded_co_presence,
+    _check_stalled_middle,
 )
 
 

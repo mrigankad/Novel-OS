@@ -10,7 +10,7 @@ from . import db, media as media_lib, richtext
 from .jobs import runner
 from .models import (
     AddCharacter, AddCodexEntry, AddComment, AddRelationship, ChapterDetail, ChapterStages,
-    CodexProposal, ContinuityExemption, ExemptFinding,
+    CodexProposal, ContinuityExemption, ExemptFinding, BookShape,
     ChapterSummary, CharacterSummary, CodexEntryOut, Comment, ConsequenceAccept,
     ConsequenceAcceptResult, ConsequencePreview, ConsequencePreviewRequest, ContinuityReport,
     ContinueParagraph, ContinueResult, CreateProject, CreateSnapshot, FinalDoc, FinalDocSave,
@@ -136,6 +136,15 @@ def _continuity_report(raw: list[dict]) -> ContinuityReport:
 def project_continuity(project_id: str, svc: ProjectService = Depends(get_service)):
     try:
         return _continuity_report(svc.continuity_findings(project_id))
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.get("/projects/{project_id}/shape", response_model=BookShape)
+def book_shape(project_id: str, svc: ProjectService = Depends(get_service)):
+    """The shape of the book: per-chapter movement and any sagging runs."""
+    try:
+        return svc.book_shape(project_id)
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
