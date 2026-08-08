@@ -3,6 +3,8 @@ import Modal from "./Modal";
 
 const SHORTCUTS: [string, string][] = [
   ["⌘K  /  Ctrl-K", "Open the command palette"],
+  ["⌘1 / ⌘2 / ⌘3", "Plan · Write · Revise"],
+  ["⌘.  /  Ctrl-.", "Quick note, without leaving the page"],
   ["[  /  ]", "Previous / next chapter"],
   ["Ctrl-F", "Find & replace (in the editor)"],
   ["?", "Show this help"],

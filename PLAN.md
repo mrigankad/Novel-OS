@@ -19,6 +19,7 @@
 | UX | Library cards + Studio Settings + first-run | ✅ Shipped |
 | P2 | Moat A continuity surfacing, Codex, portraits | ✅ **Complete** — health, Codex UI, Guardian injection, context packs, R4 relationship checks, **auto-extract proposals**, **intentional-dismissal with memory**, **stall detector** (12 in `ALL_CHECKS`) |
 | UX | Plan / Write / Revise modes; shape-of-the-book strip | ✅ Shipped — the stage pipeline is provenance now, not a workflow |
+| UX | One selection bar; quick capture (`⌘.`) | ✅ Shipped — a single AI entry point, and notes without leaving the page |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
 | P5 | Word parity track changes, styles, AI images | ◐ **Track changes shipped** (suggest mode, accept/reject, reject-all projection); styles / spellcheck / AI images not started |

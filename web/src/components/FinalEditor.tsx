@@ -1,6 +1,11 @@
 import { useCallback, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
 import RichTextEditor, { type CommentAnchor } from "./RichTextEditor";
 import SuggestionsPanel from "./SuggestionsPanel";
+import SelectionBubble from "./SelectionBubble";
+import {
+  BAR_ACTIONS, SELECTION_ACTIONS, type SelectionActionId,
+} from "../lib/selectionActions";
 import {
   EMPTY_DOC,
   insertImage,
@@ -63,6 +68,7 @@ export default function FinalEditor(props: {
   } = props;
 
   const handleRef = useRef<EditorHandle | null>(null);
+  const [editor, setEditor] = useState<Editor | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"write" | "preview">("write");
   const [suggesting, setSuggesting] = usePersisted("novelos-suggest-mode", false);
@@ -81,15 +87,22 @@ export default function FinalEditor(props: {
   const [ctx, setCtx] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [entity, setEntity] = useState<{ x: number; y: number; entry: CodexEntry } | null>(null);
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [rewriteIntent, setRewriteIntent] = useState<"rewrite" | "expand">("rewrite");
   const [rewriteSel, setRewriteSel] = useState<{
     from: number; to: number; quote: string; before: string; after: string;
   } | null>(null);
   const chooseFont = (f: ReaderFont) => { setReaderFont(f); setReaderFontState(f); };
 
-  function openRewrite() {
+  /**
+   * Both prose actions land in the same dialog and return the same three-part
+   * answer - proposal, what it breaks, what it might mean. Expand only differs
+   * by the instruction it starts from, so there is one flow to learn.
+   */
+  function openRewrite(intent: "rewrite" | "expand" = "rewrite") {
     const sel = handleRef.current?.getSelection();
     if (!sel) return;
     setRewriteSel(sel);
+    setRewriteIntent(intent);
     setRewriteOpen(true);
   }
 
@@ -112,46 +125,40 @@ export default function FinalEditor(props: {
     handleChange(result.final.doc as PMDoc);
   }
 
+  /**
+   * One definition of what you can do to a selection, shared by the floating
+   * bar and the right-click menu so the two can never offer different things.
+   */
+  /** The one place an action id becomes behaviour. */
+  function runAction(id: SelectionActionId) {
+    switch (id) {
+      case "rewrite": return openRewrite("rewrite");
+      case "expand": return openRewrite("expand");
+      case "comment": {
+        const sel = handleRef.current?.getSelection();
+        if (sel) onCommentSelection?.(sel);
+        return;
+      }
+      case "link": return openLink("link");
+      case "create": return openLink("create");
+      case "ask":
+        document.getElementById("scribe-chat-input")?.focus();
+        return;
+    }
+  }
+
   function openActionMenu(x: number, y: number) {
     if (mode !== "write") return;
-    const sel = handleRef.current?.getSelection();
+    const hasSelection = !!handleRef.current?.getSelection();
     setCtx({
       x,
       y,
-      items: [
-        {
-          id: "rewrite",
-          label: "Rewrite with AI",
-          disabled: !sel,
-          onSelect: () => openRewrite(),
-        },
-        {
-          id: "ask",
-          label: "Ask Scribe…",
-          disabled: false,
-          onSelect: () => {
-            document.getElementById("scribe-chat-input")?.focus();
-          },
-        },
-        {
-          id: "comment",
-          label: "Comment",
-          disabled: !sel,
-          onSelect: () => { if (sel) onCommentSelection?.(sel); },
-        },
-        {
-          id: "link",
-          label: "Link to Codex",
-          disabled: !sel,
-          onSelect: () => openLink("link"),
-        },
-        {
-          id: "create",
-          label: "Create Codex entry",
-          disabled: !sel,
-          onSelect: () => openLink("create"),
-        },
-      ],
+      items: SELECTION_ACTIONS.map((a) => ({
+        id: a.id,
+        label: a.label,
+        disabled: a.needsSelection && !hasSelection,
+        onSelect: () => runAction(a.id),
+      })),
     });
   }
 
@@ -160,6 +167,9 @@ export default function FinalEditor(props: {
 
   const onReady = useCallback((h: EditorHandle) => {
     handleRef.current = h;
+    // The selection bar subscribes to editor events, so it needs the instance
+    // as state - a ref read during render would not re-render it into place.
+    setEditor(h.editor);
     setLiveWords(countWords(h.getText()));
   }, []);
 
@@ -364,6 +374,14 @@ export default function FinalEditor(props: {
         <SuggestionsPanel doc={doc?.type === "doc" ? doc : EMPTY_DOC} onChange={handleChange} />
       </div>
 
+      {mode === "write" && (
+        <SelectionBubble
+          editor={editor}
+          actions={BAR_ACTIONS}
+          onSelect={runAction}
+        />
+      )}
+
       <ContextMenu
         open={ctx != null}
         x={ctx?.x ?? 0}
@@ -380,6 +398,11 @@ export default function FinalEditor(props: {
         selection={rewriteSel?.quote ?? ""}
         beforeContext={rewriteSel?.before ?? ""}
         afterContext={rewriteSel?.after ?? ""}
+        initialInstruction={
+          rewriteIntent === "expand"
+            ? "Expand this moment. Keep my voice and the same events."
+            : ""
+        }
         onAccept={acceptRewrite}
       />
 

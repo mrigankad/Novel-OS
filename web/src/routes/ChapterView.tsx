@@ -24,6 +24,7 @@ import { useLatestRef } from "../hooks/useLatestRef";
 import { useStudioMode } from "../hooks/useStudioMode";
 import { chapterLayoutFor, getStudioMode } from "../lib/studioMode";
 import ModeSwitch from "../components/ModeSwitch";
+import QuickCapture from "../components/QuickCapture";
 import type { CommentAnchor } from "../components/RichTextEditor";
 import { EMPTY_DOC, type PMDoc } from "../lib/richText";
 
@@ -522,6 +523,14 @@ export default function ChapterView() {
           </div>
         )}
       </div>
+
+      <QuickCapture
+        projectId={id}
+        chapterNumber={num}
+        onCaptured={() => {
+          api.comments(id, num).then(setComments).catch(() => {});
+        }}
+      />
 
       <AnimatePresence initial={false}>
         {showInspector && !focus && (
