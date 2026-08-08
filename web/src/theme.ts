@@ -1,29 +1,24 @@
-// Theme bootstrap runs at import time (before React renders) to avoid a flash.
+// Light-only instrument theme. Dark mode removed (2026-08-03 monochrome UI).
 
-export type Theme = "light" | "dark";
-
-const KEY = "novel-os-theme";
+export type Theme = "light";
 
 export function getTheme(): Theme {
-  const saved = localStorage.getItem(KEY) as Theme | null;
-  if (saved === "light" || saved === "dark") return saved;
-  // matchMedia is absent in some test environments (jsdom)
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
-  return prefersDark ? "dark" : "light";
+  return "light";
 }
 
-export function applyTheme(theme: Theme): void {
+// The theme argument is accepted and ignored: dark mode was removed in the
+// 2026-08-03 monochrome UI, but callers still pass a value.
+export function applyTheme(): void {
   const root = document.documentElement;
-  root.dataset.theme = theme;
-  root.style.colorScheme = theme;
+  root.dataset.theme = "light";
+  root.style.colorScheme = "light";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "dark" ? "#0e1320" : "#f3ecdd");
+    ?.setAttribute("content", "#1676df");
 }
 
-export function setTheme(theme: Theme): void {
-  localStorage.setItem(KEY, theme);
-  applyTheme(theme);
+export function setTheme(): void {
+  applyTheme();
 }
 
 // --- Reader font (manuscript canvas only; chrome always stays on --font-sans) ---
@@ -31,9 +26,9 @@ export function setTheme(theme: Theme): void {
 export type ReaderFont = "sans" | "serif" | "mono";
 
 export const READER_FONTS: { value: ReaderFont; label: string }[] = [
-  { value: "sans", label: "Google Sans" },
+  { value: "sans", label: "SF Pro" },
   { value: "serif", label: "Newsreader" },
-  { value: "mono", label: "Google Sans Code" },
+  { value: "mono", label: "Mono" },
 ];
 
 const FONT_KEY = "novel-os-reader-font";
@@ -52,6 +47,5 @@ export function setReaderFont(font: ReaderFont): void {
   applyReaderFont(font);
 }
 
-// Apply immediately on first import.
-applyTheme(getTheme());
+applyTheme();
 applyReaderFont(getReaderFont());

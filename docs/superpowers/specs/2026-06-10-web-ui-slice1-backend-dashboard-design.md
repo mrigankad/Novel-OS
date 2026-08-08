@@ -1,4 +1,4 @@
-# Novel OS Web UI — Slice 1: Backend API + Project Dashboard
+# Novel OS Web UI Slice 1: Backend API + Project Dashboard
 
 **Date:** 2026-06-10
 **Status:** Approved approach (FastAPI + React, full interactive workflow, decomposed into slices). This spec covers **Slice 1** only.
@@ -22,7 +22,7 @@ The full UI is decomposed into four slices, each its own spec → plan → build
 
 Stand up the full stack end-to-end with **read + navigation only**: a writer can
 open the app, see their projects, open one, and view its chapters, status, drafts,
-and story state — all served by a FastAPI layer that wraps the existing
+and story state all served by a FastAPI layer that wraps the existing
 orchestrator/state without duplicating logic. No agent triggering yet (that is
 Slice 2). This proves the architecture and de-risks everything downstream.
 
@@ -43,7 +43,7 @@ React (Vite, :5173) ──HTTP/JSON──> FastAPI (:8000) ──> StoryState / 
   small typed client. Styling deferred to Slice 4, but the component structure and
   brand tokens (navy `#0a0e1a`, amber `#fbbf24`) are set up now.
 
-## Backend API (Slice 1 endpoints — all read-only)
+## Backend API (Slice 1 endpoints all read-only)
 
 | Method | Path | Returns |
 |---|---|---|
@@ -62,17 +62,17 @@ React (Vite, :5173) ──HTTP/JSON──> FastAPI (:8000) ──> StoryState / 
 
 ## Frontend (Slice 1 screens)
 
-- **Projects list** — cards per project (title, genre, chapter progress). Empty state
+- **Projects list** cards per project (title, genre, chapter progress). Empty state
   explains how to create one via CLI (creation UI arrives in a later slice).
-- **Project dashboard** — chapter board (a column/grid of chapter cards showing
+- **Project dashboard** chapter board (a column/grid of chapter cards showing
   number, title, status pill, word count) + project meta sidebar.
-- **Chapter view** — outline (beat-sheet) and draft rendered as Markdown, read-only,
+- **Chapter view** outline (beat-sheet) and draft rendered as Markdown, read-only,
   side by side; status and word count in a header.
-- **App shell** — top bar with owl/wordmark, project switcher, routing
+- **App shell** top bar with owl/wordmark, project switcher, routing
   (`/`, `/projects/:id`, `/projects/:id/chapters/:n`) via React Router.
 
 State fetched with a typed `apiClient`; light data-fetching (React Query or simple
-hooks — decided in the plan). No global store needed at this size.
+hooks decided in the plan). No global store needed at this size.
 
 ## Data flow
 
@@ -92,7 +92,7 @@ click chapter ─GET /chapters/{n}─> render outline + draft (Markdown)
 ## Testing
 
 - **Backend:** pytest over `ProjectService` and routes using FastAPI `TestClient`
-  against a temp projects dir seeded with a sample `story_state.json` — assert project
+  against a temp projects dir seeded with a sample `story_state.json` assert project
   listing, chapter listing, detail, and 404s. No network, no LLM.
 - **Frontend:** component tests (Vitest + Testing Library) for the project list,
   chapter board, and chapter view against a mocked apiClient. One smoke test that the
@@ -103,13 +103,13 @@ click chapter ─GET /chapters/{n}─> render outline + draft (Markdown)
 - Triggering any agent/phase (Slice 2).
 - Editing prose or exporting from the browser (Slice 3).
 - Setup wizard screen, continuity panel, final visual polish (Slice 4).
-- Auth, hosting, multi-user — local single-user only for now.
+- Auth, hosting, multi-user local single-user only for now.
 
 ## Affected / new files
 
 - `api/__init__.py`, `api/main.py` (FastAPI app + CORS), `api/routes.py`,
   `api/services.py`, `api/models.py` (Pydantic response models).
-- `web/` — Vite React TS app (`src/api/client.ts`, `src/routes/*`, `src/components/*`).
-- `tests/test_api.py` — backend API tests.
-- `requirements.txt` — add `fastapi`, `uvicorn[standard]`.
-- `README.md` — "Run the web UI" section.
+- `web/` Vite React TS app (`src/api/client.ts`, `src/routes/*`, `src/components/*`).
+- `tests/test_api.py` backend API tests.
+- `requirements.txt` add `fastapi`, `uvicorn[standard]`.
+- `README.md` "Run the web UI" section.

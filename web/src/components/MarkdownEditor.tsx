@@ -13,12 +13,12 @@ const manuscriptTheme = EditorView.theme({
     fontFamily: "var(--font-prose)",
     fontSize: "var(--editor-size, 1.075rem)",
     padding: "0",
-    caretColor: "var(--color-amber-deep)",
+    caretColor: "var(--color-ink)",
   },
   ".cm-line": { padding: "0 2px" },
-  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-amber-deep)", borderLeftWidth: "2px" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--color-ink)", borderLeftWidth: "2px" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
-    backgroundColor: "color-mix(in srgb, var(--color-amber) 28%, transparent)",
+    backgroundColor: "color-mix(in srgb, var(--color-ink) 12%, transparent)",
   },
   ".cm-placeholder": { color: "var(--color-paper-muted)" },
 });

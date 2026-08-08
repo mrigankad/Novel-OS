@@ -2,22 +2,28 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-vi.mock("../components/MarkdownEditor", () => ({
-  default: (props: { value: string; onChange: (v: string) => void }) => (
-    <textarea value={props.value} onChange={(e) => props.onChange(e.target.value)} />
-  ),
+vi.mock("../components/RichTextEditor", () => ({
+  default: () => <div aria-label="Final manuscript" />,
+}));
+
+vi.mock("../components/ContinueChat", () => ({
+  default: () => null,
 }));
 
 import FinalEditor from "../components/FinalEditor";
 import { getReaderFont } from "../theme";
+import { EMPTY_DOC } from "../lib/richText";
 
 function renderEditor() {
   render(
     <FinalEditor
+      projectId="book"
+      chapterNumber={1}
       hasFinal
       canPromote={false}
       promoteFrom=""
-      text="Once upon a time."
+      doc={EMPTY_DOC}
+      wordCount={4}
       onChange={() => {}}
       onSave={() => {}}
       onPromote={() => {}}
@@ -35,26 +41,27 @@ beforeEach(() => {
   delete document.documentElement.dataset.readerFont;
 });
 
-test("defaults the manuscript canvas to Google Sans", () => {
+test("defaults the manuscript canvas to SF Pro", () => {
   renderEditor();
   expect(getReaderFont()).toBe("sans");
-  expect(screen.getByLabelText("Reading font")).toHaveValue("sans");
+  const group = screen.getByRole("radiogroup", { name: "Reading font" });
+  expect(group.querySelector('[aria-checked="true"]')).toHaveAttribute("aria-label", "SF Pro");
 });
 
 test("switching the reader font rebinds the token and persists it", async () => {
+  const user = userEvent.setup();
   renderEditor();
-  await userEvent.selectOptions(screen.getByLabelText("Reading font"), "serif");
+  await user.click(screen.getByRole("radio", { name: "Newsreader" }));
 
-  // Applied to <html>, which is what rebinds --font-prose in index.css.
   expect(document.documentElement.dataset.readerFont).toBe("serif");
-  // Persisted, so it survives a reload.
   expect(getReaderFont()).toBe("serif");
 });
 
-test("offers all three reader fonts", () => {
+test("offers all three reader fonts as visible choices", () => {
   renderEditor();
-  const labels = Array.from(
-    screen.getByLabelText("Reading font").querySelectorAll("option"),
-  ).map((o) => o.textContent);
-  expect(labels).toEqual(["Google Sans", "Newsreader", "Google Sans Code"]);
+  const group = screen.getByRole("radiogroup", { name: "Reading font" });
+  const labels = [...group.querySelectorAll('[role="radio"]')].map((el) =>
+    el.getAttribute("aria-label"),
+  );
+  expect(labels).toEqual(["SF Pro", "Newsreader", "Mono"]);
 });

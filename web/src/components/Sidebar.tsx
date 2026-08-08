@@ -1,78 +1,135 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import ThemeToggle from "./ThemeToggle";
+import { motion } from "motion/react";
+import BrandMark, { BrandLogo } from "./BrandMark";
+import Icon from "./Icon";
 
-function OwlMark() {
-  return (
-    <svg viewBox="0 0 32 32" className="h-8 w-8" aria-hidden="true">
-      <circle cx="16" cy="16" r="15" fill="#161d2e" stroke="#f4b740" strokeWidth="1.2" />
-      <path d="M9 11c0-2 2-3 3-1m11 1c0-2-2-3-3-1" stroke="#f4b740" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-      <circle cx="12" cy="16" r="3.4" fill="#0e1320" stroke="#f4b740" strokeWidth="1.1" />
-      <circle cx="20" cy="16" r="3.4" fill="#0e1320" stroke="#f4b740" strokeWidth="1.1" />
-      <circle cx="12" cy="16" r="1.2" fill="#f4b740" />
-      <circle cx="20" cy="16" r="1.2" fill="#f4b740" />
-      <path d="M16 19l-1.6 2.4h3.2L16 19z" fill="#f4b740" />
-    </svg>
-  );
+const STORAGE_KEY = "novelos-sidebar-collapsed";
+
+function loadCollapsed(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 export default function Sidebar() {
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
+    } catch { /* ignore */ }
+  }, [collapsed]);
+
   return (
-    <aside className="flex w-[244px] shrink-0 flex-col bg-ink text-[#c8cedd]">
-      <div className="flex items-center justify-between px-5 pt-6 pb-5">
-        <div className="flex items-center gap-2.5">
-          <OwlMark />
-          <div className="leading-tight">
-            <div className="font-display text-[19px] font-semibold tracking-tight text-white">
-              Novel OS
-            </div>
-            <div className="text-[10.5px] uppercase tracking-[0.18em] text-amber/90">
-              Manuscript Desk
-            </div>
-          </div>
+    <aside
+      className={`glass-rail flex shrink-0 flex-col text-ink-text transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+        collapsed ? "w-[72px]" : "w-[240px]"
+      }`}
+      data-collapsed={collapsed ? "true" : "false"}
+    >
+      <div className={`pt-4 pb-3 ${collapsed ? "px-2" : "px-4"}`}>
+        <div className={`mb-2 flex ${collapsed ? "justify-center" : "justify-end"}`}>
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-white/70 hover:text-ink-text"
+          >
+            <Icon
+              name="chevron-right"
+              className={`h-4 w-4 transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`}
+            />
+          </button>
         </div>
-        <ThemeToggle />
+        {collapsed ? (
+          <div className="flex justify-center">
+            <BrandMark className="h-11 w-11" />
+          </div>
+        ) : (
+          <BrandLogo className="h-24 w-auto max-w-[208px] object-contain object-left" />
+        )}
       </div>
 
-      <div className="mx-5 mb-4 h-px bg-ink-line" />
+      {!collapsed && <div className="mx-4 mb-3 h-px bg-[rgba(74,91,133,0.12)]" />}
+      {collapsed && <div className="mx-3 mb-2 h-px bg-[rgba(74,91,133,0.12)]" />}
 
-      <nav className="flex flex-col gap-0.5 px-3">
+      <nav className={`flex flex-col gap-1.5 ${collapsed ? "px-2" : "px-3"}`}>
         <button
+          type="button"
+          title="Search"
+          aria-label="Search"
           onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-          className="mb-1 flex items-center justify-between rounded-lg px-3 py-2 text-[13px] text-[#aab2c4] transition-colors hover:bg-ink-800"
+          className={`flex h-11 items-center rounded-2xl text-[13px] font-medium text-ink-muted transition-colors duration-150 hover:bg-white/70 hover:text-ink-text ${
+            collapsed ? "justify-center px-0" : "justify-between gap-3 px-3.5"
+          }`}
         >
-          <span>Search…</span>
-          <kbd className="rounded border border-ink-line px-1.5 py-0.5 text-[10px] text-[#9aa3b8]">⌘K</kbd>
+          <span className={`flex items-center ${collapsed ? "" : "gap-2.5"}`}>
+            <Icon name="search" className="h-4 w-4" />
+            {!collapsed && "Search"}
+          </span>
+          {!collapsed && (
+            <kbd className="rounded-md border border-[rgba(74,91,133,0.14)] bg-white/80 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-ink-muted shadow-sm">
+              ⌘K
+            </kbd>
+          )}
         </button>
-        <SideLink to="/" label="Library" hint="All projects" />
+        <SideLink to="/" label="Library" hint="Projects" icon="library" end collapsed={collapsed} />
+        <SideLink to="/settings" label="Settings" hint="Models" icon="sparkles" collapsed={collapsed} />
       </nav>
 
-      <div className="mt-auto px-5 pb-5 pt-6">
-        <div className="rounded-lg border border-ink-line/70 bg-ink-800/60 p-3.5">
-          <p className="font-display text-[13px] italic text-[#aeb6c8]">
-            “Write novels like a build pipeline.”
-          </p>
+      {!collapsed && (
+        <div className="mt-auto px-4 pb-5 pt-6">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12, duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
+            className="glass-card rounded-[20px] px-3.5 py-3.5"
+          >
+            <p className="text-[12px] leading-relaxed text-ink-muted">
+              Structure first. Prose second. Continuity always.
+            </p>
+          </motion.div>
         </div>
-        <p className="mt-3 text-[10.5px] tracking-wide text-[#8b93a8]">
-          v0.2.0 · local
-        </p>
-      </div>
+      )}
+      {collapsed && <div className="mt-auto" />}
     </aside>
   );
 }
 
-function SideLink({ to, label, hint }: { to: string; label: string; hint: string }) {
+function SideLink({
+  to, label, hint, icon, end, collapsed,
+}: {
+  to: string; label: string; hint: string; icon: "library" | "sparkles";
+  end?: boolean; collapsed?: boolean;
+}) {
   return (
     <NavLink
       to={to}
-      end
+      end={end}
+      title={label}
+      aria-label={label}
       className={({ isActive }) =>
-        `group flex flex-col rounded-lg px-3 py-2 transition-colors ${
-          isActive ? "bg-ink-700 text-white" : "text-[#aab2c4] hover:bg-ink-800"
+        `group flex h-11 items-center rounded-2xl transition-all duration-200 ${
+          collapsed ? "justify-center px-0" : "justify-between gap-3 px-3.5"
+        } ${
+          isActive
+            ? "bg-ink text-on-ink shadow-[0_10px_24px_rgba(23,33,63,0.18)]"
+            : "text-ink-muted hover:bg-white/70 hover:text-ink-text"
         }`
       }
     >
-      <span className="text-[13.5px] font-medium">{label}</span>
-      <span className="text-[11px] text-[#9aa3b8]">{hint}</span>
+      <span className={`flex items-center ${collapsed ? "" : "gap-2.5"}`}>
+        <Icon name={icon} className="h-4 w-4" />
+        {!collapsed && (
+          <span className="text-[13px] font-semibold tracking-[-0.01em] leading-none">{label}</span>
+        )}
+      </span>
+      {!collapsed && <span className="text-[11px] leading-none opacity-55">{hint}</span>}
     </NavLink>
   );
 }

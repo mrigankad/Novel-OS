@@ -17,7 +17,7 @@ Field syntax supported (both forms):
     - item one
     - item two
 
-Closing tag is optional — we accept either [/TAG] or "stop at next [TAG]".
+Closing tag is optional we accept either [/TAG] or "stop at next [TAG]".
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def extract_block(text: str, tag: str) -> Optional[str]:
     if close_m:
         return text[start:close_m.start()].strip()
 
-    # No closing tag — stop at the next [KNOWN_TAG] occurrence
+    # No closing tag stop at the next [KNOWN_TAG] occurrence
     rest = text[start:]
     next_tag = re.search(r"\[/?[A-Z_]+\]", rest)
     if next_tag and next_tag.group(0)[1:-1].lstrip("/").upper() in _KNOWN_TAGS:
@@ -208,14 +208,19 @@ def apply_to_state(
     log: List[str] = []
     chapter = state.get_chapter(chapter_number) or state.create_chapter(chapter_number)
 
-    # ----- characters present -> bump last_appearance_chapter
+    # ----- characters present -> chapter cast + bump last_appearance_chapter
+    present_names: List[str] = []
     for raw in _as_list(parsed.get("characters_present")):
         cid = _resolve_character_id(state, raw)
         if cid:
             state.characters[cid].last_appearance_chapter = chapter_number
+            present_names.append(state.characters[cid].full_name)
             log.append(f"[{source}] {state.characters[cid].full_name}: appeared in ch{chapter_number}")
         else:
+            present_names.append(str(raw).strip())
             log.append(f"[{source}] unknown character referenced: {raw!r}")
+    if present_names:
+        chapter.characters_present = present_names
 
     # ----- emotional shifts: "Name: new state"
     for item in _as_list(parsed.get("emotional_shifts")):

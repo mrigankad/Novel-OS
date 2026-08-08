@@ -1,6 +1,6 @@
-# Novel OS — Programmatic API
+# Novel OS Programmatic API
 
-Everything Novel OS does is available as importable Python — the CLI is just a thin layer.
+Everything Novel OS does is available as importable Python the CLI is just a thin layer.
 
 ---
 
@@ -8,7 +8,7 @@ Everything Novel OS does is available as importable Python — the CLI is just a
 
 ```
 core/
-├── orchestrator.py          NovelOrchestrator — workflow + CLI
+├── orchestrator.py          NovelOrchestrator workflow + CLI
 ├── state_manager.py         StoryState, Character, PlotThread, ChapterState, ...
 ├── llm_client.py            LLMClient (13+ providers), LLMError
 ├── state_parser.py          ingest_agent_output, parse_*, apply_to_state
@@ -52,7 +52,7 @@ state.save_state()
 
 ---
 
-## LLMClient — any provider
+## LLMClient any provider
 
 ```python
 from llm_client import LLMClient
@@ -78,7 +78,7 @@ Supported providers: `anthropic`, `openai`, `azure`, `gemini`, `nvidia`, `kimi`,
 
 ---
 
-## State parser — agent output → state mutations
+## State parser agent output → state mutations
 
 ```python
 from state_parser import ingest_agent_output
@@ -108,7 +108,7 @@ from state_parser import (
 
 ---
 
-## Continuity engine — deterministic checks
+## Continuity engine deterministic checks
 
 ```python
 from continuity_engine import run_all, Finding
@@ -135,7 +135,7 @@ from continuity_engine import (
 
 ---
 
-## NovelOrchestrator — high-level workflow
+## NovelOrchestrator high-level workflow
 
 ```python
 from orchestrator import NovelOrchestrator

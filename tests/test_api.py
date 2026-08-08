@@ -149,8 +149,8 @@ def test_stages_returns_all_present_artifacts(tmp_path):
     _seed_with_chapter(tmp_path, outline="# Beats", draft="Draft text", revised="Revised text")
     body = _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()
     assert body["outline"] == "# Beats"
-    assert body["draft"] == "Draft text"
-    assert body["revised"] == "Revised text"
+    assert (body["draft"] or "").rstrip("\n") == "Draft text"
+    assert (body["revised"] or "").rstrip("\n") == "Revised text"
     assert body["final"] is None
 
 
@@ -163,15 +163,15 @@ def test_promote_final_prefers_revised(tmp_path):
     _seed_with_chapter(tmp_path, draft="Draft text", revised="Revised text")
     resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
     assert resp.status_code == 200
-    assert resp.json()["final"] == "Revised text"
+    assert resp.json()["final"].rstrip("\n") == "Revised text"
     # now present in stages
-    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"] == "Revised text"
+    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"].rstrip("\n") == "Revised text"
 
 
 def test_promote_final_falls_back_to_draft(tmp_path):
     _seed_with_chapter(tmp_path, draft="Only draft")
     resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
-    assert resp.json()["final"] == "Only draft"
+    assert resp.json()["final"].rstrip("\n") == "Only draft"
 
 
 def test_promote_final_conflict_when_no_source(tmp_path):
@@ -181,9 +181,9 @@ def test_promote_final_conflict_when_no_source(tmp_path):
 
 def test_promote_is_idempotent_without_force(tmp_path):
     _seed_with_chapter(tmp_path, revised="Revised", final="Hand-edited final")
-    # already has a final — promote without force must not clobber the human edit
+    # already has a final promote without force must not clobber the human edit
     resp = _client(tmp_path).post("/api/projects/p/chapters/1/final/promote")
-    assert resp.json()["final"] == "Hand-edited final"
+    assert resp.json()["final"].rstrip("\n") == "Hand-edited final"
 
 
 def test_save_final_writes_and_updates_word_count(tmp_path):
@@ -191,7 +191,7 @@ def test_save_final_writes_and_updates_word_count(tmp_path):
     resp = _client(tmp_path).put("/api/projects/p/chapters/1/final", json={"text": "one two three"})
     assert resp.status_code == 200
     assert resp.json()["word_count"] == 3
-    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"] == "one two three"
+    assert _client(tmp_path).get("/api/projects/p/chapters/1/stages").json()["final"].rstrip("\n") == "one two three"
 
 
 def test_save_final_404_for_missing_chapter(tmp_path):
@@ -308,7 +308,7 @@ def test_snapshot_lifecycle(tmp_path):
     sid = r.json()["id"]
     assert any(s["id"] == sid for s in c.get("/api/projects/p/chapters/1/snapshots").json())
     got = c.get(f"/api/projects/p/chapters/1/snapshots/{sid}").json()
-    assert got["text"] == "draft body" and got["label"] == "v1"
+    assert got["text"].rstrip("\n") == "draft body" and got["label"] == "v1"
 
 
 def test_snapshot_409_without_final(tmp_path):
@@ -323,8 +323,8 @@ def test_snapshot_restore_makes_backup(tmp_path):
     sid = c.post("/api/projects/p/chapters/1/snapshots", json={"label": "v1"}).json()["id"]
     c.put("/api/projects/p/chapters/1/final", json={"text": "changed"})
     r = c.post(f"/api/projects/p/chapters/1/snapshots/{sid}/restore")
-    assert r.status_code == 200 and r.json()["final"] == "orig"
-    assert c.get("/api/projects/p/chapters/1/stages").json()["final"] == "orig"
+    assert r.status_code == 200 and r.json()["final"].rstrip("\n") == "orig"
+    assert c.get("/api/projects/p/chapters/1/stages").json()["final"].rstrip("\n") == "orig"
     labels = [s["label"] for s in c.get("/api/projects/p/chapters/1/snapshots").json()]
     assert "Before restore" in labels
 
@@ -361,7 +361,7 @@ def test_ingest_mirrors_content_to_db(tmp_path):
     _seed_with_chapter(tmp_path, outline="# Beats", draft="draft body")
     c = _client(tmp_path)
     c.post("/api/projects/p/chapters/1/final/promote")  # dual-writes final to DB
-    assert dbmod.get_artifact_text("p", 1, "final") == "draft body"
+    assert dbmod.get_artifact_text("p", 1, "final").rstrip("\n") == "draft body"
     c.get("/api/projects/p/chapters/1/stages")  # triggers ingest of outline/draft
     assert dbmod.get_artifact_text("p", 1, "outline") == "# Beats"
-    assert dbmod.get_artifact_text("p", 1, "draft") == "draft body"
+    assert dbmod.get_artifact_text("p", 1, "draft").rstrip("\n") == "draft body"

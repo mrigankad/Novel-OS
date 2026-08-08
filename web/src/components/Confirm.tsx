@@ -1,20 +1,6 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import Modal from "./Modal";
-
-interface ConfirmOptions {
-  title?: string;
-  message: string;
-  confirmLabel?: string;
-  danger?: boolean;
-}
-
-const ConfirmCtx = createContext<(opts: ConfirmOptions) => Promise<boolean>>(
-  async () => true,
-);
-
-export function useConfirm() {
-  return useContext(ConfirmCtx);
-}
+import { ConfirmCtx, type ConfirmOptions } from "./confirmContext";
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<
@@ -38,17 +24,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       <Modal open={!!state} onClose={() => close(false)} title={state?.title ?? "Are you sure?"}>
         <p className="text-[14px] leading-relaxed text-ink-muted">{state?.message}</p>
         <div className="mt-6 flex justify-end gap-3">
-          <button
-            onClick={() => close(false)}
-            className="rounded-lg px-4 py-2 text-[13.5px] font-semibold text-ink-muted transition-colors hover:bg-ink/5"
-          >
+          <button type="button" onClick={() => close(false)} className="btn-ghost px-3 py-2">
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => close(true)}
-            className={`rounded-lg px-5 py-2 text-[13.5px] font-semibold text-on-ink transition-colors ${
-              state?.danger ? "bg-red-600 hover:bg-red-700" : "bg-ink hover:bg-ink-800"
-            }`}
+            className={`btn-primary px-4 py-2 ${state?.danger ? "underline decoration-2 underline-offset-4" : ""}`}
           >
             {state?.confirmLabel ?? "Confirm"}
           </button>

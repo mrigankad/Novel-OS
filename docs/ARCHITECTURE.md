@@ -1,22 +1,22 @@
-# Novel OS — System Architecture
+# Novel OS System Architecture
 
 ## Layers
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  web/  — React + Vite + Tailwind v4 (the studio UI)          │
+│  web/  React + Vite + Tailwind v4 (the studio UI)          │
 │         Library · Dashboard · Chapter (binder/flow/editor)    │
 └───────────────▲──────────────────────────────────────────────┘
                 │  HTTP / JSON  (polls jobs)
 ┌───────────────┴──────────────────────────────────────────────┐
-│  api/  — FastAPI (system-of-record for the UI)               │
+│  api/  FastAPI (system-of-record for the UI)               │
 │   routes  →  services (ProjectService)  →  db (SQLite)        │
 │                         │                                     │
 │                    JobRunner (threads) → core/ orchestrator   │
 └───────────────┬──────────────────────────────────────────────┘
                 │  reads/writes files                          
 ┌───────────────┴──────────────────────────────────────────────┐
-│  core/  — multi-agent engine (file-based)                    │
+│  core/  multi-agent engine (file-based)                    │
 │   orchestrator · agents · StoryState · continuity_engine      │
 │   LLMClient (claude_cli / anthropic / openai / …)             │
 └──────────────────────────────────────────────────────────────┘
@@ -26,24 +26,35 @@
 
 Novel OS deliberately keeps **two** stores and an ingest bridge between them:
 
-1. **Filesystem — the agent engine's working store.**
+1. **Filesystem the agent engine's working store.**
    `core/` is file-based and unchanged: each project is a folder under
    `NOVEL_OS_PROJECTS_DIR` with `outputs/state/story_state.json` and per-chapter
    stage files (`outline`, `draft`, `revised`, `final`). Agents read/write these.
 
-2. **SQLite database — the API's system-of-record.** (`api/db.py`, via SQLModel)
+2. **SQLite database the API's system-of-record.** (`api/db.py`, via SQLModel)
    Stores everything the UI owns and queries:
-   - `Project`, `Chapter` — registry/metadata
-   - `Artifact` — the **text** of each stage (`outline/draft/revised/final`) — "files in the DB"
-   - `Snapshot` — version history (label, text, word count, timestamp)
-   - `Comment` — annotations (body, optional quote, resolved)
+   - `Project`, `Chapter` registry/metadata
+   - `Artifact` the **text** of each stage (`outline/draft/revised/final`) "files in the DB"
+   - `Snapshot` version history (label, text, word count, timestamp)
+   - `Comment` annotations (body, optional quote, resolved)
 
    DB location: `NOVEL_OS_DB` (default `sqlite:///./novel_os.db`).
+   Postgres is supported by URL (`postgresql+psycopg://…`); SQLite-only
+   `connect_args` are applied only for `sqlite:` URLs. Story truth stays on disk.
 
 3. **Ingest bridge** (`db.ingest_project`). After agents produce files, reading a
    chapter's stages mirrors those files into `Artifact` rows. The **Final** is
    DB-first: human edits write to the DB (and to the file, so the engine/export
    keep working); ingest never overwrites a saved Final from an older file.
+
+4. **Context packs** (`core/context_pack.py`). Architect / Scribe / Guardian /
+   continue / consequence prompts receive a **ranked** chapter pack (cast, bonds,
+   threads, prior synopses, Codex) with per-purpose budgets instead of dump-then-
+   truncate. No vector database — embeddings deferred to P4 semantic search.
+
+5. **Keyword search** (`GET /api/projects/{id}/search?q=`). Ranked substring/token
+   hits over characters, Codex, chapter titles, and relationships. Powers ⌘K.
+   Postgres FTS can replace the scorer later behind the same route.
 
 ### Why two stores?
 The agents are a mature file-based pipeline; rewriting them to be DB-native is
@@ -74,7 +85,7 @@ in sync. Over time, more reads move DB-first (the ingest path already populates 
 | `comment` | project_id, chapter, body, quote, resolved, created_at |
 
 ## Conventions
-- Agent phases never run inline in a request — always via `JobRunner` (threads),
+- Agent phases never run inline in a request always via `JobRunner` (threads),
   polled by the UI.
 - Human-owned content (Final, snapshots, comments) is DB-first; engine artifacts
   (outline/draft/revised) are file-first, ingested into the DB.

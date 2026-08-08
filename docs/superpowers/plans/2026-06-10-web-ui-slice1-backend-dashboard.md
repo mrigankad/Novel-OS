@@ -1,4 +1,4 @@
-# Novel OS Web UI — Slice 1 (Backend API + Dashboard) Implementation Plan
+# Novel OS Web UI Slice 1 (Backend API + Dashboard) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -10,7 +10,7 @@
 
 ---
 
-## Reference facts (from the codebase — do not re-derive)
+## Reference facts (from the codebase do not re-derive)
 
 - `core/state_manager.py` → `StoryState(project_path: str)` loads `<project_path>/outputs/state/story_state.json` in `__init__`. It is the read API.
 - Useful fields/methods on a `StoryState` instance `s`:
@@ -27,20 +27,20 @@
 
 ## File structure
 
-- `api/__init__.py` — marks the package; exposes `create_app`.
-- `api/services.py` — `ProjectService`: project discovery + state reads. The ONLY disk/state access.
-- `api/models.py` — Pydantic response models.
-- `api/routes.py` — FastAPI `APIRouter` with the read endpoints; calls `ProjectService`.
-- `api/main.py` — `create_app()` builds the FastAPI app, mounts the router, configures CORS; `app` module-level instance for uvicorn.
-- `tests/test_api.py` — backend tests via `TestClient` against a seeded temp projects dir.
-- `web/` — Vite React TS app:
-  - `web/src/api/client.ts` — typed fetch client + response types.
+- `api/__init__.py` marks the package; exposes `create_app`.
+- `api/services.py` `ProjectService`: project discovery + state reads. The ONLY disk/state access.
+- `api/models.py` Pydantic response models.
+- `api/routes.py` FastAPI `APIRouter` with the read endpoints; calls `ProjectService`.
+- `api/main.py` `create_app()` builds the FastAPI app, mounts the router, configures CORS; `app` module-level instance for uvicorn.
+- `tests/test_api.py` backend tests via `TestClient` against a seeded temp projects dir.
+- `web/` Vite React TS app:
+  - `web/src/api/client.ts` typed fetch client + response types.
   - `web/src/components/ChapterBoard.tsx`, `web/src/components/ProjectCard.tsx`
   - `web/src/routes/ProjectsList.tsx`, `web/src/routes/ProjectDashboard.tsx`, `web/src/routes/ChapterView.tsx`
-  - `web/src/App.tsx` — shell + routing.
-  - `web/src/test/*.test.tsx` — Vitest component tests.
-- `requirements.txt` — add `fastapi`, `uvicorn[standard]`.
-- `README.md` — "Run the web UI" section.
+  - `web/src/App.tsx` shell + routing.
+  - `web/src/test/*.test.tsx` Vitest component tests.
+- `requirements.txt` add `fastapi`, `uvicorn[standard]`.
+- `README.md` "Run the web UI" section.
 
 ---
 
@@ -82,7 +82,7 @@ def test_health_ok():
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_api.py::test_health_ok -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'api'`.
+Expected: FAIL `ModuleNotFoundError: No module named 'api'`.
 
 - [ ] **Step 4: Create the package and app**
 
@@ -202,7 +202,7 @@ def test_list_projects(projects_root):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_api.py::test_list_projects -v`
-Expected: FAIL — `ModuleNotFoundError: No module named 'api.services'`.
+Expected: FAIL `ModuleNotFoundError: No module named 'api.services'`.
 
 - [ ] **Step 3: Create the Pydantic models**
 
@@ -352,7 +352,7 @@ def test_get_projects_endpoint(projects_root):
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/test_api.py::test_get_projects_endpoint -v`
-Expected: FAIL — `create_app()` takes no `projects_root`, and `/api/projects` 404s.
+Expected: FAIL `create_app()` takes no `projects_root`, and `/api/projects` 404s.
 
 - [ ] **Step 3: Make the service injectable + add the route**
 
@@ -465,7 +465,7 @@ def test_chapters_list(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_api.py -k "project_detail or chapters_list" -v`
-Expected: FAIL — endpoints/methods do not exist (404).
+Expected: FAIL endpoints/methods do not exist (404).
 
 - [ ] **Step 3: Add service methods**
 
@@ -598,7 +598,7 @@ def test_characters_endpoint(tmp_path):
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_api.py -k "chapter_detail or chapter_404 or characters_endpoint" -v`
-Expected: FAIL — routes/methods missing.
+Expected: FAIL routes/methods missing.
 
 - [ ] **Step 3: Add service methods**
 
@@ -797,7 +797,7 @@ test("renders project cards from the API", async () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npm run test -- ProjectsList`
-Expected: FAIL — module `../routes/ProjectsList` not found.
+Expected: FAIL module `../routes/ProjectsList` not found.
 
 - [ ] **Step 3: Implement the components**
 
@@ -897,7 +897,7 @@ test("shows project title and chapter cards", async () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npm run test -- ProjectDashboard`
-Expected: FAIL — module not found.
+Expected: FAIL module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -1005,7 +1005,7 @@ test("renders outline and draft, with a fallback when missing", async () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npm run test -- ChapterView`
-Expected: FAIL — module not found.
+Expected: FAIL module not found.
 
 - [ ] **Step 3: Implement**
 
@@ -1092,7 +1092,7 @@ test("renders the app shell with the wordmark", async () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `cd web && npm run test -- App`
-Expected: FAIL — `App` does not export the shell/router yet.
+Expected: FAIL `App` does not export the shell/router yet.
 
 - [ ] **Step 3: Implement the shell + router**
 
@@ -1136,7 +1136,7 @@ Add a "Run the web UI" section to `README.md`:
 ````markdown
 ## 🖥️ Web UI (local)
 
-Two processes — the API and the React dev server:
+Two processes the API and the React dev server:
 
 ```bash
 # 1. Backend (from repo root)
@@ -1197,4 +1197,4 @@ Expected: all PASS (existing 17 + new API tests).
 - Run frontend tests with `npm run test` inside `web/`.
 - The `NOVEL_OS_PROJECTS_DIR` default is `./projects`; tests inject a temp dir via
   `create_app(projects_root=...)`, so they never touch the real folder.
-- Do not modify anything under `core/` — the API only reads through `StoryState`.
+- Do not modify anything under `core/` the API only reads through `StoryState`.

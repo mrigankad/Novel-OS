@@ -43,13 +43,86 @@ class Character:
     emotional_state: str = ""
     last_appearance_chapter: int = 0
     notes: str = ""
+    portrait_media_id: str = ""
     
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Character':
-        return cls(**data)
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
+
+
+CODEX_TYPES = ("character", "location", "worldbuilding", "item")
+
+RELATIONSHIP_PRESETS = (
+    "ally", "rival", "family", "romantic", "mentor", "enemy",
+    "owes debt", "secret", "unknown",
+)
+
+
+@dataclass
+class RelationshipEdge:
+    """Typed bond between Codex entities (context-menu / chart system)."""
+    id: str
+    source_id: str
+    target_id: str
+    label: str = "unknown"
+    kind: str = "character_character"
+    strength: float = 0.5
+    status: str = "active"  # active | strained | resolved | hidden
+    since_chapter: int = 0
+    notes: str = ""
+    directed: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RelationshipEdge":
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
+
+
+@dataclass
+class Collection:
+    """Saved keyword search over the project world model (Scrivener-style)."""
+    id: str
+    name: str
+    query: str
+    kinds: List[str] = field(default_factory=list)  # empty = all kinds
+    notes: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Collection":
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
+
+
+@dataclass
+class CodexEntry:
+    """Typed world-model entry (PLAN.md P2.2). Non-character types live here;
+    characters remain in `characters` for agent compatibility."""
+    id: str
+    entry_type: str  # location | worldbuilding | item
+    name: str
+    summary: str = ""
+    notes: str = ""
+    tags: List[str] = field(default_factory=list)
+    portrait_media_id: str = ""
+    fields: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CodexEntry":
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
 
 
 @dataclass
@@ -97,6 +170,7 @@ class ChapterState:
     foreshadowing_resolved: List[str] = field(default_factory=list)
     hooks_start: List[str] = field(default_factory=list)
     hooks_end: List[str] = field(default_factory=list)
+    characters_present: List[str] = field(default_factory=list)
     continuity_checks: Dict[str, Any] = field(default_factory=dict)
     quality_scores: Dict[str, float] = field(default_factory=dict)
     last_modified: str = ""
@@ -106,7 +180,8 @@ class ChapterState:
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ChapterState':
-        return cls(**data)
+        known = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
+        return cls(**{k: v for k, v in data.items() if k in known})
 
 
 @dataclass
@@ -175,6 +250,9 @@ class StoryState:
         self.metadata: Dict[str, Any] = {}
         self.story_bible: Dict[str, Any] = {}
         self.characters: Dict[str, Character] = {}
+        self.codex: Dict[str, CodexEntry] = {}
+        self.relationships: Dict[str, RelationshipEdge] = {}
+        self.collections: Dict[str, Collection] = {}
         self.plot_threads: Dict[str, PlotThread] = {}
         self.chapters: Dict[int, ChapterState] = {}
         self.timeline: List[TimelineEvent] = []
@@ -204,6 +282,18 @@ class StoryState:
                     k: Character.from_dict(v) 
                     for k, v in data.get('characters', {}).items()
                 }
+                self.codex = {
+                    k: CodexEntry.from_dict(v)
+                    for k, v in data.get('codex', {}).items()
+                }
+                self.relationships = {
+                    k: RelationshipEdge.from_dict(v)
+                    for k, v in data.get('relationships', {}).items()
+                }
+                self.collections = {
+                    k: Collection.from_dict(v)
+                    for k, v in data.get('collections', {}).items()
+                }
                 self.plot_threads = {
                     k: PlotThread.from_dict(v)
                     for k, v in data.get('plot_threads', {}).items()
@@ -221,6 +311,9 @@ class StoryState:
                 )
                 self.session_log = data.get('session_log', [])
                 self.binder = Binder.from_list(data.get('binder', []))
+
+        # Migrate legacy Character.relationships dict → typed edges once.
+        self._migrate_legacy_relationships()
 
         # A project written before the binder existed has no tree. Build one
         # from the flat chapters on first load; it is persisted on next save.
@@ -274,6 +367,9 @@ class StoryState:
             'metadata': self.metadata,
             'story_bible': self.story_bible,
             'characters': {k: v.to_dict() for k, v in self.characters.items()},
+            'codex': {k: v.to_dict() for k, v in self.codex.items()},
+            'relationships': {k: v.to_dict() for k, v in self.relationships.items()},
+            'collections': {k: v.to_dict() for k, v in self.collections.items()},
             'plot_threads': {k: v.to_dict() for k, v in self.plot_threads.items()},
             'chapters': {k: v.to_dict() for k, v in self.chapters.items()},
             'binder': self.binder.to_list(),
@@ -325,7 +421,212 @@ class StoryState:
     def get_all_characters(self) -> List[Character]:
         """Get all characters as a list."""
         return list(self.characters.values())
-    
+
+    def add_codex_entry(self, entry: CodexEntry) -> str:
+        if entry.entry_type not in CODEX_TYPES:
+            raise ValueError(f"Invalid codex type '{entry.entry_type}'")
+        self.codex[entry.id] = entry
+        self._log_action('codex_added', {'id': entry.id, 'type': entry.entry_type})
+        self.save_state()
+        return entry.id
+
+    def update_codex_entry(self, entry_id: str, **kwargs: Any) -> Optional[CodexEntry]:
+        entry = self.codex.get(entry_id)
+        if not entry:
+            return None
+        for k, v in kwargs.items():
+            if hasattr(entry, k) and v is not None:
+                setattr(entry, k, v)
+        self._log_action('codex_updated', {'id': entry_id})
+        self.save_state()
+        return entry
+
+    def get_codex_entries(self, entry_type: Optional[str] = None) -> List[CodexEntry]:
+        items = list(self.codex.values())
+        if entry_type:
+            items = [e for e in items if e.entry_type == entry_type]
+        return sorted(items, key=lambda e: e.name.lower())
+
+    def format_codex_block(self, max_chars: int = 4500) -> str:
+        """Canonical world-model text for Guardian (and other agents) prompts.
+
+        Characters live in `characters`; non-character types in `codex`. Empty
+        when the author hasn't filled anything yet.
+        """
+        lines: List[str] = ["## Codex (canonical world model - treat as ground truth)", ""]
+        chars = self.get_all_characters()
+        if chars:
+            lines.append("### Characters")
+            for c in sorted(chars, key=lambda x: x.full_name.lower()):
+                bits = [f"**{c.full_name}** ({c.role or 'unspecified'})"]
+                if c.current_location:
+                    bits.append(f"location: {c.current_location}")
+                if c.emotional_state:
+                    bits.append(f"emotion: {c.emotional_state}")
+                if c.notes:
+                    bits.append(c.notes.strip()[:240])
+                lines.append("- " + " · ".join(bits))
+            lines.append("")
+        by_type = {
+            "location": "Locations",
+            "worldbuilding": "World rules",
+            "item": "Items",
+        }
+        for etype, heading in by_type.items():
+            entries = self.get_codex_entries(etype)
+            if not entries:
+                continue
+            lines.append(f"### {heading}")
+            for e in entries:
+                line = f"- **{e.name}**"
+                if e.summary:
+                    line += f": {e.summary.strip()[:320]}"
+                lines.append(line)
+                if e.notes:
+                    lines.append(f"  notes: {e.notes.strip()[:200]}")
+            lines.append("")
+        # Relationship graph (1-hop bonds)
+        rels = getattr(self, "relationships", None) or {}
+        if rels:
+            lines.append("### Relationships")
+            for e in sorted(rels.values(), key=lambda x: x.label.lower()):
+                a = self.characters.get(e.source_id)
+                b = self.characters.get(e.target_id)
+                an = a.full_name if a else e.source_id
+                bn = b.full_name if b else e.target_id
+                arrow = " → " if e.directed else " ↔ "
+                lines.append(f"- **{an}**{arrow}**{bn}** ({e.label}"
+                             f"{', ' + e.status if e.status and e.status != 'active' else ''})")
+                if e.notes:
+                    lines.append(f"  notes: {e.notes.strip()[:160]}")
+            lines.append("")
+        if len(lines) <= 2:
+            return ""
+        text = "\n".join(lines).rstrip() + "\n"
+        if len(text) > max_chars:
+            text = text[: max_chars - 40].rstrip() + "\n…[codex truncated]\n"
+        return text
+
+    def set_character_portrait(self, character_id: str, media_id: str) -> Optional[Character]:
+        char = self.characters.get(character_id)
+        if not char:
+            return None
+        char.portrait_media_id = media_id
+        self.save_state()
+        return char
+
+    def _migrate_legacy_relationships(self) -> None:
+        """Promote Character.relationships string map into RelationshipEdge rows."""
+        if self.relationships:
+            return
+        n = 0
+        for cid, char in self.characters.items():
+            for other_id, label in (char.relationships or {}).items():
+                if other_id not in self.characters and other_id not in self.codex:
+                    continue
+                # Skip if reverse already created
+                exists = any(
+                    {e.source_id, e.target_id} == {cid, other_id}
+                    for e in self.relationships.values()
+                )
+                if exists:
+                    continue
+                n += 1
+                eid = f"rel-{n:03d}"
+                while eid in self.relationships:
+                    n += 1
+                    eid = f"rel-{n:03d}"
+                self.relationships[eid] = RelationshipEdge(
+                    id=eid,
+                    source_id=cid,
+                    target_id=other_id,
+                    label=str(label or "unknown"),
+                )
+
+    def list_relationships(self, entry_id: Optional[str] = None) -> List[RelationshipEdge]:
+        items = list(self.relationships.values())
+        if entry_id:
+            items = [e for e in items if e.source_id == entry_id or e.target_id == entry_id]
+        return sorted(items, key=lambda e: e.label.lower())
+
+    def add_relationship(
+        self,
+        source_id: str,
+        target_id: str,
+        label: str = "unknown",
+        *,
+        notes: str = "",
+        directed: bool = False,
+        since_chapter: int = 0,
+    ) -> RelationshipEdge:
+        if source_id == target_id:
+            raise ValueError("Cannot relate an entry to itself")
+        for e in self.relationships.values():
+            if not e.directed and {e.source_id, e.target_id} == {source_id, target_id}:
+                e.label = label.strip() or e.label
+                e.notes = notes.strip() or e.notes
+                self.save_state()
+                return e
+            if e.directed and e.source_id == source_id and e.target_id == target_id:
+                e.label = label.strip() or e.label
+                e.notes = notes.strip() or e.notes
+                self.save_state()
+                return e
+        n = len(self.relationships) + 1
+        eid = f"rel-{n:03d}"
+        while eid in self.relationships:
+            n += 1
+            eid = f"rel-{n:03d}"
+        edge = RelationshipEdge(
+            id=eid,
+            source_id=source_id,
+            target_id=target_id,
+            label=(label or "unknown").strip(),
+            notes=notes.strip(),
+            directed=directed,
+            since_chapter=since_chapter,
+        )
+        self.relationships[eid] = edge
+        self._log_action("relationship_added", {"id": eid})
+        self.save_state()
+        return edge
+
+    def delete_relationship(self, edge_id: str) -> bool:
+        if edge_id not in self.relationships:
+            return False
+        del self.relationships[edge_id]
+        self._log_action("relationship_deleted", {"id": edge_id})
+        self.save_state()
+        return True
+
+    def list_collections(self) -> List[Collection]:
+        return sorted(self.collections.values(), key=lambda c: c.name.lower())
+
+    def add_collection(
+        self, name: str, query: str, kinds: Optional[List[str]] = None, notes: str = "",
+    ) -> Collection:
+        import uuid
+        cid = f"col-{uuid.uuid4().hex[:8]}"
+        col = Collection(
+            id=cid,
+            name=(name or query or "Untitled").strip()[:80],
+            query=(query or "").strip(),
+            kinds=[k for k in (kinds or []) if k],
+            notes=(notes or "").strip(),
+        )
+        self.collections[cid] = col
+        self._log_action("collection_added", {"id": cid})
+        self.save_state()
+        return col
+
+    def delete_collection(self, collection_id: str) -> bool:
+        if collection_id not in self.collections:
+            return False
+        del self.collections[collection_id]
+        self._log_action("collection_deleted", {"id": collection_id})
+        self.save_state()
+        return True
+
     def update_character_location(self, character_id: str, location: str, chapter: int):
         """Update a character's current location."""
         if character_id in self.characters:
@@ -519,6 +820,22 @@ class StoryState:
     
     def get_continuity_context(self, chapter: int) -> Dict[str, Any]:
         """Get context needed for continuity checking."""
+        try:
+            from context_pack import build_context_pack, format_context_pack
+            pack = build_context_pack(self, chapter, purpose="guardian")
+            codex_block = format_context_pack(pack)
+            rel_subset = [
+                e.to_dict()
+                for e in getattr(self, "relationships", {}).values()
+                if any(b["id"] == e.id for b in pack.bonds)
+            ] or [
+                e.to_dict() for e in getattr(self, "relationships", {}).values()
+            ]
+        except Exception:
+            codex_block = self.format_codex_block()
+            rel_subset = [
+                e.to_dict() for e in getattr(self, "relationships", {}).values()
+            ]
         return {
             'chapter': chapter,
             'character_locations': {
@@ -538,7 +855,9 @@ class StoryState:
             ],
             'previous_chapter_events': [
                 e.to_dict() for e in self.get_timeline_for_chapter(chapter - 1)
-            ] if chapter > 1 else []
+            ] if chapter > 1 else [],
+            'codex_block': codex_block,
+            'relationships': rel_subset,
         }
 
 

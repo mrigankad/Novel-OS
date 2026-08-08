@@ -1,8 +1,8 @@
 """
 Novel OS - Setup Wizard
 
-Zero-friction onboarding. Detects whatever the user already has — the Claude Code
-CLI, any provider API key, or a local model server — lets them pick, runs a live
+Zero-friction onboarding. Detects whatever the user already has the Claude Code
+CLI, any provider API key, or a local model server lets them pick, runs a live
 connection test, and writes the choice to `.env`.
 
 Run it with:
@@ -73,11 +73,11 @@ def detect_options(env: Optional[dict] = None) -> List[Option]:
     env = os.environ if env is None else env
     options: List[Option] = []
 
-    # 1. Claude Code CLI — free, subscription-backed, no key.
+    # 1. Claude Code CLI free, subscription-backed, no key.
     if shutil.which("claude"):
         options.append(Option(
             provider="claude_cli",
-            label="Claude Code CLI (free — uses your `claude` login / subscription)",
+            label="Claude Code CLI (free uses your `claude` login / subscription)",
             recommended=True,
         ))
 
@@ -86,15 +86,15 @@ def detect_options(env: Optional[dict] = None) -> List[Option]:
     for provider, key_env, label in NATIVE_KEYS:
         if env.get(key_env) and (provider, key_env) not in seen:
             seen.add((provider, key_env))
-            options.append(Option(provider=provider, label=f"{label} — {key_env} detected"))
+            options.append(Option(provider=provider, label=f"{label} {key_env} detected"))
 
     if env.get("AZURE_OPENAI_API_KEY") and env.get("AZURE_OPENAI_ENDPOINT"):
-        options.append(Option(provider="azure", label="Azure OpenAI — credentials detected"))
+        options.append(Option(provider="azure", label="Azure OpenAI credentials detected"))
 
     # 3. OpenAI-compatible aliases with a detected key.
     for alias, (_, _, key_env) in OPENAI_COMPAT_ALIASES.items():
         if env.get(key_env):
-            options.append(Option(provider=alias, label=f"{alias} — {key_env} detected"))
+            options.append(Option(provider=alias, label=f"{alias} {key_env} detected"))
 
     # 4. Reachable local servers.
     if _port_open("localhost", 11434):
@@ -102,7 +102,7 @@ def detect_options(env: Optional[dict] = None) -> List[Option]:
     if _port_open("localhost", 1234):
         options.append(Option(provider="lmstudio", label="LM Studio (running locally on :1234)"))
 
-    # 5. Manual entry — always available.
+    # 5. Manual entry always available.
     options.append(Option(
         provider="__manual__",
         label="Enter an API key / custom endpoint manually",
@@ -168,7 +168,7 @@ def run_wizard(env_path: Optional[Path] = None,
     env_path = env_path or (Path.cwd() / ".env")
     options = detect_options()
 
-    print_fn("\n  Novel OS — setup\n  " + "-" * 30)
+    print_fn("\n  Novel OS setup\n  " + "-" * 30)
     print_fn("  Detecting what you already have...\n")
     for i, opt in enumerate(options, 1):
         tag = "  ★" if opt.recommended else "   "
@@ -216,7 +216,7 @@ def run_wizard(env_path: Optional[Path] = None,
         return (input_fn(f"  {msg} [y/N]: ").strip().lower() or "n") == "y"
 
     write_env(updates, env_path, confirm=_confirm)
-    print_fn(f"  Saved to {env_path}. You're ready — run the orchestrator to start writing.\n")
+    print_fn(f"  Saved to {env_path}. You're ready run the orchestrator to start writing.\n")
     return 0
 
 

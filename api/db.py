@@ -55,14 +55,26 @@ class Chapter(SQLModel, table=True):
 
 
 class Artifact(SQLModel, table=True):
-    """One row per (project, chapter, stage) holding the stage's text."""
+    """One row per (project, chapter, stage) holding the stage's text.
+
+    `doc_json` carries the ProseMirror document for Final (PLAN.md P1). It is
+    the canonical form; `text` is the markdown projection agents read, and is
+    regenerated from the document on every save. Drafts and revisions stay
+    markdown-only immutable provenance.
+    """
     id: str = Field(default_factory=_new_id, primary_key=True)
     project_id: str = Field(index=True)
     chapter: int = Field(index=True)
     stage: str = Field(index=True)  # outline | draft | revised | final
     text: str = ""
+    doc_json: str = ""
     word_count: int = 0
     updated_at: str = Field(default_factory=_now)
+    # P3.2 pipeline provenance
+    produced_by_agent: str = ""
+    produced_by_model: str = ""
+    reviewed_by: str = ""
+    reviewed_at: str = ""
 
 
 class Snapshot(SQLModel, table=True):
@@ -77,11 +89,19 @@ class Snapshot(SQLModel, table=True):
 
 
 class Comment(SQLModel, table=True):
+    """A note on a chapter. Pre-P1 comments only had `quote`; P1 adds
+    ProseMirror-ish character offsets (`from_pos`/`to_pos`) so the note can
+    survive edits. `anchor_status` is `ok` when positions resolve, or
+    `unresolved` when the quoted span can no longer be found."""
     id: str = Field(default_factory=_new_id, primary_key=True)
     project_id: str = Field(index=True)
     chapter: int = Field(index=True)
     body: str = ""
     quote: str = ""
+    from_pos: Optional[int] = None
+    to_pos: Optional[int] = None
+    anchor_status: str = "ok"  # ok | unresolved
+    persona: str = "author"  # author | editor | beta (P3.3 single-writer personas)
     resolved: bool = False
     created_at: str = Field(default_factory=_now)
 
@@ -153,10 +173,51 @@ class AuthSession(SQLModel, table=True):
 _engine = None
 
 
+# Columns added to tables that already exist in the wild. `create_all` only
+# creates missing tables it will not alter an existing one so a new column
+# on a shipped table needs an explicit ALTER. Additive only: never drop or
+# retype, so an older build can still read the database.
+_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+    # (table, column, DDL type + default)
+    ("artifact", "doc_json", "TEXT DEFAULT ''"),
+    ("artifact", "produced_by_agent", "TEXT DEFAULT ''"),
+    ("artifact", "produced_by_model", "TEXT DEFAULT ''"),
+    ("artifact", "reviewed_by", "TEXT DEFAULT ''"),
+    ("artifact", "reviewed_at", "TEXT DEFAULT ''"),
+    ("comment", "from_pos", "INTEGER"),
+    ("comment", "to_pos", "INTEGER"),
+    ("comment", "anchor_status", "TEXT DEFAULT 'ok'"),
+    ("comment", "persona", "TEXT DEFAULT 'author'"),
+)
+
+
+def _run_migrations(engine) -> None:
+    from sqlalchemy import text as _sql
+
+    with engine.begin() as conn:
+        for table, column, ddl in _MIGRATIONS:
+            existing = {
+                row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")
+            }
+            if not existing:
+                continue  # table not created yet; create_all made it correctly
+            if column not in existing:
+                conn.execute(_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+
+
+def _connect_args_for(db_url: str) -> dict:
+    """SQLite needs check_same_thread=False; Postgres must not get that kwarg."""
+    url = (db_url or "").lower()
+    if url.startswith("sqlite:"):
+        return {"check_same_thread": False}
+    return {}
+
+
 def configure(db_url: str) -> None:
     global _engine
-    _engine = create_engine(db_url, connect_args={"check_same_thread": False})
+    _engine = create_engine(db_url, connect_args=_connect_args_for(db_url))
     SQLModel.metadata.create_all(_engine)
+    _run_migrations(_engine)
 
 
 def _session() -> Session:
@@ -238,22 +299,73 @@ def _get_artifact(s: Session, project_id: str, chapter: int, stage: str) -> Opti
     ).first()
 
 
-def upsert_artifact(project_id: str, chapter: int, stage: str, text: str) -> None:
+def upsert_artifact(
+    project_id: str,
+    chapter: int,
+    stage: str,
+    text: str,
+    doc_json: Optional[str] = None,
+    *,
+    produced_by_agent: Optional[str] = None,
+    produced_by_model: Optional[str] = None,
+    reviewed_by: Optional[str] = None,
+    reviewed_at: Optional[str] = None,
+) -> None:
     with _session() as s:
         art = _get_artifact(s, project_id, chapter, stage)
         if art is None:
             art = Artifact(project_id=project_id, chapter=chapter, stage=stage)
         art.text = text
+        if doc_json is not None:
+            art.doc_json = doc_json
         art.word_count = _wc(text)
         art.updated_at = _now()
+        if produced_by_agent is not None:
+            art.produced_by_agent = produced_by_agent
+        if produced_by_model is not None:
+            art.produced_by_model = produced_by_model
+        if reviewed_by is not None:
+            art.reviewed_by = reviewed_by
+        if reviewed_at is not None:
+            art.reviewed_at = reviewed_at
         s.add(art)
         s.commit()
+
+
+def get_artifact(project_id: str, chapter: int, stage: str) -> Optional[Artifact]:
+    with _session() as s:
+        art = _get_artifact(s, project_id, chapter, stage)
+        if art is None:
+            return None
+        # Detach fields we need outside the session
+        return Artifact(
+            id=art.id,
+            project_id=art.project_id,
+            chapter=art.chapter,
+            stage=art.stage,
+            text=art.text,
+            doc_json=art.doc_json,
+            word_count=art.word_count,
+            updated_at=art.updated_at,
+            produced_by_agent=getattr(art, "produced_by_agent", "") or "",
+            produced_by_model=getattr(art, "produced_by_model", "") or "",
+            reviewed_by=getattr(art, "reviewed_by", "") or "",
+            reviewed_at=getattr(art, "reviewed_at", "") or "",
+        )
 
 
 def get_artifact_text(project_id: str, chapter: int, stage: str) -> Optional[str]:
     with _session() as s:
         art = _get_artifact(s, project_id, chapter, stage)
         return art.text if art else None
+
+
+def get_artifact_doc(project_id: str, chapter: int, stage: str) -> Optional[str]:
+    """The stored ProseMirror JSON, or None if this stage has never been saved
+    as rich text (every pre-P1 Final, and all drafts/revisions)."""
+    with _session() as s:
+        art = _get_artifact(s, project_id, chapter, stage)
+        return (art.doc_json or None) if art else None
 
 
 # --------------------------------------------------------------------------- snapshots
@@ -310,9 +422,30 @@ def comments_list(project_id: str, chapter: int) -> list[Comment]:
         return list(rows)
 
 
-def comment_add(project_id: str, chapter: int, body: str, quote: str = "") -> Comment:
+def comment_add(
+    project_id: str,
+    chapter: int,
+    body: str,
+    quote: str = "",
+    from_pos: Optional[int] = None,
+    to_pos: Optional[int] = None,
+    anchor_status: str = "ok",
+    persona: str = "author",
+) -> Comment:
+    persona = (persona or "author").strip().lower()
+    if persona not in ("author", "editor", "beta"):
+        persona = "author"
     with _session() as s:
-        c = Comment(project_id=project_id, chapter=chapter, body=body, quote=quote)
+        c = Comment(
+            project_id=project_id,
+            chapter=chapter,
+            body=body,
+            quote=quote,
+            from_pos=from_pos,
+            to_pos=to_pos,
+            anchor_status=anchor_status,
+            persona=persona,
+        )
         s.add(c)
         s.commit()
         s.refresh(c)
@@ -383,7 +516,30 @@ def media_add(project_id: str, sha: str, ext: str, filename: str, content_type: 
 def media_get(project_id: str, media_id: str) -> Optional[Media]:
     with _session() as s:
         m = s.get(Media, media_id)
-        return m if m and m.project_id == project_id else None
+        if m is None or m.project_id != project_id:
+            return None
+        return m
+
+
+def media_update(
+    project_id: str,
+    media_id: str,
+    *,
+    alt: Optional[str] = None,
+    kind: Optional[str] = None,
+) -> Optional[Media]:
+    with _session() as s:
+        m = s.get(Media, media_id)
+        if m is None or m.project_id != project_id:
+            return None
+        if alt is not None:
+            m.alt = alt
+        if kind is not None and kind.strip():
+            m.kind = kind.strip()
+        s.add(m)
+        s.commit()
+        s.refresh(m)
+        return m
 
 
 def media_delete(project_id: str, media_id: str) -> Optional[Media]:

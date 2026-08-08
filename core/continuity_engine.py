@@ -13,19 +13,24 @@ Categories of checks:
   - characters appearing after a flagged death
   - plot threads marked active past their target_resolution_chapter
   - missing required character fields
+  - orphan / self relationship edges
+  - hostile pairs co-present in a chapter
+  - relationship since_chapter anachronism
+  - contradictory bonds (e.g. enemy + romantic)
+  - dead character co-present with a living bonded partner
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from state_manager import StoryState
 
 
-# Tunables — keep conservative to avoid false positives.
+# Tunables keep conservative to avoid false positives.
 DORMANT_THREAD_GAP_CHAPTERS = 3
 ABSENT_CHARACTER_GAP_CHAPTERS = 5
 DEAD_KEYWORDS = ("dead", "killed", "deceased", "died")
@@ -151,7 +156,7 @@ def check_absent_characters(state: "StoryState", as_of_chapter: Optional[int] = 
         if char.role in ("minor",):
             continue
         if char.last_appearance_chapter == 0:
-            # Never seen — flag only if they're a main role
+            # Never seen flag only if they're a main role
             if char.role in ("protagonist", "antagonist"):
                 out.append(Finding(
                     severity="warning",
@@ -238,6 +243,205 @@ def check_required_character_fields(state: "StoryState") -> List[Finding]:
     return out
 
 
+_HOSTILE_LABELS = frozenset({
+    "enemy", "enemies", "rival", "rivals", "hostile", "nemesis", "foe",
+})
+
+_INTIMATE_LABELS = frozenset({
+    "romantic", "lovers", "married", "spouse", "dating", "intimate", "ally", "allies",
+    "family", "siblings", "friends", "best friends",
+})
+
+
+def _present_ids_for_chapter(state: "StoryState", cur: int) -> Set[str]:
+    chapter = state.chapters.get(cur)
+    if not chapter:
+        return set()
+    present_raw = [p.strip().lower() for p in (chapter.characters_present or []) if p.strip()]
+    name_to_id = {
+        c.full_name.strip().lower(): c.id for c in state.characters.values()
+    }
+    present_ids = {name_to_id[n] for n in present_raw if n in name_to_id}
+    if chapter.pov_character:
+        pov_id = name_to_id.get(chapter.pov_character.strip().lower())
+        if pov_id:
+            present_ids.add(pov_id)
+    return present_ids
+
+
+def _is_dead_character(char) -> bool:
+    es = (char.emotional_state or "").lower()
+    notes = (char.notes or "").lower()
+    role = (char.role or "").lower()
+    return any(k in es or k in notes or k in role for k in DEAD_KEYWORDS)
+
+
+def check_relationship_integrity(state: "StoryState") -> List[Finding]:
+    """Orphan / broken relationship edges in the Codex graph."""
+    known = set(state.characters) | set(getattr(state, "codex", {}) or {})
+    out: List[Finding] = []
+    for edge in getattr(state, "relationships", {}).values():
+        if edge.source_id == edge.target_id:
+            out.append(Finding(
+                severity="warning",
+                category="relationship_self",
+                message=f"Relationship '{edge.label}' links an entry to itself ({edge.source_id}).",
+                suggestion="Delete this edge.",
+                entity_id=edge.id,
+            ))
+            continue
+        missing = [eid for eid in (edge.source_id, edge.target_id) if eid not in known]
+        if missing:
+            out.append(Finding(
+                severity="warning",
+                category="relationship_orphan",
+                message=f"Relationship '{edge.label}' references missing Codex id(s): {', '.join(missing)}.",
+                suggestion="Delete the edge or restore the missing entry.",
+                entity_id=edge.id,
+            ))
+    return out
+
+
+def check_hostile_pairs_co_present(
+    state: "StoryState", as_of_chapter: Optional[int] = None,
+) -> List[Finding]:
+    """Warn when enemy/rival pairs share a chapter cast without an edge update."""
+    cur = as_of_chapter if as_of_chapter is not None else _current_chapter(state)
+    if cur == 0:
+        return []
+    present_ids = _present_ids_for_chapter(state, cur)
+    if len(present_ids) < 2:
+        return []
+
+    out: List[Finding] = []
+    for edge in getattr(state, "relationships", {}).values():
+        if edge.status not in ("", "active"):
+            continue
+        label = (edge.label or "").strip().lower()
+        if label not in _HOSTILE_LABELS:
+            continue
+        pair = {edge.source_id, edge.target_id}
+        if not pair <= present_ids:
+            continue
+        a = state.characters.get(edge.source_id)
+        b = state.characters.get(edge.target_id)
+        an = a.full_name if a else edge.source_id
+        bn = b.full_name if b else edge.target_id
+        out.append(Finding(
+            severity="warning",
+            category="hostile_co_presence",
+            message=f"{an} and {bn} are both present in chapter {cur} but Codex still "
+                    f"marks them as '{edge.label}'.",
+            suggestion="Update the relationship on the chart, or confirm the hostility is intentional.",
+            chapter=cur,
+            entity_id=edge.id,
+        ))
+    return out
+
+
+def check_relationship_since_anachronism(
+    state: "StoryState", as_of_chapter: Optional[int] = None,
+) -> List[Finding]:
+    """Warn when a bond's since_chapter is after the chapter where both are already present."""
+    cur = as_of_chapter if as_of_chapter is not None else _current_chapter(state)
+    if cur == 0:
+        return []
+    present_ids = _present_ids_for_chapter(state, cur)
+    if len(present_ids) < 2:
+        return []
+    out: List[Finding] = []
+    for edge in getattr(state, "relationships", {}).values():
+        since = int(getattr(edge, "since_chapter", 0) or 0)
+        if since <= 0 or since <= cur:
+            continue
+        if edge.status not in ("", "active"):
+            continue
+        pair = {edge.source_id, edge.target_id}
+        if not pair <= present_ids:
+            continue
+        a = state.characters.get(edge.source_id)
+        b = state.characters.get(edge.target_id)
+        an = a.full_name if a else edge.source_id
+        bn = b.full_name if b else edge.target_id
+        out.append(Finding(
+            severity="warning",
+            category="relationship_since_anachronism",
+            message=f"Chapter {cur} presents {an} with {bn} as '{edge.label}', but the edge "
+                    f"is marked since_chapter={since}.",
+            suggestion="Lower since_chapter, or keep them from sharing the scene until then.",
+            chapter=cur,
+            entity_id=edge.id,
+        ))
+    return out
+
+
+def check_contradictory_relationships(state: "StoryState") -> List[Finding]:
+    """Warn when the same pair has both hostile and intimate active edges."""
+    by_pair: dict[tuple[str, str], list] = {}
+    for edge in getattr(state, "relationships", {}).values():
+        if edge.status not in ("", "active"):
+            continue
+        key = tuple(sorted((edge.source_id, edge.target_id)))
+        by_pair.setdefault(key, []).append(edge)
+
+    out: List[Finding] = []
+    for (aid, bid), edges in by_pair.items():
+        labels = {(e.label or "").strip().lower() for e in edges}
+        hostile = labels & _HOSTILE_LABELS
+        intimate = labels & _INTIMATE_LABELS
+        if not (hostile and intimate):
+            continue
+        a = state.characters.get(aid)
+        b = state.characters.get(bid)
+        an = a.full_name if a else aid
+        bn = b.full_name if b else bid
+        out.append(Finding(
+            severity="warning",
+            category="relationship_contradiction",
+            message=f"{an} and {bn} have conflicting active bonds: "
+                    f"{', '.join(sorted(hostile))} vs {', '.join(sorted(intimate))}.",
+            suggestion="Resolve on the chart (e.g. strained enemies, or retire one edge).",
+            entity_id=edges[0].id,
+        ))
+    return out
+
+
+def check_dead_bonded_co_presence(
+    state: "StoryState", as_of_chapter: Optional[int] = None,
+) -> List[Finding]:
+    """Critical when a dead-flagged character shares a scene with a living partner."""
+    cur = as_of_chapter if as_of_chapter is not None else _current_chapter(state)
+    if cur == 0:
+        return []
+    present_ids = _present_ids_for_chapter(state, cur)
+    if not present_ids:
+        return []
+    out: List[Finding] = []
+    for edge in getattr(state, "relationships", {}).values():
+        if edge.status not in ("", "active"):
+            continue
+        pair = {edge.source_id, edge.target_id}
+        if not pair <= present_ids:
+            continue
+        for cid in pair:
+            char = state.characters.get(cid)
+            if not char or not _is_dead_character(char):
+                continue
+            other_id = next(iter(pair - {cid}))
+            other = state.characters.get(other_id)
+            on = other.full_name if other else other_id
+            out.append(Finding(
+                severity="critical",
+                category="dead_character_co_presence",
+                message=f"{char.full_name} is flagged dead/killed but shares chapter {cur} "
+                        f"with {on} (bond '{edge.label}').",
+                suggestion="Mark the scene as flashback/resurrection in notes, or remove them from the cast.",
+                chapter=cur,
+                entity_id=edge.id,
+            ))
+    return out
+
+
 # --------------------------------------------------------------------- runners
 
 ALL_CHECKS = (
@@ -247,6 +451,11 @@ ALL_CHECKS = (
     check_absent_characters,
     check_dead_characters_reappearing,
     check_required_character_fields,
+    check_relationship_integrity,
+    check_hostile_pairs_co_present,
+    check_relationship_since_anachronism,
+    check_contradictory_relationships,
+    check_dead_bonded_co_presence,
 )
 
 
@@ -255,7 +464,7 @@ def run_all(state: "StoryState", project_path: Optional[Path] = None,
     """Run every check that applies. project_path enables file-consistency checks."""
     out: List[Finding] = []
     for check in ALL_CHECKS:
-        # check_* functions that take only `state` won't accept as_of_chapter — handle both
+        # check_* functions that take only `state` won't accept as_of_chapter handle both
         try:
             out.extend(check(state, as_of_chapter))  # type: ignore[arg-type]
         except TypeError:

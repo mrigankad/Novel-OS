@@ -1,4 +1,4 @@
-# 🎭 Novel OS — System Overview
+# 🎭 Novel OS System Overview
 
 A production-grade multi-agent fiction writing framework.
 
@@ -62,7 +62,7 @@ graph TB
 
 | # | Agent | Purpose | Output blocks parsed back to state |
 |---|---|---|---|
-| 1 | 🏗️ **Architect** | Story planning, 3-act structure, beats, chapter outlines | (none — produces outline files) |
+| 1 | 🏗️ **Architect** | Story planning, 3-act structure, beats, chapter outlines | (none produces outline files) |
 | 2 | ✍️ **Scribe** | Drafts prose in deep POV | `[SCRIBE_STATE_UPDATE]` → characters_present, key_events, emotional_shifts, foreshadowing |
 | 3 | 🔍 **Editor** | Five modes: line / developmental / pacing / dialogue / tension | `[EDITOR_STATE_UPDATE]` → quality_score_before/after |
 | 4 | 🛡️ **Continuity Guardian** | Character / timeline / world / plot validation | `[CONTINUITY_REPORT]` + `[CONTINUITY_STATE_UPDATE]` → status, critical_issues, warnings, updated_character_positions, new_facts |
@@ -76,13 +76,13 @@ Each agent prompt ends with a strict **OUTPUT CONTRACT** that forces the LLM to 
 
 The `StoryState` (`core/state_manager.py`) is a single JSON document tracking:
 
-- **Story bible** — genre, themes, tone, setting, world rules
-- **Characters** — desires, fears, arcs, knowledge, possessions, current location, emotional state, last appearance
-- **Plot threads** — type, priority, status, milestones, foreshadowing planted, target resolution chapter
-- **Chapters** — POV, status, word count, scenes, plot advances, emotional beats, foreshadowing in/out, continuity check results, quality scores
-- **Timeline** — chronological event log
-- **Style profile** — POV, tense, prose style, sentence-length targets, vocabulary level, ratios
-- **Session log** — every state-mutating action
+- **Story bible** genre, themes, tone, setting, world rules
+- **Characters** desires, fears, arcs, knowledge, possessions, current location, emotional state, last appearance
+- **Plot threads** type, priority, status, milestones, foreshadowing planted, target resolution chapter
+- **Chapters** POV, status, word count, scenes, plot advances, emotional beats, foreshadowing in/out, continuity check results, quality scores
+- **Timeline** chronological event log
+- **Style profile** POV, tense, prose style, sentence-length targets, vocabulary level, ratios
+- **Session log** every state-mutating action
 
 Atomic writes with `.bak` rollback (Windows-safe via `os.replace`).
 
@@ -124,7 +124,7 @@ Native backends: Anthropic SDK, OpenAI SDK, Azure OpenAI client, google-genai. A
 
 ## Continuity Engine
 
-Deterministic checks (`core/continuity_engine.py`) — free, instant, no LLM:
+Deterministic checks (`core/continuity_engine.py`) free, instant, no LLM:
 
 | Check | Severity | Default threshold |
 |---|---|---|

@@ -1,4 +1,4 @@
-# Novel OS — Claude Code Backend + Setup Wizard
+# Novel OS Claude Code Backend + Setup Wizard
 
 **Date:** 2026-06-10
 **Status:** Approved design, ready for implementation plan
@@ -8,16 +8,16 @@
 Make Novel OS adapt to whatever an individual user already has, with as close to
 zero configuration as possible. Different users arrive with different things:
 
-- **Subscription user** — has Claude Pro/Max and the `claude` Claude Code CLI; wants
+- **Subscription user** has Claude Pro/Max and the `claude` Claude Code CLI; wants
   to run Novel OS **without paying per-token API fees**. Not possible today.
-- **API-key user** — has some provider key in their environment; works today, but
+- **API-key user** has some provider key in their environment; works today, but
   setup is hand-edited env vars and errors are cryptic.
-- **Local / free user** — Ollama or LM Studio; works, but must know the incantation.
-- **Power user** — wants control; out of scope for this pass beyond clean config.
+- **Local / free user** Ollama or LM Studio; works, but must know the incantation.
+- **Power user** wants control; out of scope for this pass beyond clean config.
 
 The connecting thread: Novel OS should meet the user where they are. This spec
-delivers two pieces toward that — a key-free Claude Code backend and an onboarding
-wizard — without changing the orchestrator or agent contracts.
+delivers two pieces toward that a key-free Claude Code backend and an onboarding
+wizard without changing the orchestrator or agent contracts.
 
 ## Scope
 
@@ -32,7 +32,7 @@ wizard — without changing the orchestrator or agent contracts.
 The wizard writes plain `.env` config (`NOVEL_OS_LLM_PROVIDER`, `NOVEL_OS_MODEL`,
 optional key), so a future router/robustness layer can extend it without rework.
 
-## Component 1 — `claude_cli` backend
+## Component 1 `claude_cli` backend
 
 Lives in `core/llm_client.py`, alongside the existing backends. The `complete(system, user)`
 public signature is unchanged, so `core/orchestrator.py` needs **no changes**.
@@ -62,7 +62,7 @@ When both a paid key and the `claude` CLI are available:
 The wizard (Component 2) is where an interactive user chooses between options when more
 than one is available.
 
-## Component 2 — `novel-os init` setup wizard
+## Component 2 `novel-os init` setup wizard
 
 New module `core/setup_wizard.py`, runnable as `python -m core.setup_wizard`.
 
@@ -70,7 +70,7 @@ New module `core/setup_wizard.py`, runnable as `python -m core.setup_wizard`.
   and reachable local servers (Ollama `:11434`, LM Studio `:1234` via a short HTTP probe
   with a tight timeout).
 - **Present:** a ranked menu of what was found, e.g.
-  - `✓ Claude Code CLI (free, uses your subscription) — recommended`
+  - `✓ Claude Code CLI (free, uses your subscription) recommended`
   - `✓ OPENAI_API_KEY detected`
   - `○ Ollama running locally`
   - `+ Enter an API key / custom endpoint manually`
@@ -119,8 +119,8 @@ user runs `novel-os init`
 
 ## Affected files
 
-- `core/llm_client.py` — add `claude_cli` detection, build, and completion.
-- `core/setup_wizard.py` — new module + `__main__`.
-- `core/orchestrator.py` — `--setup` flag and first-run offer (minimal).
-- `tests/` — new tests for detection, backend, precedence, wizard.
-- `README.md` — document `novel-os init` and the key-free Claude Code path.
+- `core/llm_client.py` add `claude_cli` detection, build, and completion.
+- `core/setup_wizard.py` new module + `__main__`.
+- `core/orchestrator.py` `--setup` flag and first-run offer (minimal).
+- `tests/` new tests for detection, backend, precedence, wizard.
+- `README.md` document `novel-os init` and the key-free Claude Code path.

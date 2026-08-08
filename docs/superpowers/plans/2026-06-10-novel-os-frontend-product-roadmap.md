@@ -1,20 +1,20 @@
-# Novel OS — AI Writing Studio: Engine + UI Roadmap (End-to-End)
+# Novel OS AI Writing Studio: Engine + UI Roadmap (End-to-End)
 
 **Date:** 2026-06-10
 **Status:** Proposed vision + roadmap (awaiting approval). Absorbs the earlier polish plan (as "Track C") and the pipeline/consequence plan.
-**Goal:** Turn Novel OS into a full writing studio with Scrivener-grade structure — **plus** the two things Scrivener can never have: an agent pipeline that writes/revises, and a world model that catches story consequences. This plan covers both the **engine (core/)** and the **UI (web/)**.
+**Goal:** Turn Novel OS into a full writing studio with Scrivener-grade structure **plus** the two things Scrivener can never have: an agent pipeline that writes/revises, and a world model that catches story consequences. This plan covers both the **engine (core/)** and the **UI (web/)**.
 
 ---
 
 ## 1. Positioning
 
-> **Scrivener manages the lifecycle of a novel. Novel OS manages it *and writes it with you* — with a world model that knows when an edit breaks the story.**
+> **Scrivener manages the lifecycle of a novel. Novel OS manages it *and writes it with you* with a world model that knows when an edit breaks the story.**
 
 Scrivener = Word + Notion + Trello + research DB for authors (binder, corkboard, outliner, snapshots, metadata, compile). Novel OS should match that studio surface, then beat it on the axes Scrivener has no answer for:
 
 | Novel OS advantage | Scrivener equivalent |
 |---|---|
-| Agents (Architect/Scribe/Editor/Guardian) generate & revise | none — fully manual |
+| Agents (Architect/Scribe/Editor/Guardian) generate & revise | none fully manual |
 | World model + Continuity Guardian flags contradictions | none |
 | Pipeline flow: Outline→Draft→Revised→Final provenance | manual snapshots |
 | AI-derived metadata (tension, emotion, pacing) | manual labels only |
@@ -23,9 +23,9 @@ Scrivener = Word + Notion + Trello + research DB for authors (binder, corkboard,
 
 So: **build the studio, then make every studio feature AI-native.**
 
-## 1.5 The core lifecycle — **AI-computed → human-reviewed → Final**
+## 1.5 The core lifecycle **AI-computed → human-reviewed → Final**
 
-One principle governs the whole studio: **the AI proposes, the human disposes.** Everything an agent produces is a *proposal* until a human reviews it. The reviewed result is the **Final** — the only human-owned, mutable, canonical artifact. This is universal, not prose-specific:
+One principle governs the whole studio: **the AI proposes, the human disposes.** Everything an agent produces is a *proposal* until a human reviews it. The reviewed result is the **Final** the only human-owned, mutable, canonical artifact. This is universal, not prose-specific:
 
 | Thing | AI computes (proposal) | Human reviews | Final (canonical) |
 |---|---|---|---|
@@ -37,7 +37,7 @@ One principle governs the whole studio: **the AI proposes, the human disposes.**
 Implications baked into the engine and UI from M0 on:
 - A three-state lifecycle on every writable unit: **`proposed` → `in_review` → `final`** (extends today's status enum).
 - **Provenance is immutable.** Drafts, AI revisions, and suggestions are kept as read-only history; only Final and human-confirmed metadata are mutable. Nothing is "Final" until a human reviewed it.
-- **Every AI output has a review surface** — a diff/accept/reject affordance — not a silent overwrite. Agents never write Final directly.
+- **Every AI output has a review surface** a diff/accept/reject affordance not a silent overwrite. Agents never write Final directly.
 - Each artifact records `produced_by` (agent/model) and `reviewed_by`/`reviewed_at`, so you always know what's machine-proposed vs human-blessed.
 
 ## 2. Scrivener → Novel OS feature map
@@ -60,7 +60,7 @@ Each row = a Scrivener capability, the Novel OS engine support it needs, the UI 
 | **Templates** | Existing `templates/` → tree templates | New-project / new-scene templates | Genre-aware scaffolding from Architect |
 | **Compile/Export** (DOCX/PDF/EPUB/MOBI/HTML) | Compile engine walking the tree | Compile dialog with presets | Auto front-matter, blurb, chapter titles from state |
 | **Statistics** (wc, reading time, frequency) | Stats over artifacts | Stats panel | Style Curator: word-frequency/echo + readability flags |
-| **Focus/Composition, themes, customization** | — | Typewriter/focus mode, light+dark, controls | — |
+| **Focus/Composition, themes, customization** | | Typewriter/focus mode, light+dark, controls | |
 
 ## 3. The engine, redesigned (core/)
 
@@ -88,29 +88,29 @@ A story control system. Core shell = **Binder · Editor · Inspector**, with ful
 
 Each milestone ships working, tested software (Vitest + `pytest` + build green), committed, verified live. Three tracks interleave: **A = engine, B = product UI, C = frontend craft.**
 
-> **M0 — Foundations**
+> **M0 Foundations**
 > *C:* self-host fonts, React Query data layer, ErrorBoundary, a11y baseline, light/dark tokens.
-> *A:* design + migrate the **document-tree** model (parts/chapters/scenes) with back-compat for existing flat projects; expose tree read API. **Biggest engine change — do it carefully, with a migration test.**
+> *A:* design + migrate the **document-tree** model (parts/chapters/scenes) with back-compat for existing flat projects; expose tree read API. **Biggest engine change do it carefully, with a migration test.**
 
-> **M1 — Binder + Scene editor + Inspector**
+> **M1 Binder + Scene editor + Inspector**
 > Tree binder (drag-drop, split/merge), scene-level manuscript editor, inspector with synopsis + metadata. *C:* motion + reading depth.
 
-> **M2 — Pipeline Flow + Snapshots + edit/save Final**
+> **M2 Pipeline Flow + Snapshots + edit/save Final**
 > The flow ribbon (provenance), snapshot history (compare/restore), and **promote→edit→save Final** (first write path). Delivers your "drafts separate / flow to final / edit & save final."
 
-> **M3 — Corkboard + Outliner**
+> **M3 Corkboard + Outliner**
 > Scene-card corkboard (drag-reorder) and the metadata outliner table; AI-derived columns (tension/emotion) computed by agents.
 
-> **M4 — Codex + Collections/Search**
+> **M4 Codex + Collections/Search**
 > Characters/locations/worldbuilding DB with scene links; saved searches & semantic collections over the world model. *C:* ⌘K command palette + keyboard nav.
 
-> **M5 — Run the pipeline live (jobs + SSE)**
+> **M5 Run the pipeline live (jobs + SSE)**
 > Trigger any stage (plan/write/edit/validate/approve) from the UI; live progress; the flow animates. Off-thread job registry + SSE. *C:* dark mode + real owl mascot + progress rings.
 
-> **M6 — Consequence engine (signature)**
+> **M6 Consequence engine (signature)**
 > Scribe **revise-span** + Guardian **ripple/diff**: select a paragraph → prompt → rewrite + story-ripple preview → accept (updates Final + world-state). The moat.
 
-> **M7 — Compile, Targets, Stats, Research**
+> **M7 Compile, Targets, Stats, Research**
 > Compile to DOCX/EPUB/PDF with auto front-matter; project/session targets + progress; statistics & word-frequency (Style Curator); research store + split-screen reference.
 
 ## 6. Recommended sequence & rationale
@@ -129,16 +129,16 @@ M0 is load-bearing (everything sits on the tree model + RQ data layer). M2 is th
 
 ## 7. Cross-cutting standards
 - Additive engine changes with **migration tests**; never break existing flat projects or agent logic.
-- Writes are atomic (temp+rename), id/path-traversal guarded; **drafts & AI revisions are immutable provenance** — only Final and metadata are user-mutable.
+- Writes are atomic (temp+rename), id/path-traversal guarded; **drafts & AI revisions are immutable provenance** only Final and metadata are user-mutable.
 - Agents never run inline in an HTTP request (job registry + SSE).
 - All motion respects `prefers-reduced-motion`; fonts/assets self-hosted; mascot downscaled.
 - Every milestone: backend `pytest`, frontend Vitest, `npm run build` green; keep existing assertions intact.
 
 ## 8. Risks
 - **Tree migration (M0):** the flat→tree change is the riskiest; gate it behind a migration + golden-file tests before building UI on it.
-- **Scope:** 8 milestones is a long arc — each is independently shippable; we can stop or reprioritize at any boundary.
+- **Scope:** 8 milestones is a long arc each is independently shippable; we can stop or reprioritize at any boundary.
 - **Consequence accuracy (M6):** start with deterministic continuity-engine checks; label AI-inferred ripple as "predicted."
-- **Compile fidelity (M7):** EPUB/DOCX formatting is fiddly — lean on a proven library (research at build time).
+- **Compile fidelity (M7):** EPUB/DOCX formatting is fiddly lean on a proven library (research at build time).
 
 ## 9. Definition of done (the studio)
-Binder/corkboard/outliner, snapshots, codex, collections, targets/stats, compile — at Scrivener parity — **plus** live agent runs, the Outline→Final pipeline flow with editable Final, and the consequence engine. Polished light+dark, motion, ⌘K, real mascot. All green, accessible, fast.
+Binder/corkboard/outliner, snapshots, codex, collections, targets/stats, compile at Scrivener parity **plus** live agent runs, the Outline→Final pipeline flow with editable Final, and the consequence engine. Polished light+dark, motion, ⌘K, real mascot. All green, accessible, fast.

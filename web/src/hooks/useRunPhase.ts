@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import { useToast } from "../components/Toaster";
+import { useToast } from "../components/toastContext";
 
 const LABELS: Record<string, string> = {
   plan_outline: "Planning outline",

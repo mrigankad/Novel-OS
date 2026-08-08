@@ -3,7 +3,7 @@ Novel OS - Pluggable LLM Client
 
 Supports any LLM provider via these backend types:
 
-  - claude_cli   Claude Code CLI (no API key — uses your `claude` login / subscription)
+  - claude_cli   Claude Code CLI (no API key uses your `claude` login / subscription)
   - anthropic    Claude (anthropic SDK)
   - openai       Native OpenAI (openai SDK)
   - azure        Azure OpenAI (openai SDK, AzureOpenAI client)
@@ -139,7 +139,7 @@ class LLMClient:
                 return alias
         if os.environ.get("NOVEL_OS_API_KEY") and os.environ.get("NOVEL_OS_BASE_URL"):
             return "openai_compatible"
-        # No paid key anywhere — fall back to the Claude Code CLI if it's installed,
+        # No paid key anywhere fall back to the Claude Code CLI if it's installed,
         # so subscription users get zero-config, zero-cost generation.
         if shutil.which("claude"):
             return "claude_cli"
@@ -159,7 +159,7 @@ class LLMClient:
 
         if name == "claude_cli":
             # No SDK/client to build; the backend is the `claude` CLI itself.
-            # A model is optional — if unset, the CLI uses its configured default.
+            # A model is optional if unset, the CLI uses its configured default.
             return self._build_claude_cli(), model or env_model or ""
         if name == "anthropic":
             return self._build_anthropic(), model or env_model or DEFAULT_ANTHROPIC_MODEL
@@ -278,7 +278,7 @@ class LLMClient:
     def _complete_claude_cli(self, system: str, user: str) -> str:
         """Run the prompt through the Claude Code CLI in non-interactive print mode.
 
-        Uses the user's `claude` login (subscription) — no API key, no per-token billing.
+        Uses the user's `claude` login (subscription) no API key, no per-token billing.
         The user prompt is passed on stdin (not argv) to avoid length/quoting limits.
         """
         cli = self._backend  # path to the claude binary
@@ -321,7 +321,7 @@ class LLMClient:
             stderr = (proc.stderr or "").strip()
             hint = ""
             if "login" in stderr.lower() or "auth" in stderr.lower() or not stderr:
-                hint = " — you may need to run `claude login`."
+                hint = " you may need to run `claude login`."
             raise LLMError(f"Claude Code CLI failed (exit {proc.returncode}): {stderr}{hint}")
         out = (proc.stdout or "").strip()
         if not out:

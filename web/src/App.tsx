@@ -12,6 +12,9 @@ import { ConfirmProvider } from "./components/Confirm";
 const ProjectsList = lazy(() => import("./routes/ProjectsList"));
 const ProjectDashboard = lazy(() => import("./routes/ProjectDashboard"));
 const ChapterView = lazy(() => import("./routes/ChapterView"));
+const Settings = lazy(() => import("./routes/Settings"));
+const RelationshipChart = lazy(() => import("./routes/RelationshipChart"));
+const ResearchMoodboard = lazy(() => import("./routes/ResearchMoodboard"));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -19,16 +22,19 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.35, ease: [0.2, 0.8, 0.2, 1] }}
+        initial={{ opacity: 0, y: 10, scale: 0.985 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -8, scale: 0.99 }}
         className="h-full"
       >
         <Suspense fallback={<div className="px-10 py-12 text-ink-muted">Loading…</div>}>
           <Routes location={location}>
             <Route path="/" element={<ProjectsList />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/projects/:id" element={<ProjectDashboard />} />
+            <Route path="/projects/:id/chart" element={<RelationshipChart />} />
+            <Route path="/projects/:id/research" element={<ResearchMoodboard />} />
             <Route path="/projects/:id/chapters/:n" element={<ChapterView />} />
           </Routes>
         </Suspense>

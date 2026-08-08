@@ -1,4 +1,4 @@
-# Novel OS — Workflows
+# Novel OS Workflows
 
 Step-by-step recipes for using Novel OS day to day.
 
@@ -31,23 +31,23 @@ flowchart LR
 ```
 
 ```bash
-# 1. Plan — Architect expands the chapter outline
+# 1. Plan Architect expands the chapter outline
 python core/orchestrator.py plan chapter --number 1 --pov "Lena Vasquez"
 
-# 2. Write — Scribe drafts the prose
+# 2. Write Scribe drafts the prose
 python core/orchestrator.py write --chapter 1
 
-# 3. Edit — Editor refines (pick a mode)
+# 3. Edit Editor refines (pick a mode)
 python core/orchestrator.py edit --chapter 1 --mode line
 # Modes: line | developmental | pacing | dialogue | tension
 
-# 4. Check — free deterministic continuity scan
+# 4. Check free deterministic continuity scan
 python core/orchestrator.py check --chapter 1
 
-# 5. Validate — LLM Guardian validates (pre-check findings are included automatically)
+# 5. Validate LLM Guardian validates (pre-check findings are included automatically)
 python core/orchestrator.py validate --chapter 1
 
-# 6. Approve — gated on Status: FAIL
+# 6. Approve gated on Status: FAIL
 python core/orchestrator.py approve --chapter 1
 ```
 
@@ -65,7 +65,7 @@ python core/orchestrator.py write --chapter 1 --dry-run
 python core/orchestrator.py write --chapter 1 --draft-file my_response.md
 ```
 
-Submitted files still get parsed — `[SCRIBE_STATE_UPDATE]` / `[EDITOR_STATE_UPDATE]` blocks update state regardless of how the chapter was produced.
+Submitted files still get parsed `[SCRIBE_STATE_UPDATE]` / `[EDITOR_STATE_UPDATE]` blocks update state regardless of how the chapter was produced.
 
 ---
 
@@ -79,7 +79,7 @@ python core/orchestrator.py character list    # full cast with arc state
 python core/orchestrator.py plot list         # threads by priority
 ```
 
-The continuity engine exits non-zero on critical findings — wire it into CI if you care.
+The continuity engine exits non-zero on critical findings wire it into CI if you care.
 
 ---
 
@@ -100,7 +100,7 @@ python core/orchestrator.py approve  --chapter N
 
 ## 🔄 Re-running a phase
 
-Phases are idempotent — re-running overwrites the corresponding artifact and re-parses.
+Phases are idempotent re-running overwrites the corresponding artifact and re-parses.
 
 ```bash
 python core/orchestrator.py edit --chapter 3 --mode tension   # re-edit

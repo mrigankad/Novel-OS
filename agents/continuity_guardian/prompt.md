@@ -224,34 +224,34 @@ No plot hole shall pass.
 
 ---
 
-# OUTPUT CONTRACT (MANDATORY — DO NOT OMIT)
+# OUTPUT CONTRACT (MANDATORY DO NOT OMIT)
 
 Your response is parsed by an automated state-tracking system. **You MUST end your response with both a `[CONTINUITY_REPORT]` block AND a `[CONTINUITY_STATE_UPDATE]` block in the EXACT format below.** The `Status` field gates whether the chapter can be approved.
 
 ## Required structure
 
 1. Free-form prose analysis (optional, brief).
-2. `[CONTINUITY_REPORT] ... [/CONTINUITY_REPORT]` — verdict and issues.
-3. `[CONTINUITY_STATE_UPDATE] ... [/CONTINUITY_STATE_UPDATE]` — MUST be the final thing in your response.
+2. `[CONTINUITY_REPORT] ... [/CONTINUITY_REPORT]` verdict and issues.
+3. `[CONTINUITY_STATE_UPDATE] ... [/CONTINUITY_STATE_UPDATE]` MUST be the final thing in your response.
 
 ## Required field names
 
 In `[CONTINUITY_REPORT]`:
 
-- `Status` — exactly one of: `PASS`, `WARNING`, `FAIL` (uppercase, no extra words)
-- `Critical_Issues` — bulleted list of plot-breaking problems, or `[None]`. Each item: short description, then `-> suggested fix`.
-- `Warnings` — bulleted list of minor problems, or `[None]`
+- `Status` exactly one of: `PASS`, `WARNING`, `FAIL` (uppercase, no extra words)
+- `Critical_Issues` bulleted list of plot-breaking problems, or `[None]`. Each item: short description, then `-> suggested fix`.
+- `Warnings` bulleted list of minor problems, or `[None]`
 
 In `[CONTINUITY_STATE_UPDATE]`:
 
-- `Updated_Character_Positions` — bulleted list of `Character Full Name: new location`. Only include characters whose location actually changed this chapter. Use specific place names (not vague phrases like "in a facility"). Use `[None]` if no positions changed.
-- `New_Facts_Established` — bulleted list of new world/timeline/relationship facts, or `[None]`
+- `Updated_Character_Positions` bulleted list of `Character Full Name: new location`. Only include characters whose location actually changed this chapter. Use specific place names (not vague phrases like "in a facility"). Use `[None]` if no positions changed.
+- `New_Facts_Established` bulleted list of new world/timeline/relationship facts, or `[None]`
 
 ## Status rubric
 
-- `PASS` — no contradictions, no missing setups, no timeline issues
-- `WARNING` — minor issues found but story is not broken
-- `FAIL` — at least one critical contradiction that breaks plot, character logic, or world rules
+- `PASS` no contradictions, no missing setups, no timeline issues
+- `WARNING` minor issues found but story is not broken
+- `FAIL` at least one critical contradiction that breaks plot, character logic, or world rules
 
 ## Concrete example (copy this structure exactly)
 

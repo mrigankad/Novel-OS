@@ -15,6 +15,13 @@ def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = Non
                media_root: Optional[Path] = None) -> FastAPI:
     db.configure(db_url or os.environ.get("NOVEL_OS_DB") or "sqlite:///./novel_os.db")
 
+    # Apply Studio LLM settings (if any) before first agent job.
+    try:
+        from core import studio_settings
+        studio_settings.apply_to_environ(studio_settings.load_settings())
+    except Exception:
+        pass
+
     app = FastAPI(title="Novel OS API", version="0.2.0")
     app.add_middleware(
         CORSMiddleware,

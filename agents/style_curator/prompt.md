@@ -281,7 +281,7 @@ Make every sentence sing.
 
 ---
 
-# OUTPUT CONTRACT (MANDATORY — DO NOT OMIT)
+# OUTPUT CONTRACT (MANDATORY DO NOT OMIT)
 
 Your response is parsed by an automated state-tracking system. **You MUST end your response with a `[STYLE_STATE_UPDATE]` block in the EXACT format below.** Scores are persisted into the project state.
 
@@ -289,16 +289,16 @@ Your response is parsed by an automated state-tracking system. **You MUST end yo
 
 1. Free-form analysis (optional).
 2. Optional `[STYLE_ANALYSIS]` block with metrics.
-3. `[STYLE_STATE_UPDATE] ... [/STYLE_STATE_UPDATE]` — MUST be the final thing in your response.
+3. `[STYLE_STATE_UPDATE] ... [/STYLE_STATE_UPDATE]` MUST be the final thing in your response.
 
 ## Required field names in `[STYLE_STATE_UPDATE]`
 
-Use **only** these exact names — spelling and underscores matter:
+Use **only** these exact names spelling and underscores matter:
 
-- `Consistency_Score` — single number 0–10 (chapter's match to established voice)
-- `Genre_Adherence` — single number 0–10 (compliance with genre conventions)
-- `Voice_Strength` — single number 0–10 (distinctiveness of the prose voice)
-- `Drift_Detected` — bulleted list of `location: issue -> correction`, or `[None]`
+- `Consistency_Score` single number 0–10 (chapter's match to established voice)
+- `Genre_Adherence` single number 0–10 (compliance with genre conventions)
+- `Voice_Strength` single number 0–10 (distinctiveness of the prose voice)
+- `Drift_Detected` bulleted list of `location: issue -> correction`, or `[None]`
 
 ## Concrete example (copy this structure exactly)
 

@@ -280,3 +280,69 @@ def test_binder_endpoint_404s_on_unknown_project(tmp_path):
     client = TestClient(create_app(
         projects_root=root, db_url=f"sqlite:///{(tmp_path / 'b.db').as_posix()}"))
     assert client.get("/api/projects/nope/binder").status_code == 404
+
+
+def test_binder_move_reorders_chapters_and_persists(tmp_path):
+    from fastapi.testclient import TestClient
+    from api.main import create_app
+    from document_tree import MANUSCRIPT_ID
+
+    root = tmp_path / "projects"
+    proj = root / "book"
+    (proj / "outputs" / "state").mkdir(parents=True)
+    (proj / "outputs" / "state" / "story_state.json").write_text(json.dumps({
+        "metadata": {"title": "Book", "genre": "SF", "author": "A"},
+        "chapters": {
+            "1": ChapterState(number=1, title="One").to_dict(),
+            "2": ChapterState(number=2, title="Two").to_dict(),
+        },
+    }), encoding="utf-8")
+
+    client = TestClient(create_app(
+        projects_root=root, db_url=f"sqlite:///{(tmp_path / 'm.db').as_posix()}"))
+
+    tree = client.get("/api/projects/book/binder").json()
+    chapters = tree[0]["children"]
+    assert [c["title"] for c in chapters] == ["One", "Two"]
+    first_id = chapters[0]["id"]
+
+    moved = client.post("/api/projects/book/binder/move", json={
+        "node_id": first_id,
+        "parent_id": MANUSCRIPT_ID,
+        "index": 1,
+    }).json()
+    assert [c["title"] for c in moved[0]["children"]] == ["Two", "One"]
+
+    reloaded = client.get("/api/projects/book/binder").json()
+    assert [c["title"] for c in reloaded[0]["children"]] == ["Two", "One"]
+    # Writing path chapter numbers unchanged
+    assert {c["chapter_number"] for c in reloaded[0]["children"]} == {1, 2}
+
+
+def test_binder_patch_synopsis_persists(tmp_path):
+    from fastapi.testclient import TestClient
+    from api.main import create_app
+
+    root = tmp_path / "projects"
+    proj = root / "book"
+    (proj / "outputs" / "state").mkdir(parents=True)
+    (proj / "outputs" / "state" / "story_state.json").write_text(json.dumps({
+        "metadata": {"title": "Book", "genre": "SF", "author": "A"},
+        "chapters": {"1": ChapterState(number=1, title="One").to_dict()},
+    }), encoding="utf-8")
+
+    client = TestClient(create_app(
+        projects_root=root, db_url=f"sqlite:///{(tmp_path / 'p.db').as_posix()}"))
+
+    tree = client.get("/api/projects/book/binder").json()
+    ch_id = tree[0]["children"][0]["id"]
+
+    patched = client.patch(
+        f"/api/projects/book/binder/{ch_id}",
+        json={"synopsis": "Ilse waits for the freight elevator."},
+    )
+    assert patched.status_code == 200
+    assert patched.json()[0]["children"][0]["synopsis"] == "Ilse waits for the freight elevator."
+
+    again = client.get("/api/projects/book/binder").json()
+    assert again[0]["children"][0]["synopsis"] == "Ilse waits for the freight elevator."

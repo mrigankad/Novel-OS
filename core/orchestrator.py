@@ -23,6 +23,8 @@ from state_manager import StoryState, Character, PlotThread, ChapterState, Timel
 from llm_client import LLMClient, LLMError
 from state_parser import ingest_agent_output
 from continuity_engine import run_all as run_continuity_checks, summarize as summarize_findings, to_context_block
+from prose_sanitize import sanitize_manuscript, apply_header_to_chapter, strip_em_dashes
+from context_pack import build_context_pack, format_context_pack, slice_chapter_for_llm
 
 
 class NovelOrchestrator:
@@ -72,20 +74,38 @@ class NovelOrchestrator:
             result = llm.run_agent(agent_name, user_prompt)
         except LLMError as e:
             print(f"❌ LLM call failed: {e}")
-            print(f"   Prompt saved at {prompt_path} — you can run it manually.")
+            print(f"   Prompt saved at {prompt_path} you can run it manually.")
             return None
-        output_path.write_text(result, encoding='utf-8')
-        print(f"✅ Output saved: {output_path}")
 
+        # Ingest structured blocks from the raw agent response first.
         if chapter_number is not None:
             changes = ingest_agent_output(self.state, chapter_number, agent_name, result)
             if changes:
                 print(f"   📝 State updates ({len(changes)}):")
                 for line in changes:
                     print(f"      • {line}")
-                self.state.save_state()
 
-        return result
+        # Manuscript stages: strip em dashes, HTML CHAPTER headers, and
+        # agent bookkeeping blocks so humans never read machine chrome.
+        saved = result
+        if agent_name in ("scribe", "editor") and output_path.suffix == ".md":
+            clean, meta = sanitize_manuscript(result)
+            saved = clean
+            if chapter_number is not None:
+                chapter = self.state.get_chapter(chapter_number)
+                apply_header_to_chapter(chapter, meta)
+                if chapter and clean:
+                    chapter.word_count = len(clean.split())
+        elif agent_name in ("scribe", "editor", "continuity_guardian", "style_curator"):
+            saved = strip_em_dashes(result)
+
+        output_path.write_text(saved, encoding='utf-8')
+        print(f"✅ Output saved: {output_path}")
+
+        if chapter_number is not None:
+            self.state.save_state()
+
+        return saved
 
     def _ensure_directories(self):
         """Create output directories."""
@@ -412,8 +432,7 @@ class NovelOrchestrator:
         This is deliberately distinct from `_generate_chapter_prompt` (the Scribe's
         drafting prompt). The Architect plans the chapter; the Scribe writes it.
         """
-        characters = self.state.get_all_characters()
-        active_threads = self.state.get_active_plot_threads()
+        pack_md = format_context_pack(build_context_pack(self.state, chapter.number, purpose="architect"))
 
         prompt = f"""# ARCHITECT TASK: Outline Chapter {chapter.number}
 
@@ -427,24 +446,13 @@ later expand into prose. This is a PLANNING artifact.
 - **Target Word Count**: {chapter.target_word_count}
 
 ## Story Context
+- **Genre**: {self.state.metadata.get('genre', 'Unknown')}
+- **Premise**: {self.state.metadata.get('premise') or self.state.story_bible.get('premise') or '[Not provided]'}
 
-### Relevant Characters
-"""
-        for char in characters:
-            if char.last_appearance_chapter >= chapter.number - 3:
-                prompt += f"\n**{char.full_name}** ({char.role}) — "
-                prompt += f"location: {char.current_location or 'Unknown'}, "
-                prompt += f"emotion: {char.emotional_state or 'Unknown'}, "
-                prompt += f"arc: {char.arc_stage} ({char.arc_progress}%)\n"
-
-        prompt += "\n### Active Plot Threads\n"
-        for thread in active_threads[:5]:
-            prompt += f"- **{thread.name}**: {thread.description[:100]}...\n"
-
-        prompt += f"""
+{pack_md}
 ## Required Output Format
 
-Return ONLY the outline, in this Markdown structure — do NOT write any prose,
+Return ONLY the outline, in this Markdown structure do NOT write any prose,
 dialogue, or narrative paragraphs:
 
 ```
@@ -456,9 +464,9 @@ dialogue, or narrative paragraphs:
 <1-2 sentences: what must change by the end of this chapter>
 
 ## Beats
-1. **<beat name>** — <1-2 sentence summary of what happens; the conflict/turn>
-2. **<beat name>** — <...>
-3. **<beat name>** — <...>
+1. **<beat name>** <1-2 sentence summary of what happens; the conflict/turn>
+2. **<beat name>** <...>
+3. **<beat name>** <...>
 (4-7 beats total)
 
 ## Continuity Notes
@@ -468,17 +476,14 @@ dialogue, or narrative paragraphs:
 <the line/turn that pulls the reader into the next chapter>
 ```
 
-Write the beat-sheet now. Outline only — no prose.
+Write the beat-sheet now. Outline only no prose.
 """
         return prompt
 
     def _generate_chapter_prompt(self, chapter: ChapterState) -> str:
         """Generate a detailed prompt for the Scribe agent."""
-        
-        # Get context from state
-        characters = self.state.get_all_characters()
-        active_threads = self.state.get_active_plot_threads()
-        
+        pack_md = format_context_pack(build_context_pack(self.state, chapter.number, purpose="scribe"))
+
         prompt = f"""# SCRIBE PROMPT: Chapter {chapter.number}
 
 ## Chapter Information
@@ -488,34 +493,14 @@ Write the beat-sheet now. Outline only — no prose.
 - **Target Word Count**: {chapter.target_word_count}
 
 ## Story Context
+- **Genre**: {self.state.metadata.get('genre', 'Unknown')}
+- **Premise**: {self.state.metadata.get('premise') or self.state.story_bible.get('premise') or '[Not provided]'}
 
-### Characters in This Chapter
-"""
-        
-        for char in characters:
-            if char.last_appearance_chapter >= chapter.number - 3:
-                prompt += f"\n**{char.full_name}** ({char.role})\n"
-                prompt += f"- Current Location: {char.current_location or 'Unknown'}\n"
-                prompt += f"- Emotional State: {char.emotional_state or 'Unknown'}\n"
-                prompt += f"- Arc Stage: {char.arc_stage} ({char.arc_progress}%)\n"
-        
-        prompt += "\n### Active Plot Threads\n"
-        for thread in active_threads[:5]:  # Top 5 active threads
-            prompt += f"- **{thread.name}**: {thread.description[:100]}...\n"
-        
-        prompt += f"""
-### Previous Chapter Recap
-[Summary of Chapter {chapter.number - 1}]
-
+{pack_md}
 ## Chapter Goals
 - [Primary plot advancement]
 - [Character development moment]
 - [Emotional beat to hit]
-
-## Scene Outline
-1. [Scene 1: Opening hook]
-2. [Scene 2: Complication]
-3. [Scene 3: Climax/Resolution]
 
 ## Writing Requirements
 - Maintain deep POV for {chapter.pov_character or '[POV character]'}
@@ -548,17 +533,20 @@ Write the beat-sheet now. Outline only — no prose.
         draft_path = self.manuscript_dir / f"chapter_{chapter_number:03d}_draft.md"
 
         if draft_text:
+            clean, meta = sanitize_manuscript(draft_text)
+            apply_header_to_chapter(chapter, meta)
             chapter.status = 'drafted'
-            chapter.word_count = len(draft_text.split())
-            draft_path.write_text(draft_text, encoding='utf-8')
+            chapter.word_count = len(clean.split())
+            draft_path.write_text(clean, encoding='utf-8')
             print(f"   Draft saved: {draft_path}")
             self.state.save_state()
             return
 
         # Build Scribe user prompt: prefer expanded outline if present, else fall back.
         outline_path = self.outputs_dir / f"chapter_{chapter_number:03d}_outline.md"
+        pack_md = format_context_pack(build_context_pack(self.state, chapter_number, purpose="scribe"))
         if outline_path.exists():
-            user_prompt = outline_path.read_text(encoding='utf-8')
+            user_prompt = outline_path.read_text(encoding='utf-8') + "\n\n" + pack_md
         else:
             user_prompt = self._generate_chapter_prompt(chapter)
 
@@ -761,7 +749,7 @@ Provide:
             print(f"❌ No chapter file found.")
             return
 
-        # Deterministic pre-check — runs free, gives the Guardian a head start.
+        # Deterministic pre-check runs free, gives the Guardian a head start.
         findings = run_continuity_checks(self.state, self.project_path, as_of_chapter=chapter_number)
         if findings:
             print(f"   🔬 Pre-check: {len(findings)} deterministic finding(s)")
@@ -791,17 +779,24 @@ Provide:
     def _generate_validation_prompt(self, chapter_number: int, chapter_text: str) -> str:
         """Generate a validation prompt."""
         context = self.state.get_continuity_context(chapter_number)
-        
+        body = slice_chapter_for_llm(chapter_text)
+        pack_md = format_context_pack(
+            build_context_pack(
+                self.state, chapter_number, purpose="guardian", chapter_text=chapter_text,
+            )
+        )
+
         prompt = f"""# CONTINUITY GUARDIAN PROMPT: Chapter {chapter_number}
 
 ## Chapter Text to Validate
 
 ```markdown
-{chapter_text[:5000]}...
-[Chapter continues...]
+{body}
 ```
 
 ## Current Story State
+
+{pack_md}
 
 ### Character Positions
 """
@@ -809,24 +804,27 @@ Provide:
             char = self.state.get_character(char_id)
             if char:
                 prompt += f"- **{char.full_name}**: {location or 'Unknown'}\n"
-        
+
         prompt += "\n### Character Emotional States\n"
         for char_id, state in context['character_emotional_states'].items():
             char = self.state.get_character(char_id)
             if char:
                 prompt += f"- **{char.full_name}**: {state or 'Unknown'}\n"
-        
-        prompt += "\n### Active Plot Threads\n"
-        for thread_data in context['active_threads']:
-            prompt += f"- **{thread_data['name']}**: {thread_data['description'][:80]}...\n"
-        
+
+        prompt += (
+            "\nValidate the chapter against the Context pack / Codex above. Flag contradictions "
+            "with named characters, locations, world rules, items, and "
+            "relationship labels as Critical or Warning. Do not invent Codex facts "
+            "that are not listed.\n"
+        )
+
         prompt += f"""
 ### Previous Chapter Events
-[Check against Chapter {chapter_number - 1} events]
+[Check against Chapter {chapter_number - 1} events and Prior chapters in the pack]
 
 ## Story Bible Reference
 - Genre: {self.state.metadata.get('genre', 'Unknown')}
-- World Rules: [Reference story_bible.md]
+- World Rules: [Reference story_bible.md and Codex world rules above]
 
 ## Validation Tasks
 
@@ -834,7 +832,7 @@ Provide:
 - [ ] Actions align with established personality
 - [ ] Knowledge matches what they should know
 - [ ] Skills/capabilities remain consistent
-- [ ] Relationships reflect prior development
+- [ ] Relationships reflect prior development and Codex edges
 
 ### Timeline Continuity
 - [ ] Events occur in logical sequence
@@ -843,7 +841,9 @@ Provide:
 
 ### World Consistency
 - [ ] Magic/tech rules followed
-- [ ] Setting details match prior descriptions
+- [ ] Setting details match prior descriptions and Codex locations
+- [ ] Named items/places match Codex entries
+- [ ] Hostile/ally bonds match on-page behavior
 
 ### Plot Continuity
 - [ ] Foreshadowing acknowledged or advanced
@@ -880,7 +880,7 @@ New_Facts_Established: [List]
         cstatus = chapter.continuity_checks.get('status')
         if cstatus == 'FAIL':
             issues = chapter.continuity_checks.get('critical_issues', [])
-            print(f"❌ Cannot approve — Continuity Guardian reported FAIL with {len(issues)} critical issue(s).")
+            print(f"❌ Cannot approve Continuity Guardian reported FAIL with {len(issues)} critical issue(s).")
             print("   Resolve or override by editing the chapter, then re-validate.")
             return
 
@@ -1091,7 +1091,7 @@ Examples:
     approve_parser = subparsers.add_parser('approve', help='Approve chapter')
     approve_parser.add_argument('--chapter', type=int, required=True, help='Chapter number')
     
-    # Check command — deterministic continuity engine
+    # Check command deterministic continuity engine
     check_parser = subparsers.add_parser('check', help='Run deterministic continuity checks (no LLM)')
     check_parser.add_argument('--chapter', type=int, default=None,
                               help='Evaluate as-of this chapter (default: latest drafted)')
@@ -1104,7 +1104,7 @@ Examples:
     export_parser.add_argument('--format', default='markdown', choices=['markdown', 'docx'],
                               help='Export format')
 
-    # Setup wizard — configure which LLM Novel OS talks to.
+    # Setup wizard configure which LLM Novel OS talks to.
     subparsers.add_parser('setup', help='Configure your LLM provider (interactive)')
 
     args = parser.parse_args()

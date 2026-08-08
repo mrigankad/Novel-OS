@@ -165,6 +165,18 @@ def test_list_filters_by_kind(client):
     assert [m["kind"] for m in portraits] == ["portrait"]
 
 
+def test_patch_media_updates_alt(client):
+    media = _upload(client, _png(6, 6), kind="research", name="pier.png").json()
+    resp = client.patch(
+        f"/api/projects/the-last-signal/media/{media['id']}",
+        json={"alt": "Glass Harbor pier at dusk"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["alt"] == "Glass Harbor pier at dusk"
+    listed = client.get("/api/projects/the-last-signal/media?kind=research").json()
+    assert listed[0]["alt"] == "Glass Harbor pier at dusk"
+
+
 def test_upload_rejects_svg(client):
     resp = _upload(client, b"<svg onload=alert(1)/>", name="x.svg", ctype="image/svg+xml")
     assert resp.status_code == 415
