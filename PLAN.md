@@ -22,8 +22,8 @@
 | UX | One selection bar; quick capture (`⌘.`) | ✅ Shipped — a single AI entry point, and notes without leaving the page |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
-| P5 | Word parity track changes, styles, AI images | ◐ **Track changes shipped** (suggest mode, accept/reject, reject-all projection); styles / spellcheck / AI images not started |
-| P6 | Publishing DOCX / EPUB / PDF / HTML | ☐ Not started |
+| P5 | Word parity track changes, styles, AI images | ◐ **Track changes + named styles shipped**; spellcheck / AI images not started |
+| P6 | Publishing DOCX / EPUB / PDF / HTML | ◐ **Compile engine + HTML/Markdown shipped**; DOCX / EPUB / PDF need their libraries |
 | P7 | Commercial auth, billing, onboarding, marketing | ☐ Not started |
 
 **Storage + layer architecture:** [`docs/superpowers/plans/2026-08-08-full-stack-architecture-and-buildout.md`](docs/superpowers/plans/2026-08-08-full-stack-architecture-and-buildout.md)
@@ -186,6 +186,7 @@ Scrivener parity, now that the differentiators exist.
   - **Enforced at the storage layer, not just the UI:** `api/richtext.py` projects the *reject-all* view, so a pending suggestion is never in the markdown agents read or the file on disk. `save_final_doc` applies house style to text nodes instead of re-parsing markdown, which would have wiped every suggestion on the first save.
   - **Still to do:** routing agent revisions in as suggestions rather than into the `revised` stage, and per-change attribution once P7 auth supplies real identities.
 - **Styles system** named styles driving compile output (Scrivener compile parity).
+  - **Shipped:** `core/styles.py` — seven roles (title, subtitle, chapter title, body, first paragraph, block quote, scene break), validated whole and rejected whole, persisted in `story_state.json`. Distinct from `StyleProfile`, which is the *prose voice* the agents read; this one is typography only and can never change a word. Indents are in ems so presets can swap sizes without re-tuning. A missing role falls back to body rather than failing — an export must not die on the eve of a deadline.
 - **Spelling & grammar** with a per-project dictionary so invented names and terms stop being flagged.
 - **AI image generation** character portraits, cover art, scene illustrations from story state. New `core/image_client.py` mirroring the provider-agnostic pattern of `llm_client.py`, preserving BYO-key.
 
@@ -194,7 +195,10 @@ Scrivener parity, now that the differentiators exist.
 ## P6 Publishing
 
 - Compile engine walking the document tree.
+  - **Shipped:** `core/compile_book.py`, split into **gather** (walk chapters, pick the most finished prose, parse to typed blocks) and **render** (blocks + stylesheet → a format). That split is what makes DOCX and EPUB new *renderers* rather than new walks. `GET …/compile?format=html|markdown`.
+  - Final is read as the **reject-all** projection, so a pending track-change is never exported as though the author accepted it.
 - **DOCX / EPUB / PDF / HTML** with automatic front-matter, blurb, and chapter titles drawn from state.
+  - HTML ships (self-contained, printable — an emailed export must stand alone). DOCX/EPUB/PDF are the remaining renderers and are the first features to need new dependencies (`python-docx`, `ebooklib`); that is a deliberate decision point, not an oversight.
 - Inline images and styles carry through with fidelity.
 - Export presets; validate EPUB against epubcheck.
 

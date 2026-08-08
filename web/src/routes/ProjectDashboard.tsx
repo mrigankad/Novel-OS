@@ -25,6 +25,7 @@ import CodexImageButton from "../components/CodexImageButton";
 import CodexProposals from "../components/CodexProposals";
 import ModeSwitch from "../components/ModeSwitch";
 import BookShape from "../components/BookShape";
+import CompilePanel from "../components/CompilePanel";
 import { useStudioMode } from "../hooks/useStudioMode";
 import { getStudioMode } from "../lib/studioMode";
 import { useToast } from "../components/toastContext";
@@ -241,6 +242,8 @@ export default function ProjectDashboard() {
             {mode === "revise" ? (
               <>
                 <ContinuityHealth report={continuity} onRefresh={refreshContinuity} />
+                {/* Compiling is the last thing you do, and only in Revise. */}
+                <CompilePanel projectId={id} />
                 <ManuscriptStats projectId={id} />
                 <WritingTargets
                   projectId={id}

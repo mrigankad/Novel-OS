@@ -259,6 +259,10 @@ class StoryState:
         # the panel re-raises the same non-error every run and the writer learns
         # to ignore it - which costs more than the check is worth.
         self.continuity_exemptions: Dict[str, Dict[str, Any]] = {}
+        # Typographic styles for compile (P5.2). Distinct from `style_profile`,
+        # which is the prose voice the agents read: this one only decides what
+        # the book looks like, and can never change a word of it.
+        self.compile_styles: Dict[str, Any] = {}
         self.plot_threads: Dict[str, PlotThread] = {}
         self.chapters: Dict[int, ChapterState] = {}
         self.timeline: List[TimelineEvent] = []
@@ -303,6 +307,7 @@ class StoryState:
                 self.continuity_exemptions = dict(
                     data.get('continuity_exemptions', {}) or {}
                 )
+                self.compile_styles = dict(data.get('compile_styles', {}) or {})
                 self.plot_threads = {
                     k: PlotThread.from_dict(v)
                     for k, v in data.get('plot_threads', {}).items()
@@ -380,6 +385,7 @@ class StoryState:
             'relationships': {k: v.to_dict() for k, v in self.relationships.items()},
             'collections': {k: v.to_dict() for k, v in self.collections.items()},
             'continuity_exemptions': dict(self.continuity_exemptions),
+            'compile_styles': dict(self.compile_styles),
             'plot_threads': {k: v.to_dict() for k, v in self.plot_threads.items()},
             'chapters': {k: v.to_dict() for k, v in self.chapters.items()},
             'binder': self.binder.to_list(),

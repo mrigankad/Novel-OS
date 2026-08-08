@@ -154,6 +154,26 @@ class AddCodexEntry(BaseModel):
     tags: list[str] = []
 
 
+class StyleOut(BaseModel):
+    """One named appearance. Typography only - it can never change a word."""
+    font: str = "serif"
+    size_pt: float = 12.0
+    line_height: float = 1.5
+    align: str = "left"
+    bold: bool = False
+    italic: bool = False
+    small_caps: bool = False
+    first_line_indent_em: float = 0.0
+    space_before_em: float = 0.0
+    space_after_em: float = 0.0
+    page_break_before: bool = False
+
+
+class StyleSheetOut(BaseModel):
+    styles: dict[str, StyleOut] = {}
+    scene_break_marker: str = "* * *"
+
+
 class ChapterActivity(BaseModel):
     """What measurably changed in one chapter - the shape strip's unit."""
     number: int

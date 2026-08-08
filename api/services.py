@@ -1601,6 +1601,60 @@ Foreshadowing_Planted: …
                 lines.append("\n\n---\n\n")
         return "\n".join(lines)
 
+    def get_styles(self, project_id: str) -> dict:
+        """The project's compile stylesheet, defaults filled in (P5.2)."""
+        from styles import StyleSheet  # noqa: E402
+
+        s = self._load(project_id)
+        return StyleSheet.from_dict(s.compile_styles).to_dict()
+
+    def save_styles(self, project_id: str, data: dict) -> dict:
+        """Validate and persist a stylesheet. Rejects the whole thing or none."""
+        from styles import StyleError, parse  # noqa: E402
+
+        s = self._load(project_id)
+        try:
+            sheet = parse(data or {})
+        except StyleError as e:
+            raise BadRequest(str(e))
+        s.compile_styles = sheet.to_dict()
+        s.save_state()
+        return s.compile_styles
+
+    def compile_book(self, project_id: str, fmt: str = "html") -> tuple[str, str, str]:
+        """Compile the manuscript. Returns (body, content_type, extension).
+
+        Reads the most finished stage per chapter, and Final is the reject-all
+        projection - so a pending track-change is never exported as though the
+        author had accepted it.
+        """
+        from compile_book import CONTENT_TYPES, EXTENSIONS, gather, render  # noqa: E402
+        from styles import StyleSheet  # noqa: E402
+
+        s = self._load(project_id)
+        chapters: list[dict] = []
+        for c in sorted(s.chapters.values(), key=lambda c: c.number):
+            p = self._stage_paths(project_id, c.number)
+            text = _read(p["final"]) or _read(p["revised"]) or _read(p["draft"])
+            chapters.append({
+                "number": c.number,
+                "title": getattr(c, "title", "") or "",
+                "text": text or "",
+            })
+
+        book = gather(
+            title=s.metadata.get("title", "Untitled"),
+            author=s.metadata.get("author", ""),
+            genre=s.metadata.get("genre", ""),
+            chapters=chapters,
+        )
+        sheet = StyleSheet.from_dict(s.compile_styles)
+        try:
+            body = render(book, sheet, fmt)
+        except ValueError as e:
+            raise BadRequest(str(e))
+        return body, CONTENT_TYPES.get(fmt, "text/plain"), EXTENSIONS.get(fmt, "txt")
+
     def manuscript_statistics(self, project_id: str) -> dict:
         """Style Curator surface: frequency, echoes, reading time (deterministic)."""
         from style_stats import analyze_manuscript  # noqa: E402

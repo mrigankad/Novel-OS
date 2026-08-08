@@ -10,7 +10,7 @@ from . import db, media as media_lib, richtext
 from .jobs import runner
 from .models import (
     AddCharacter, AddCodexEntry, AddComment, AddRelationship, ChapterDetail, ChapterStages,
-    CodexProposal, ContinuityExemption, ExemptFinding, BookShape,
+    CodexProposal, ContinuityExemption, ExemptFinding, BookShape, StyleSheetOut,
     ChapterSummary, CharacterSummary, CodexEntryOut, Comment, ConsequenceAccept,
     ConsequenceAcceptResult, ConsequencePreview, ConsequencePreviewRequest, ContinuityReport,
     ContinueParagraph, ContinueResult, CreateProject, CreateSnapshot, FinalDoc, FinalDocSave,
@@ -230,6 +230,45 @@ def export_markdown(project_id: str, svc: ProjectService = Depends(get_service))
         return svc.export_markdown(project_id)
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.get("/projects/{project_id}/styles", response_model=StyleSheetOut)
+def get_styles(project_id: str, svc: ProjectService = Depends(get_service)):
+    """Named compile styles (P5.2), with defaults filled in."""
+    try:
+        return svc.get_styles(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.put("/projects/{project_id}/styles", response_model=StyleSheetOut)
+def put_styles(project_id: str, body: StyleSheetOut,
+               svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.save_styles(project_id, body.model_dump())
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/projects/{project_id}/compile")
+def compile_book(project_id: str, format: str = "html",
+                 svc: ProjectService = Depends(get_service)):
+    """Compile the whole manuscript through the stylesheet (P6)."""
+    try:
+        body, content_type, ext = svc.compile_book(project_id, format)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return Response(
+        content=body,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{project_id}.{ext}"',
+        },
+    )
 
 
 @router.get("/projects/{project_id}/statistics", response_model=ProjectStatistics)

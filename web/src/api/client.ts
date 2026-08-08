@@ -49,6 +49,28 @@ export interface ContinuityFinding {
   key: string;
 }
 
+/** One named appearance in the compile stylesheet (P5.2). Typography only. */
+export interface CompileStyle {
+  font: string;
+  size_pt: number;
+  line_height: number;
+  align: string;
+  bold: boolean;
+  italic: boolean;
+  small_caps: boolean;
+  first_line_indent_em: number;
+  space_before_em: number;
+  space_after_em: number;
+  page_break_before: boolean;
+}
+
+export interface StyleSheet {
+  styles: Record<string, CompileStyle>;
+  scene_break_marker: string;
+}
+
+export type CompileFormat = "html" | "markdown";
+
 /** One chapter's measurable movement — the shape strip's unit (§4.3). */
 export interface ChapterActivity {
   number: number;
@@ -348,6 +370,11 @@ export const api = {
   }) => send<StudioLlmStatus>("/api/studio/llm", "PUT", body),
   continuity: (id: string) => get<ContinuityReport>(`/api/projects/${id}/continuity`),
   bookShape: (id: string) => get<BookShapeReport>(`/api/projects/${id}/shape`),
+  styles: (id: string) => get<StyleSheet>(`/api/projects/${id}/styles`),
+  saveStyles: (id: string, sheet: StyleSheet) =>
+    send<StyleSheet>(`/api/projects/${id}/styles`, "PUT", sheet),
+  compileUrl: (id: string, format: CompileFormat = "html") =>
+    `${BASE}/api/projects/${id}/compile?format=${format}`,
   exemptions: (id: string) =>
     get<ContinuityExemption[]>(`/api/projects/${id}/continuity/exemptions`),
   exemptFinding: (id: string, key: string, reason: string) =>
