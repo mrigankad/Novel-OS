@@ -1621,14 +1621,16 @@ Foreshadowing_Planted: …
         s.save_state()
         return s.compile_styles
 
-    def compile_book(self, project_id: str, fmt: str = "html") -> tuple[str, str, str]:
+    def compile_book(self, project_id: str, fmt: str = "html") -> tuple[bytes, str, str]:
         """Compile the manuscript. Returns (body, content_type, extension).
 
         Reads the most finished stage per chapter, and Final is the reject-all
         projection - so a pending track-change is never exported as though the
         author had accepted it.
         """
-        from compile_book import CONTENT_TYPES, EXTENSIONS, gather, render  # noqa: E402
+        from compile_book import (  # noqa: E402
+            CONTENT_TYPES, EXTENSIONS, gather, render_bytes,
+        )
         from styles import StyleSheet  # noqa: E402
 
         s = self._load(project_id)
@@ -1650,7 +1652,7 @@ Foreshadowing_Planted: …
         )
         sheet = StyleSheet.from_dict(s.compile_styles)
         try:
-            body = render(book, sheet, fmt)
+            body = render_bytes(book, sheet, fmt)
         except ValueError as e:
             raise BadRequest(str(e))
         return body, CONTENT_TYPES.get(fmt, "text/plain"), EXTENSIONS.get(fmt, "txt")

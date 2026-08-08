@@ -91,6 +91,8 @@ export default function CompilePanel({ projectId }: { projectId: string }) {
             value={format}
             onChange={(v) => setFormat(v as CompileFormat)}
             options={[
+              { value: "docx", label: "Word (.docx)" },
+              { value: "epub", label: "EPUB" },
               { value: "html", label: "HTML" },
               { value: "markdown", label: "Markdown" },
             ]}

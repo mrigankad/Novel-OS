@@ -194,12 +194,48 @@ def _css(style: Style) -> str:
     return ";".join(parts)
 
 
+@dataclass
+class Run:
+    """A stretch of text with uniform emphasis."""
+    text: str
+    bold: bool = False
+    italic: bool = False
+
+
+_INLINE = re.compile(r"(\*\*.+?\*\*|(?<!\*)\*[^*]+?\*(?!\*))", re.S)
+
+
+def inline_runs(text: str) -> List[Run]:
+    """Split markdown emphasis into runs.
+
+    Every renderer needs this - HTML wants tags, DOCX wants <w:r> elements with
+    <w:b/> - so the parsing happens once here rather than three times in three
+    slightly different ways.
+    """
+    runs: List[Run] = []
+    for piece in _INLINE.split(text or ""):
+        if not piece:
+            continue
+        if piece.startswith("**") and piece.endswith("**") and len(piece) > 4:
+            runs.append(Run(piece[2:-2], bold=True))
+        elif piece.startswith("*") and piece.endswith("*") and len(piece) > 2:
+            runs.append(Run(piece[1:-1], italic=True))
+        else:
+            runs.append(Run(piece))
+    return runs
+
+
 def _inline(text: str) -> str:
     """Escape, then restore the few inline marks markdown carries."""
-    out = html.escape(text)
-    out = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", out, flags=re.S)
-    out = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<em>\1</em>", out, flags=re.S)
-    return out
+    out = []
+    for run in inline_runs(text):
+        body = html.escape(run.text)
+        if run.bold:
+            body = f"<strong>{body}</strong>"
+        if run.italic:
+            body = f"<em>{body}</em>"
+        out.append(body)
+    return "".join(out)
 
 
 def render_html(book: CompiledBook, sheet: StyleSheet) -> str:
@@ -264,19 +300,47 @@ RENDERERS: Dict[str, Callable[[CompiledBook, StyleSheet], str]] = {
     "markdown": render_markdown,
 }
 
+# DOCX and EPUB produce bytes, not text. They live in their own modules and are
+# imported lazily so the text formats never pay for loading them.
+BINARY_FORMATS = ("docx", "epub")
+
+FORMATS = tuple(sorted(RENDERERS)) + BINARY_FORMATS
+
 # What each format is served as, so the route does not have to know.
 CONTENT_TYPES = {
     "html": "text/html; charset=utf-8",
     "markdown": "text/markdown; charset=utf-8",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "epub": "application/epub+zip",
 }
 
-EXTENSIONS = {"html": "html", "markdown": "md"}
+EXTENSIONS = {"html": "html", "markdown": "md", "docx": "docx", "epub": "epub"}
+
+
+def _unknown(fmt: str) -> ValueError:
+    return ValueError(
+        f"Unknown format '{fmt}'. Available: {', '.join(sorted(FORMATS))}."
+    )
 
 
 def render(book: CompiledBook, sheet: StyleSheet, fmt: str) -> str:
+    """Render a text format. Use `render_bytes` for anything servable."""
     renderer = RENDERERS.get(fmt)
     if renderer is None:
-        raise ValueError(
-            f"Unknown format '{fmt}'. Available: {', '.join(sorted(RENDERERS))}."
-        )
+        raise _unknown(fmt)
     return renderer(book, sheet)
+
+
+def render_bytes(book: CompiledBook, sheet: StyleSheet, fmt: str) -> bytes:
+    """Render any supported format to the bytes that go over the wire."""
+    if fmt in RENDERERS:
+        return render(book, sheet, fmt).encode("utf-8")
+    if fmt == "docx":
+        from compile_docx import render_docx
+
+        return render_docx(book, sheet)
+    if fmt == "epub":
+        from compile_epub import render_epub
+
+        return render_epub(book, sheet)
+    raise _unknown(fmt)

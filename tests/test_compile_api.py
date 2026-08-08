@@ -107,10 +107,20 @@ def test_markdown_compile_is_offered_too(client):
     assert r.text.startswith("# The Pier")
 
 
+def test_docx_and_epub_are_served_as_downloadable_binaries(client):
+    for fmt, ext, magic in [("docx", "docx", b"PK"), ("epub", "epub", b"PK")]:
+        r = client.get(f"/api/projects/book/compile?format={fmt}")
+        assert r.status_code == 200, fmt
+        assert f'filename="book.{ext}"' in r.headers["content-disposition"]
+        # Both are ZIP containers.
+        assert r.content.startswith(magic), fmt
+
+
 def test_an_unknown_format_is_a_400_that_lists_the_options(client):
-    r = client.get("/api/projects/book/compile?format=docx")
+    r = client.get("/api/projects/book/compile?format=pdf")
     assert r.status_code == 400
-    assert "html" in r.json()["detail"]
+    detail = r.json()["detail"]
+    assert "docx" in detail and "epub" in detail
 
 
 def test_compile_404_for_an_unknown_project(client):
