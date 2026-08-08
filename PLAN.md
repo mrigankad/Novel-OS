@@ -20,7 +20,7 @@
 | P2 | Moat A continuity surfacing, Codex, portraits | ◐ Health + Codex UI + Guardian injection + **context packs** + **R4 relationship checks** all shipped (11 checks in `ALL_CHECKS`); **Codex auto-extract proposals** is the only item left |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
-| P5 | Word parity track changes, styles, AI images | ☐ Not started |
+| P5 | Word parity track changes, styles, AI images | ◐ **Track changes shipped** (suggest mode, accept/reject, reject-all projection); styles / spellcheck / AI images not started |
 | P6 | Publishing DOCX / EPUB / PDF / HTML | ☐ Not started |
 | P7 | Commercial auth, billing, onboarding, marketing | ☐ Not started |
 
@@ -172,6 +172,9 @@ Scrivener parity, now that the differentiators exist.
 ## P5 Word parity
 
 - **Track changes / suggest mode** color-coded edits, accept/reject per change, author attribution. AI suggestions render as in-place marks.
+  - **Shipped:** `suggestionInsert` / `suggestionDelete` marks; suggest mode turns typing into proposals and deletion into struck text; per-change and bulk accept/reject in `SuggestionsPanel`; resolution is a pure JSON transform (`web/src/lib/trackChanges.ts`) so it is exactly testable and undoable.
+  - **Enforced at the storage layer, not just the UI:** `api/richtext.py` projects the *reject-all* view, so a pending suggestion is never in the markdown agents read or the file on disk. `save_final_doc` applies house style to text nodes instead of re-parsing markdown, which would have wiped every suggestion on the first save.
+  - **Still to do:** routing agent revisions in as suggestions rather than into the `revised` stage, and per-change attribution once P7 auth supplies real identities.
 - **Styles system** named styles driving compile output (Scrivener compile parity).
 - **Spelling & grammar** with a per-project dictionary so invented names and terms stop being flagged.
 - **AI image generation** character portraits, cover art, scene illustrations from story state. New `core/image_client.py` mirroring the provider-agnostic pattern of `llm_client.py`, preserving BYO-key.

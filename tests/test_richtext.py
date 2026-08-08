@@ -316,3 +316,78 @@ def test_comment_with_missing_quote_is_unresolved(tmp_path):
     })
     assert resp.status_code == 201
     assert resp.json()["anchor_status"] == "unresolved"
+
+
+# ------------------------------------------------- track changes (P5.1)
+
+def _suggested(t, kind, author="Mriganka"):
+    return text(t, {"type": kind, "attrs": {"author": author, "id": "s1"}})
+
+
+def test_pending_insertion_is_absent_from_the_markdown_agents_read():
+    d = doc(para(
+        text("She left "),
+        _suggested("without looking back", rt.SUGGESTION_INSERT),
+        text("."),
+    ))
+    assert md(d) == "She left .\n"
+
+
+def test_text_proposed_for_deletion_is_still_in_the_projection():
+    """A deletion is a proposal - until accepted the words are still the novel."""
+    d = doc(para(
+        text("She left "),
+        _suggested("quietly ", rt.SUGGESTION_DELETE),
+        text("by the pier."),
+    ))
+    assert md(d) == "She left quietly by the pier.\n"
+
+
+def test_projection_is_the_reject_all_view():
+    d = doc(para(
+        _suggested("New. ", rt.SUGGESTION_INSERT),
+        text("Kept. "),
+        _suggested("Doomed.", rt.SUGGESTION_DELETE),
+    ))
+    assert md(d) == "Kept. Doomed.\n"
+
+
+def test_pending_insertions_do_not_inflate_the_word_count():
+    d = doc(para(text("one two "), _suggested("three four", rt.SUGGESTION_INSERT)))
+    assert rt.word_count(d) == 2
+
+
+def test_has_suggestions_detects_either_kind():
+    assert not rt.has_suggestions(doc(para(text("plain"))))
+    assert rt.has_suggestions(doc(para(_suggested("x", rt.SUGGESTION_INSERT))))
+    assert rt.has_suggestions(doc(para(_suggested("x", rt.SUGGESTION_DELETE))))
+
+
+def test_map_text_rewrites_text_without_disturbing_marks():
+    d = doc(para(_suggested("a — b", rt.SUGGESTION_INSERT), text("tail")))
+    out = rt.map_text(d, lambda s: s.replace("—", "-"))
+    node = out["content"][0]["content"][0]
+    assert node["text"] == "a - b"
+    assert node["marks"][0]["type"] == rt.SUGGESTION_INSERT
+    assert node["marks"][0]["attrs"]["author"] == "Mriganka"
+
+
+def test_saving_a_doc_preserves_pending_suggestions(tmp_path):
+    """The save path used to rebuild the doc from markdown, which would drop
+    every suggestion because markdown cannot express one."""
+    client, proj = _project(tmp_path)
+    body = doc(para(
+        text("She left "),
+        _suggested("without looking back", rt.SUGGESTION_INSERT),
+        text("."),
+    ))
+    resp = client.put("/api/projects/book/chapters/1/final/doc", json={"doc": body})
+    assert resp.status_code == 200
+
+    saved = client.get("/api/projects/book/chapters/1/final/doc").json()
+    assert rt.has_suggestions(saved["doc"])
+    # ...and the file the agents read still shows the reject-all view.
+    on_disk = (proj / "outputs" / "manuscript" / "chapter_001_final.md").read_text(
+        encoding="utf-8"
+    )
+    assert "without looking back" not in on_disk

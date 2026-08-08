@@ -41,9 +41,62 @@ MARK_DELIMITERS = {
     "code": "`",
 }
 
+# Track changes (PLAN.md P5.1). A suggestion is a *proposal*, so the markdown
+# projection - the thing agents read and the thing that gets exported - shows the
+# manuscript as it stands if every pending change were rejected: proposed
+# insertions are omitted, and text proposed for deletion is still present.
+#
+# This keeps the P3.3 rule intact at the storage layer rather than relying on the
+# UI to enforce it: an agent can never mistake an unreviewed suggestion for
+# accepted prose, because the suggestion is not in the text it is given.
+SUGGESTION_INSERT = "suggestionInsert"
+SUGGESTION_DELETE = "suggestionDelete"
+
 # Scene break. The style profile's marker is "***", but a horizontal rule is
 # the semantic node; markdown emits "---" and both parse back to the same thing.
 SCENE_BREAK = "---"
+
+
+def map_text(node: Any, fn) -> Any:
+    """Return a copy of the document with `fn` applied to every text node.
+
+    House-style passes used to run by projecting to markdown, cleaning the
+    string, and parsing it back. That round trip silently dropped anything
+    markdown cannot express - which now includes track-change suggestions, so a
+    single save would have discarded every pending edit. Rewriting text in place
+    keeps the document structure and its marks exactly as the author left them.
+    """
+    if isinstance(node, list):
+        return [map_text(c, fn) for c in node]
+    if not isinstance(node, dict):
+        return node
+    out = dict(node)
+    if out.get("type") == TEXT:
+        out["text"] = fn(out.get("text") or "")
+    if out.get("content"):
+        out["content"] = [map_text(c, fn) for c in out["content"]]
+    return out
+
+
+def _mark_names(node: Dict[str, Any]) -> set:
+    return {m.get("type") for m in (node.get("marks") or [])}
+
+
+def has_suggestions(doc: Optional[Dict[str, Any]]) -> bool:
+    """True when the document carries at least one unreviewed suggestion."""
+    return _count_suggestions(doc) > 0
+
+
+def _count_suggestions(node: Any) -> int:
+    if isinstance(node, list):
+        return sum(_count_suggestions(c) for c in node)
+    if not isinstance(node, dict):
+        return 0
+    if node.get("type") == TEXT and _mark_names(node) & {
+        SUGGESTION_INSERT, SUGGESTION_DELETE
+    }:
+        return 1
+    return _count_suggestions(node.get("content") or [])
 
 _SETEXT_H1 = re.compile(r"^=+\s*$")
 _SETEXT_H2 = re.compile(r"^-{2,}\s*$")
@@ -137,6 +190,9 @@ def _inline_to_md(nodes: List[Dict[str, Any]]) -> str:
         elif ntype == IMAGE:
             out.append(_image_to_md(node))
         elif ntype == TEXT:
+            # A proposed insertion is not part of the manuscript until accepted.
+            if SUGGESTION_INSERT in _mark_names(node):
+                continue
             out.append(_text_to_md(node))
         elif node.get("content"):
             out.append(_inline_to_md(node["content"]))
@@ -440,6 +496,10 @@ def _plain_text(node: Any) -> str:
     if not isinstance(node, dict):
         return ""
     if node.get("type") == TEXT:
+        # Match to_markdown: pending insertions are not yet part of the text, so
+        # they must not inflate the word count or shift comment offsets.
+        if SUGGESTION_INSERT in _mark_names(node):
+            return ""
         return node.get("text") or ""
     inner = "".join(_plain_text(c) for c in node.get("content") or [])
     return f"{inner}\n" if node.get("type") in _BLOCK_TYPES else inner

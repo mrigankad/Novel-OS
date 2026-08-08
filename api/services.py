@@ -971,14 +971,19 @@ POV: {pov or "[unspecified]"}
 
     def save_final_doc(self, project_id: str, number: int, doc: dict) -> int:
         """Save a ProseMirror document as Final, projecting markdown for agents."""
-        from prose_sanitize import sanitize_manuscript, apply_header_to_chapter  # noqa: E402
-        md = richtext.to_markdown(doc)
+        from prose_sanitize import (  # noqa: E402
+            sanitize_manuscript, apply_header_to_chapter, strip_em_dashes,
+        )
+        # House style is applied to the document's text nodes, not by parsing a
+        # cleaned markdown string back into a document: that round trip drops
+        # every mark markdown cannot express, which would wipe pending track
+        # changes on the first save.
+        clean_doc = richtext.map_text(doc, strip_em_dashes)
+        md = richtext.to_markdown(clean_doc)
         clean, meta = sanitize_manuscript(md)
         s = self._load(project_id)
         apply_header_to_chapter(s.chapters.get(number), meta)
         s.save_state()
-        # Rebuild doc from cleaned markdown so marks stay consistent
-        clean_doc = richtext.from_markdown(clean) if clean else richtext.empty_doc()
         return self._commit_final(project_id, number, clean, doc=clean_doc)
 
     def promote_final(self, project_id: str, number: int, force: bool = False) -> str:

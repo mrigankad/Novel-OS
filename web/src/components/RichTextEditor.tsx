@@ -6,6 +6,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import { CommentAnchors, type CommentAnchor } from "./commentAnchors";
 import { CodexMention } from "./codexMention";
+import { SuggestionDelete, SuggestionInsert, TrackChanges } from "./trackChangesMarks";
 import { useLatestRef } from "../hooks/useLatestRef";
 
 import type { EditorHandle, PMDoc } from "../lib/richText";
@@ -23,6 +24,10 @@ type Props = {
   /** Fired after left-click mouseup when a non-empty selection remains. */
   onSelectionAction?: (clientX: number, clientY: number) => void;
   onMentionClick?: (entryId: string, entryType: string, clientX: number, clientY: number) => void;
+  /** Suggest mode: edits become tracked proposals instead of direct changes. */
+  suggesting?: boolean;
+  /** Name recorded on suggestions made in this session. */
+  author?: string;
 };
 
 /**
@@ -32,6 +37,7 @@ type Props = {
 export default function RichTextEditor({
   doc, onChange, placeholder = "Write the chapter…", editable = true, onReady,
   commentAnchors = [], onContextMenu, onSelectionAction, onMentionClick,
+  suggesting = false, author = "",
 }: Props) {
   const skipNext = useRef(false);
   const onContextMenuRef = useLatestRef(onContextMenu);
@@ -50,6 +56,9 @@ export default function RichTextEditor({
       Placeholder.configure({ placeholder }),
       CommentAnchors.configure({ anchors: commentAnchors }),
       CodexMention,
+      SuggestionInsert,
+      SuggestionDelete,
+      TrackChanges.configure({ author }),
     ],
     content: doc,
     editable,
@@ -154,6 +163,10 @@ export default function RichTextEditor({
   useEffect(() => {
     if (editor) editor.setEditable(editable);
   }, [editor, editable]);
+
+  useEffect(() => {
+    editor?.commands.setSuggesting(suggesting);
+  }, [editor, suggesting]);
 
   return <EditorContent editor={editor} />;
 }

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import RichTextEditor, { type CommentAnchor } from "./RichTextEditor";
+import SuggestionsPanel from "./SuggestionsPanel";
 import {
   EMPTY_DOC,
   insertImage,
@@ -64,6 +65,11 @@ export default function FinalEditor(props: {
   const handleRef = useRef<EditorHandle | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"write" | "preview">("write");
+  const [suggesting, setSuggesting] = usePersisted("novelos-suggest-mode", false);
+  // Attribution reuses the persona convention comments already follow. Single
+  // writer today, so it labels rather than authenticates - real identities
+  // arrive with P7 auth on the existing tenancy tables.
+  const [authorName] = usePersisted("novelos-author-name", "You");
   const [sizeIdx, setSizeIdx] = usePersisted("novelos-editor-size", 1);
   const [measure, setMeasure] = usePersisted<Measure>("novelos-editor-measure", "normal");
   const [readerFont, setReaderFontState] = useState<ReaderFont>(getReaderFont);
@@ -287,6 +293,20 @@ export default function FinalEditor(props: {
           <TBtn onClick={() => toggleBlockquote(handleRef.current)} label="Quote">”</TBtn>
           <TBtn onClick={() => insertSceneBreak(handleRef.current)} label="Scene break">✦</TBtn>
           <div className="mx-1 h-5 w-px bg-paper-line" />
+          <button
+            type="button"
+            aria-pressed={suggesting}
+            onClick={() => setSuggesting(!suggesting)}
+            title="Suggest mode — edits become tracked proposals"
+            className={`rounded-lg px-2 py-1 text-[12px] font-medium transition ${
+              suggesting
+                ? "bg-[var(--color-violet)] text-white"
+                : "text-ink-muted hover:bg-paper-line/60"
+            }`}
+          >
+            Suggest
+          </button>
+          <div className="mx-1 h-5 w-px bg-paper-line" />
           <TBtn onClick={() => fileRef.current?.click()} label="Insert image">
             {uploading ? "…" : "▣"}
           </TBtn>
@@ -319,6 +339,8 @@ export default function FinalEditor(props: {
             onChange={handleChange}
             onReady={onReady}
             editable={mode === "write"}
+            suggesting={suggesting}
+            author={authorName}
             commentAnchors={commentAnchors}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -337,6 +359,10 @@ export default function FinalEditor(props: {
           />
         </div>
       </article>
+
+      <div style={{ maxWidth: MEASURES[measure], marginInline: "auto" }}>
+        <SuggestionsPanel doc={doc?.type === "doc" ? doc : EMPTY_DOC} onChange={handleChange} />
+      </div>
 
       <ContextMenu
         open={ctx != null}
