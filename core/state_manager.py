@@ -253,6 +253,12 @@ class StoryState:
         self.codex: Dict[str, CodexEntry] = {}
         self.relationships: Dict[str, RelationshipEdge] = {}
         self.collections: Dict[str, Collection] = {}
+        # Continuity findings the writer has marked intentional, keyed by the
+        # fact they exempt. A checker cannot tell an unreliable narrator or a
+        # character who lies from a mistake, so without a dismissal that sticks
+        # the panel re-raises the same non-error every run and the writer learns
+        # to ignore it - which costs more than the check is worth.
+        self.continuity_exemptions: Dict[str, Dict[str, Any]] = {}
         self.plot_threads: Dict[str, PlotThread] = {}
         self.chapters: Dict[int, ChapterState] = {}
         self.timeline: List[TimelineEvent] = []
@@ -294,6 +300,9 @@ class StoryState:
                     k: Collection.from_dict(v)
                     for k, v in data.get('collections', {}).items()
                 }
+                self.continuity_exemptions = dict(
+                    data.get('continuity_exemptions', {}) or {}
+                )
                 self.plot_threads = {
                     k: PlotThread.from_dict(v)
                     for k, v in data.get('plot_threads', {}).items()
@@ -370,6 +379,7 @@ class StoryState:
             'codex': {k: v.to_dict() for k, v in self.codex.items()},
             'relationships': {k: v.to_dict() for k, v in self.relationships.items()},
             'collections': {k: v.to_dict() for k, v in self.collections.items()},
+            'continuity_exemptions': dict(self.continuity_exemptions),
             'plot_threads': {k: v.to_dict() for k, v in self.plot_threads.items()},
             'chapters': {k: v.to_dict() for k, v in self.chapters.items()},
             'binder': self.binder.to_list(),
@@ -596,6 +606,30 @@ class StoryState:
             return False
         del self.relationships[edge_id]
         self._log_action("relationship_deleted", {"id": edge_id})
+        self.save_state()
+        return True
+
+    def exempt_finding(self, key: str, reason: str = "") -> Dict[str, Any]:
+        """Mark a continuity finding intentional so it stops being reported.
+
+        The reason is the point: six months later the writer needs to know why
+        past-them waved this through, and the Guardian gets to read it too.
+        """
+        key = (key or "").strip()
+        if not key:
+            raise ValueError("An exemption needs a finding key.")
+        record = {"reason": (reason or "").strip(), "at": datetime.now().isoformat()}
+        self.continuity_exemptions[key] = record
+        self._log_action("continuity_exempted", {"key": key})
+        self.save_state()
+        return record
+
+    def unexempt_finding(self, key: str) -> bool:
+        """Undo an exemption, so the finding can be reported again."""
+        if key not in self.continuity_exemptions:
+            return False
+        del self.continuity_exemptions[key]
+        self._log_action("continuity_unexempted", {"key": key})
         self.save_state()
         return True
 

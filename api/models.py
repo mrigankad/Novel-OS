@@ -73,6 +73,9 @@ class ContinuityFinding(BaseModel):
     suggestion: str = ""
     chapter: int | None = None
     entity_id: str | None = None
+    # Stable identity of the fact, for marking it intentional. Excludes the
+    # message and chapter so a dismissal survives rewordings and re-sightings.
+    key: str = ""
 
 
 class ContinuityReport(BaseModel):
@@ -149,6 +152,28 @@ class AddCodexEntry(BaseModel):
     notes: str = ""
     role: str = "supporting"
     tags: list[str] = []
+
+
+class ExemptFinding(BaseModel):
+    """Mark a continuity finding intentional. `key` identifies the fact."""
+    key: str
+    reason: str = ""
+
+
+class ContinuityExemption(BaseModel):
+    key: str
+    reason: str = ""
+    at: str = ""
+
+
+class CodexProposal(BaseModel):
+    """A candidate Codex entry extracted from prose, awaiting confirmation."""
+    name: str
+    entry_type: str
+    mentions: int
+    evidence: str
+    chapters: list[int] = []
+    excerpt: str = ""
 
 
 class SetPortrait(BaseModel):

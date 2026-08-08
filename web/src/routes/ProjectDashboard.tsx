@@ -22,6 +22,7 @@ import ChoiceGroup from "../components/ChoiceGroup";
 import AddRelationshipModal from "../components/AddRelationshipModal";
 import Icon from "../components/Icon";
 import CodexImageButton from "../components/CodexImageButton";
+import CodexProposals from "../components/CodexProposals";
 import { useToast } from "../components/toastContext";
 import { useRunPhase } from "../hooks/useRunPhase";
 import type { IconName } from "../icons/registry";
@@ -269,6 +270,8 @@ export default function ProjectDashboard() {
                 </button>
               </div>
             </div>
+
+            <CodexProposals projectId={id} onAccepted={load} />
 
             <div className="mb-4 flex flex-wrap gap-1.5">
               {CODEX_FILTERS.map((f) => (

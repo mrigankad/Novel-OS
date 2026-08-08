@@ -349,6 +349,81 @@ function Comments({ id, num, pendingComment, onPendingCommentConsumed, onComment
   );
 }
 
+/**
+ * "This is intentional" (PLAN.md P2.1).
+ *
+ * A checker cannot tell an unreliable narrator or a character who lies from a
+ * real mistake, so the writer needs a third answer besides fixing and ignoring.
+ * The reason is required in spirit but not enforced: asking for it is what makes
+ * the exemption reviewable six months later, but blocking on it would just
+ * teach people to type "x".
+ */
+function IntentionalButton({
+  projectId, finding, onExempted,
+}: {
+  projectId: string;
+  finding: ContinuityFinding;
+  onExempted: () => void;
+}) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      await api.exemptFinding(projectId, finding.key, reason);
+      toast("Marked intentional — it won't be raised again", "success");
+      setOpen(false);
+      setReason("");
+      onExempted();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        className="btn-ghost mt-2 px-2 py-0.5 text-[11.5px]"
+        onClick={() => setOpen(true)}
+      >
+        This is intentional
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <input
+        autoFocus
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void submit();
+          if (e.key === "Escape") setOpen(false);
+        }}
+        placeholder="Why? e.g. she lies about it"
+        aria-label="Why is this intentional?"
+        className="min-w-0 flex-1 rounded-lg border border-[rgba(96,112,153,0.2)] bg-white/80 px-2 py-1 text-[12px] text-ink-text"
+      />
+      <button type="button" className="btn-ghost px-2 py-0.5 text-[11.5px]"
+              onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+      <button type="button" disabled={busy}
+              className="btn-secondary px-2 py-0.5 text-[11.5px] disabled:opacity-40"
+              onClick={() => void submit()}>
+        {busy ? "Saving…" : "Dismiss"}
+      </button>
+    </div>
+  );
+}
+
 function ContinuityPanel({ id, num }: { id: string; num: number }) {
   const [findings, setFindings] = useState<ContinuityFinding[] | null>(null);
   const [counts, setCounts] = useState({ critical: 0, warning: 0, info: 0 });
@@ -402,6 +477,13 @@ function ContinuityPanel({ id, num }: { id: string; num: number }) {
           <p className="text-[13px] text-ink-text">{f.message}</p>
           {f.suggestion && (
             <p className="mt-1.5 text-[12px] text-ink-muted">{f.suggestion}</p>
+          )}
+          {f.key && (
+            <IntentionalButton
+              projectId={id}
+              finding={f}
+              onExempted={load}
+            />
           )}
         </div>
       ))}

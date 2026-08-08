@@ -49,6 +49,17 @@ class Finding:
     chapter: Optional[int] = None
     entity_id: Optional[str] = None  # character_id, thread_id, etc.
 
+    @property
+    def key(self) -> str:
+        """Stable identity for the *fact* this finding is about.
+
+        Deliberately excludes the message and the chapter. The message gets
+        reworded as checks improve, and the same contradiction surfaces at
+        whichever chapter it is next observed - keying on either would silently
+        resurrect a dismissal the writer already made.
+        """
+        return f"{self.category}:{self.entity_id or ''}"
+
     def format(self) -> str:
         head = f"[{self.severity.upper()}] {self.category}"
         if self.chapter is not None:
@@ -58,7 +69,7 @@ class Finding:
         return "\n".join(p for p in (head, body, tail) if p)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {**asdict(self), "key": self.key}
 
 
 # --------------------------------------------------------------------- checks
@@ -482,7 +493,21 @@ def run_all(state: "StoryState", project_path: Optional[Path] = None,
             out.extend(check(state))  # type: ignore[arg-type]
     if project_path is not None:
         out.extend(check_chapter_file_consistency(state, project_path))
-    return out
+    return drop_exempt(state, out)
+
+
+def drop_exempt(state: "StoryState", findings: List[Finding]) -> List[Finding]:
+    """Remove findings the writer has marked intentional.
+
+    Applied inside `run_all`, so every consumer - the panel, the CLI summary and
+    the Guardian's prompt - agrees about what counts as a problem. Filtering in
+    the UI alone would leave the AI arguing with a decision the human already
+    made.
+    """
+    exempt = getattr(state, "continuity_exemptions", None) or {}
+    if not exempt:
+        return findings
+    return [f for f in findings if f.key not in exempt]
 
 
 def summarize(findings: List[Finding]) -> str:

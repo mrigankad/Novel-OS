@@ -45,6 +45,14 @@ export interface ContinuityFinding {
   suggestion?: string;
   chapter?: number | null;
   entity_id?: string | null;
+  /** Stable identity of the fact, for marking it intentional. */
+  key: string;
+}
+
+export interface ContinuityExemption {
+  key: string;
+  reason: string;
+  at: string;
 }
 export interface ContinuityReport {
   findings: ContinuityFinding[];
@@ -187,6 +195,17 @@ export interface BinderNode {
 // write time - so a value off the wire is always one of these four.
 export type CodexEntryType = "character" | "location" | "worldbuilding" | "item";
 
+/** A candidate Codex entry found in the prose, awaiting confirmation (P2.2). */
+export interface CodexProposal {
+  name: string;
+  entry_type: CodexEntryType;
+  mentions: number;
+  /** Why it was proposed, in words a writer can judge: "12 mentions, speaks". */
+  evidence: string;
+  chapters: number[];
+  excerpt: string;
+}
+
 export interface CodexEntry {
   id: string;
   entry_type: CodexEntryType;
@@ -299,6 +318,14 @@ export const api = {
     api_key?: string; base_url?: string; onboarding_completed?: boolean;
   }) => send<StudioLlmStatus>("/api/studio/llm", "PUT", body),
   continuity: (id: string) => get<ContinuityReport>(`/api/projects/${id}/continuity`),
+  exemptions: (id: string) =>
+    get<ContinuityExemption[]>(`/api/projects/${id}/continuity/exemptions`),
+  exemptFinding: (id: string, key: string, reason: string) =>
+    send<ContinuityExemption>(
+      `/api/projects/${id}/continuity/exemptions`, "POST", { key, reason },
+    ),
+  unexemptFinding: (id: string, key: string) =>
+    del(`/api/projects/${id}/continuity/exemptions/${encodeURIComponent(key)}`),
   statistics: (id: string) => get<ProjectStatistics>(`/api/projects/${id}/statistics`),
   chapterContinuity: (id: string, n: number) =>
     get<ContinuityReport>(`/api/projects/${id}/chapters/${n}/continuity`),
@@ -371,6 +398,10 @@ export const api = {
     entry_type: CodexEntryType | string; name: string; summary?: string;
     notes?: string; role?: string; tags?: string[];
   }) => send<CodexEntry[]>(`/api/projects/${id}/codex`, "POST", body),
+  codexProposals: (id: string, minMentions = 3, limit = 60) =>
+    get<CodexProposal[]>(
+      `/api/projects/${id}/codex/proposals?min_mentions=${minMentions}&limit=${limit}`,
+    ),
   setPortrait: (id: string, entryId: string, mediaId: string, entryType = "character") =>
     send<CodexEntry>(`/api/projects/${id}/codex/${entryId}/portrait`, "PUT", {
       media_id: mediaId, entry_type: entryType,

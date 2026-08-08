@@ -10,6 +10,7 @@ from . import db, media as media_lib, richtext
 from .jobs import runner
 from .models import (
     AddCharacter, AddCodexEntry, AddComment, AddRelationship, ChapterDetail, ChapterStages,
+    CodexProposal, ContinuityExemption, ExemptFinding,
     ChapterSummary, CharacterSummary, CodexEntryOut, Comment, ConsequenceAccept,
     ConsequenceAcceptResult, ConsequencePreview, ConsequencePreviewRequest, ContinuityReport,
     ContinueParagraph, ContinueResult, CreateProject, CreateSnapshot, FinalDoc, FinalDocSave,
@@ -135,6 +136,43 @@ def _continuity_report(raw: list[dict]) -> ContinuityReport:
 def project_continuity(project_id: str, svc: ProjectService = Depends(get_service)):
     try:
         return _continuity_report(svc.continuity_findings(project_id))
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.get("/projects/{project_id}/continuity/exemptions",
+            response_model=list[ContinuityExemption])
+def list_exemptions(project_id: str, svc: ProjectService = Depends(get_service)):
+    try:
+        return svc.list_exemptions(project_id)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+
+@router.post("/projects/{project_id}/continuity/exemptions",
+             response_model=ContinuityExemption, status_code=201)
+def exempt_finding(project_id: str, body: ExemptFinding,
+                   svc: ProjectService = Depends(get_service)):
+    """Mark a finding intentional so it stops being reported to anyone.
+
+    The filter lives in the engine, so the Guardian stops raising it too - the
+    AI must not argue with a call the writer has already made.
+    """
+    try:
+        return svc.exempt_finding(project_id, body.key, body.reason)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/projects/{project_id}/continuity/exemptions/{key:path}",
+               status_code=204)
+def unexempt_finding(project_id: str, key: str,
+                     svc: ProjectService = Depends(get_service)):
+    try:
+        if not svc.unexempt_finding(project_id, key):
+            raise HTTPException(status_code=404, detail=f"No exemption for '{key}'")
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
 
@@ -532,6 +570,23 @@ def list_codex(project_id: str, entry_type: str | None = None,
                svc: ProjectService = Depends(get_service)):
     try:
         return svc.list_codex(project_id, entry_type)
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/projects/{project_id}/codex/proposals",
+            response_model=list[CodexProposal])
+def codex_proposals(project_id: str, min_mentions: int = 3, limit: int = 60,
+                    svc: ProjectService = Depends(get_service)):
+    """Codex candidates found in the manuscript (PLAN.md P2.2).
+
+    Read-only. Accepting one is an ordinary POST to /codex, so nothing here can
+    write to the world model without a human deciding to.
+    """
+    try:
+        return svc.codex_proposals(project_id, min_mentions=min_mentions, limit=limit)
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
     except BadRequest as e:

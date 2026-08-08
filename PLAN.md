@@ -17,7 +17,7 @@
 | UI | Flagship glass (Approach B, SF Pro) | ✅ Shipped |
 | Assets | Lucide icons + Novel OS mark (self-hosted) | ✅ Staged |
 | UX | Library cards + Studio Settings + first-run | ✅ Shipped |
-| P2 | Moat A continuity surfacing, Codex, portraits | ◐ Health + Codex UI + Guardian injection + **context packs** + **R4 relationship checks** all shipped (11 checks in `ALL_CHECKS`); **Codex auto-extract proposals** is the only item left |
+| P2 | Moat A continuity surfacing, Codex, portraits | ✅ **Complete** — health, Codex UI, Guardian injection, context packs, R4 relationship checks (11 in `ALL_CHECKS`), **auto-extract proposals**, **intentional-dismissal with memory** |
 | P3 | Moat B consequence preview, provenance, review | ◐ Preview + provenance + review + comment personas |
 | P4 | Studio binder, corkboard, outliner, research | ◐ Binder + corkboard + outliner + research + **⌘K search** + **Collections MVP**; semantic collections later |
 | P5 | Word parity track changes, styles, AI images | ◐ **Track changes shipped** (suggest mode, accept/reject, reject-all projection); styles / spellcheck / AI images not started |
@@ -113,10 +113,12 @@ The ProseMirror migration. Load-bearing for track changes, inline images, anchor
 - Project-level continuity health on the dashboard the "nobody else has this" screen.
 - Per-chapter badges driven by real check results, not status strings.
 - Run checks on demand and after every state mutation; they are free and instant, so there is no reason to batch them.
+- **Shipped: "this is intentional".** A checker cannot tell an unreliable narrator, deliberate foreshadowing, or a character who lies from a real mistake, so every finding carries a stable `key` (category + entity, deliberately excluding message and chapter) and can be exempted with a reason into `story_state.json`. The filter lives in `run_all`, so the panel, the CLI summary **and the Guardian's prompt** all agree — the AI never argues with a call the writer already made. Without this the panel re-raises the same non-error every run and gets ignored, which costs more than the check is worth.
 
 ### P2.2 Codex world model
 - Generalize characters into typed entries: `character`, `location`, `worldbuilding`, `item`. Structured fields, freeform notes, links to scenes.
 - Guardian validates prose against the Codex; entities auto-extract from prose as *proposals* requiring human confirmation.
+  - **Shipped:** `core/codex_extract.py` + `GET …/codex/proposals` + the review queue on the dashboard. Extraction is **deterministic text analysis** — dialogue attribution, honorifics, possessives, place prepositions, full-name grouping — so importing a finished manuscript is instant, free and offline. Precision is the design target: a missed name costs one manual entry, but a panel of wrong guesses costs trust in every proposal we ever make. This closes the friction that rival tools are worst at — Sudowrite makes you re-type a cast the draft already contains, NovelCrafter asks for configuration before anything works.
 - Codex database views with filtering; wire into ⌘K and sidebar search.
 
 ### P2.3 Codex portraits

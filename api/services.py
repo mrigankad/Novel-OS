@@ -492,6 +492,42 @@ class ProjectService:
         ))
         return self.list_codex(project_id, entry_type)
 
+    def codex_proposals(self, project_id: str, min_mentions: int = 3,
+                        limit: int = 60) -> list[dict]:
+        """Candidate Codex entries found in the manuscript (PLAN.md P2.2).
+
+        Read-only by construction: this proposes, it never writes. Accepting a
+        proposal goes through the ordinary `add_codex_entry` path so there is
+        exactly one way an entry can come into being.
+
+        Extraction is deterministic text analysis, so importing a finished
+        manuscript is instant and free - the friction it removes is having to
+        re-type a cast the draft already contains.
+        """
+        from codex_extract import extract_proposals, known_names_from_state  # noqa: E402
+
+        s = self._load(project_id)
+        chapters: dict[int, str] = {}
+        for number in sorted(s.chapters):
+            paths = self._stage_paths(project_id, number)
+            # Prefer the most finished prose available for this chapter.
+            for stage in ("final", "revised", "draft"):
+                text = _read(paths[stage])
+                if text:
+                    chapters[number] = text
+                    break
+
+        if not chapters:
+            return []
+        return [
+            p.to_dict() for p in extract_proposals(
+                chapters,
+                known_names=known_names_from_state(s),
+                min_mentions=max(1, min_mentions),
+                limit=max(1, min(limit, 200)),
+            )
+        ]
+
     def set_portrait(self, project_id: str, entry_id: str, media_id: str,
                      entry_type: str = "character") -> CodexEntryOut:
         """Attach a media id as portrait, or clear when media_id is empty."""
@@ -1593,3 +1629,29 @@ Foreshadowing_Planted: …
         if chapter is not None:
             findings = [f for f in findings if f.chapter is None or f.chapter == chapter]
         return [f.to_dict() for f in findings]
+
+    def exempt_finding(self, project_id: str, key: str, reason: str = "") -> dict:
+        """Mark a finding intentional (PLAN.md P2.1).
+
+        A checker cannot distinguish an unreliable narrator, deliberate
+        foreshadowing, or a character who lies from a real mistake. Without a
+        dismissal that persists, the panel re-raises the same non-error forever
+        and the writer stops reading it.
+        """
+        s = self._load(project_id)
+        try:
+            record = s.exempt_finding(key, reason)
+        except ValueError as e:
+            raise BadRequest(str(e))
+        return {"key": key, **record}
+
+    def unexempt_finding(self, project_id: str, key: str) -> bool:
+        s = self._load(project_id)
+        return s.unexempt_finding(key)
+
+    def list_exemptions(self, project_id: str) -> list[dict]:
+        s = self._load(project_id)
+        return [
+            {"key": k, "reason": v.get("reason", ""), "at": v.get("at", "")}
+            for k, v in sorted(s.continuity_exemptions.items())
+        ]
