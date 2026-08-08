@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,7 +11,10 @@ import {
 } from "../api/client";
 import StatusPill from "../components/StatusPill";
 import PipelineFlow, { type StageKey } from "../components/PipelineFlow";
-import FinalEditor from "../components/FinalEditor";
+// TipTap and its extensions are the bulk of this route's bundle, and they are
+// only needed once the Final pane is on screen - so the chapter shell, binder
+// and stage tabs paint without waiting for the editor to download.
+const FinalEditor = lazy(() => import("../components/FinalEditor"));
 import ContinueChat from "../components/ContinueChat";
 import Inspector, { type Tab as InspectorTab } from "../components/Inspector";
 import BinderNav from "../components/BinderNav";
@@ -434,6 +437,13 @@ export default function ChapterView() {
         <div className={focus ? "px-6 py-8" : "px-8 py-10"}>
           <div className={`mx-auto ${selected === "final" ? "max-w-[960px]" : "max-w-[760px]"}`}>
             {selected === "final" ? (
+              <Suspense
+                fallback={
+                  <div className="manuscript-page mx-auto max-w-[680px] px-11 py-14 text-center text-ink-muted">
+                    Opening the manuscript…
+                  </div>
+                }
+              >
               <FinalEditor
                 projectId={id}
                 chapterNumber={num}
@@ -459,6 +469,7 @@ export default function ChapterView() {
                 }}
                 commentAnchors={commentAnchors}
               />
+              </Suspense>
             ) : (
               <ProvenancePane
                 projectId={id}
