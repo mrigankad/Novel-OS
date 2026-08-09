@@ -1,0 +1,11 @@
+# Everything needed to run the test suite.
+#
+# Kept separate from requirements.txt because that file is deliberately a menu -
+# each LLM backend is optional and you install only the one you use. The tests,
+# by contrast, have a fixed set of needs and none of them is a provider SDK: the
+# engine is exercised against fakes, so CI never talks to a model.
+-r requirements.txt
+
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27            # FastAPI's TestClient transport
