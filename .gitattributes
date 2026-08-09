@@ -1,0 +1,41 @@
+# Line endings
+#
+# Every text file is stored with LF in the repository and checked out with LF,
+# regardless of platform. Without this, a Windows checkout (core.autocrlf=true)
+# rewrites files on the way in and git reports the whole tree as modified - which
+# makes an incoming pull request unreviewable, because the real change is buried
+# in hundreds of files whose only difference is invisible.
+*               text=auto eol=lf
+
+# Binary assets: never inspected for line endings, never diffed as text.
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.webp          binary
+*.avif          binary
+*.ico           binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.otf           binary
+*.eot           binary
+*.pdf           binary
+*.zip           binary
+# Compile output - both are ZIP containers, so treat them as opaque.
+*.docx          binary
+*.epub          binary
+
+# SVG is text and worth diffing, but it is also an asset - keep it LF.
+*.svg           text eol=lf
+
+# Windows shells will not run a script with LF endings.
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# Lockfiles are generated; collapse them in pull request diffs.
+package-lock.json  linguist-generated=true -diff
+
+# Keep GitHub's language stats about the project, not its assets.
+assets/**       linguist-vendored
