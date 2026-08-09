@@ -9,6 +9,7 @@ from . import db
 from .media import LocalMediaStore
 from .routes import router, get_media_store, get_service
 from .services import ProjectService
+from .version import __version__
 
 
 #: Vite's default, and the next port it falls back to when that one is taken -
@@ -40,7 +41,7 @@ def create_app(projects_root: Optional[Path] = None, db_url: Optional[str] = Non
     except Exception:
         pass
 
-    app = FastAPI(title="Novel OS API", version="0.2.0")
+    app = FastAPI(title="Novel OS API", version=__version__)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),

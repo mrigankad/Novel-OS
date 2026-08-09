@@ -20,6 +20,7 @@ from .models import (
     BinderMoveRequest, BinderPatchRequest, SynopsisRefreshResult, UpdateMedia,
     ProjectStatistics, OutlinerMetricsRefreshResult,
 )
+from .version import __version__
 from .services import (
     BadRequest, ChapterNotFound, NoSourceArtifact, ProjectNotFound, ProjectService,
 )
@@ -39,7 +40,7 @@ def get_media_store() -> media_lib.MediaStore:
 
 @router.get("/health")
 def health() -> dict:
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": __version__}
 
 
 @router.get("/studio/llm", response_model=StudioLlmStatus)
