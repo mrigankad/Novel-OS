@@ -62,11 +62,16 @@ export default function ChapterView() {
   const [focus, setFocus] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const compact = useMediaQuery(COMPACT_CHAPTER);
-  const [showBinder, setShowBinder] = useState(() =>
-    typeof window !== "undefined" ? !window.matchMedia(COMPACT_CHAPTER).matches : true,
+  // Seed the rails from the current mode, not just from the viewport: Write is
+  // supposed to *open* with the manuscript as the page, not only collapse the
+  // rails once you switch into it.
+  const roomForRails = () =>
+    typeof window === "undefined" || !window.matchMedia(COMPACT_CHAPTER).matches;
+  const [showBinder, setShowBinder] = useState(
+    () => roomForRails() && chapterLayoutFor(getStudioMode()).binder,
   );
-  const [showInspector, setShowInspector] = useState(() =>
-    typeof window !== "undefined" ? !window.matchMedia(COMPACT_CHAPTER).matches : true,
+  const [showInspector, setShowInspector] = useState(
+    () => roomForRails() && chapterLayoutFor(getStudioMode()).inspector,
   );
 
   // When the viewport needs the space, collapse both rails. Adjusted during
