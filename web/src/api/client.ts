@@ -369,6 +369,11 @@ export const api = {
     api_key?: string; base_url?: string; onboarding_completed?: boolean;
   }) => send<StudioLlmStatus>("/api/studio/llm", "PUT", body),
   continuity: (id: string) => get<ContinuityReport>(`/api/projects/${id}/continuity`),
+  /** Edit an entry. Send only what changed - absent fields are left alone. */
+  updateCodexEntry: (
+    id: string, entryId: string,
+    changes: Partial<Pick<CodexEntry, "name" | "summary" | "notes" | "role">>,
+  ) => send<CodexEntry>(`/api/projects/${id}/codex/${entryId}`, "PATCH", changes),
   bookShape: (id: string) => get<BookShapeReport>(`/api/projects/${id}/shape`),
   styles: (id: string) => get<StyleSheet>(`/api/projects/${id}/styles`),
   saveStyles: (id: string, sheet: StyleSheet) =>

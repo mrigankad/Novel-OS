@@ -23,6 +23,7 @@ import AddRelationshipModal from "../components/AddRelationshipModal";
 import Icon from "../components/Icon";
 import CodexImageButton from "../components/CodexImageButton";
 import CodexProposals from "../components/CodexProposals";
+import EditCodexModal from "../components/EditCodexModal";
 import ModeSwitch from "../components/ModeSwitch";
 import BookShape from "../components/BookShape";
 import CompilePanel from "../components/CompilePanel";
@@ -64,6 +65,7 @@ export default function ProjectDashboard() {
   const [continuity, setContinuity] = useState<ContinuityReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [entryOpen, setEntryOpen] = useState(false);
+  const [editing, setEditing] = useState<CodexEntry | null>(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkSource, setLinkSource] = useState<string | undefined>();
   const [codexFilter, setCodexFilter] = useState<"all" | CodexEntryType>("all");
@@ -352,6 +354,7 @@ export default function ProjectDashboard() {
                       (e) => e.source_id === entry.id || e.target_id === entry.id,
                     )}
                     onUpdated={load}
+                    onEdit={() => setEditing(entry)}
                     onAddLink={
                       entry.entry_type === "character"
                         ? () => {
@@ -370,6 +373,13 @@ export default function ProjectDashboard() {
       </div>
 
       <AddCodexModal id={id} open={entryOpen} onClose={() => setEntryOpen(false)} onAdded={load} />
+      <EditCodexModal
+        projectId={id}
+        entry={editing}
+        open={editing != null}
+        onClose={() => setEditing(null)}
+        onSaved={load}
+      />
       <AddRelationshipModal
         open={linkOpen}
         onClose={() => { setLinkOpen(false); setLinkSource(undefined); }}
@@ -452,12 +462,13 @@ function ContinuityHealth({
 }
 
 function CodexCard({
-  projectId, entry, edges, onUpdated, onAddLink,
+  projectId, entry, edges, onUpdated, onEdit, onAddLink,
 }: {
   projectId: string;
   entry: CodexEntry;
   edges: RelationshipEdge[];
   onUpdated: () => void;
+  onEdit: () => void;
   onAddLink?: () => void;
 }) {
   const toast = useToast();
@@ -495,6 +506,15 @@ function CodexCard({
             <p className="mt-1 line-clamp-2 text-[12px] text-ink-muted">{entry.summary}</p>
           ) : null}
         </div>
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label={`Edit ${entry.name}`}
+          title="Edit"
+          className="shrink-0 self-start rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-[rgba(104,103,234,0.08)] hover:text-[var(--color-violet)]"
+        >
+          <Icon name="pencil" className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       {isPerson && (
