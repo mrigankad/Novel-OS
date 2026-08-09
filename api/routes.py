@@ -18,7 +18,7 @@ from .models import (
     RunPhase, SearchHit, CollectionOut, CreateCollection, SetPortrait, SnapshotMeta, SnapshotText, StageDiff, StageReviewRequest,
     StageReviewResult, StudioLlmStatus, StudioLlmUpdate, UpdateComment, UpdateProject,
     BinderMoveRequest, BinderPatchRequest, SynopsisRefreshResult, UpdateMedia,
-    ProjectStatistics, OutlinerMetricsRefreshResult,
+    ProjectStatistics, OutlinerMetricsRefreshResult, UpdateCodexEntry,
 )
 from .version import __version__
 from .services import (
@@ -704,6 +704,24 @@ def add_codex_entry(project_id: str, body: AddCodexEntry,
         return svc.add_codex_entry(
             project_id, body.entry_type, body.name,
             summary=body.summary, notes=body.notes, role=body.role, tags=body.tags,
+        )
+    except ProjectNotFound:
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+    except BadRequest as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/projects/{project_id}/codex/{entry_id}", response_model=CodexEntryOut)
+def update_codex_entry(project_id: str, entry_id: str, body: UpdateCodexEntry,
+                       svc: ProjectService = Depends(get_service)):
+    """Edit an existing Codex entry.
+
+    Only the fields present in the request are applied, so editing one thing
+    cannot blank the others.
+    """
+    try:
+        return svc.update_codex_entry(
+            project_id, entry_id, body.model_dump(exclude_unset=True),
         )
     except ProjectNotFound:
         raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")

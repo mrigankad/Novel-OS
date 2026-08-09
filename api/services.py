@@ -492,6 +492,70 @@ class ProjectService:
         ))
         return self.list_codex(project_id, entry_type)
 
+    #: What a writer may edit on a Codex entry. Deliberately a whitelist rather
+    #: than "whatever the client sent": engine-owned fields like
+    #: last_appearance_chapter are derived from the manuscript, and letting a
+    #: form overwrite them would put the world model at odds with the prose.
+    EDITABLE_CHARACTER_FIELDS = (
+        "full_name", "role", "age", "physical_description", "internal_desire",
+        "external_goal", "fear", "weakness", "strength", "secret",
+        "arc_stage", "current_location", "emotional_state", "notes",
+    )
+    EDITABLE_CODEX_FIELDS = ("name", "summary", "notes", "tags")
+
+    def update_codex_entry(self, project_id: str, entry_id: str,
+                           changes: dict) -> CodexEntryOut:
+        """Edit an existing Codex entry (characters included).
+
+        The engine has supported this since the Codex existed; it was simply
+        never exposed over HTTP, so the studio could create an entry and then
+        never correct it. Reported in issue #2.
+
+        Characters live in `state.characters` and everything else in
+        `state.codex`, so the two are routed separately here rather than making
+        callers know which kind they are holding.
+        """
+        s = self._load(project_id)
+
+        if entry_id in s.characters:
+            updates = {
+                k: v for k, v in (changes or {}).items()
+                if k in self.EDITABLE_CHARACTER_FIELDS and v is not None
+            }
+            # The UI calls it `name` for every entry type; characters store it
+            # as `full_name`.
+            if "name" in (changes or {}) and changes["name"] is not None:
+                updates["full_name"] = changes["name"]
+            if "full_name" in updates and not str(updates["full_name"]).strip():
+                raise BadRequest("Name cannot be empty.")
+            if not updates:
+                raise BadRequest("Nothing to update.")
+            s.update_character(entry_id, updates)
+            s.save_state()
+            return self._codex_entry(project_id, entry_id)
+
+        entry = s.codex.get(entry_id)
+        if entry is None:
+            raise BadRequest(f"No Codex entry '{entry_id}'.")
+
+        updates = {
+            k: v for k, v in (changes or {}).items()
+            if k in self.EDITABLE_CODEX_FIELDS and v is not None
+        }
+        if "name" in updates and not str(updates["name"]).strip():
+            raise BadRequest("Name cannot be empty.")
+        if not updates:
+            raise BadRequest("Nothing to update.")
+        s.update_codex_entry(entry_id, **updates)
+        return self._codex_entry(project_id, entry_id)
+
+    def _codex_entry(self, project_id: str, entry_id: str) -> CodexEntryOut:
+        """One entry, in the same shape the list endpoint returns."""
+        for e in self.list_codex(project_id):
+            if e.id == entry_id:
+                return e
+        raise BadRequest(f"No Codex entry '{entry_id}'.")
+
     def codex_proposals(self, project_id: str, min_mentions: int = 3,
                         limit: int = 60) -> list[dict]:
         """Candidate Codex entries found in the manuscript (PLAN.md P2.2).

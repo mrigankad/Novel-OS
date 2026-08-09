@@ -154,6 +154,34 @@ class AddCodexEntry(BaseModel):
     tags: list[str] = []
 
 
+class UpdateCodexEntry(BaseModel):
+    """Fields a writer may change on an existing entry.
+
+    Every field is optional and only what's sent is applied, so a form that
+    edits one thing cannot blank the rest. Engine-owned fields - last
+    appearance, arc progress, relationships - are absent on purpose: they are
+    derived from the manuscript, and a form that overwrote them would put the
+    world model at odds with the prose it describes.
+    """
+    name: str | None = None
+    summary: str | None = None
+    notes: str | None = None
+    tags: list[str] | None = None
+    # Characters only; ignored for other entry types.
+    role: str | None = None
+    age: int | None = None
+    physical_description: str | None = None
+    internal_desire: str | None = None
+    external_goal: str | None = None
+    fear: str | None = None
+    weakness: str | None = None
+    strength: str | None = None
+    secret: str | None = None
+    arc_stage: str | None = None
+    current_location: str | None = None
+    emotional_state: str | None = None
+
+
 class StyleOut(BaseModel):
     """One named appearance. Typography only - it can never change a word."""
     font: str = "serif"
