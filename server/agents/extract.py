@@ -88,16 +88,47 @@ def candidates(session: Session, project_id: str, chapter: Optional[int] = None)
     """Deterministic pass: recurring capitalised names not already known."""
     texts = chapters_text(session, project_id, chapter)
     known = known_names(session, project_id)
-    out: list[dict] = []
-    for p in extract_proposals(texts, known_names=known, min_mentions=2, limit=MAX_CANDIDATES * 2):
-        key = norm(p.name)
-        if key in known or key in STOPWORDS:
+    raw: list[dict] = []
+    # Join compounds ("Marsh and Cole") BEFORE filtering known/dismissed names,
+    # so a dismissed fragment like "Cole" can't block the real entity.
+    for p in extract_proposals(texts, known_names=set(), min_mentions=2, limit=MAX_CANDIDATES * 4):
+        if norm(p.name) in STOPWORDS:
             continue
-        out.append({"name": p.name, "kind": _KIND_MAP.get(p.entry_type, "lore"), "mentions": p.mentions,
+        raw.append({"name": p.name, "kind": _KIND_MAP.get(p.entry_type, "lore"), "mentions": p.mentions,
                     "first_chapter": p.chapters[0] if p.chapters else None, "excerpt": p.excerpt})
-        if len(out) >= MAX_CANDIDATES:
-            break
-    return out
+    out = [c for c in join_compound_names(raw, texts) if norm(c["name"]) not in known]
+    return out[:MAX_CANDIDATES]
+
+
+def join_compound_names(cands: list[dict], texts: dict[int, str]) -> list[dict]:
+    """'Marsh and Cole' is one firm, not two factions. When two candidates almost
+    always appear as 'A and B' (or 'A & B'), propose the compound name instead."""
+    corpus = "\n".join(texts.values())
+    by_name = {c["name"]: c for c in cands}
+    merged: set[str] = set()
+    out: list[dict] = []
+    for a in cands:
+        if a["name"] in merged:
+            continue
+        for b in cands:
+            if b is a or b["name"] in merged:
+                continue
+            for joiner in (" and ", " & "):
+                compound = f"{a['name']}{joiner}{b['name']}"
+                together = corpus.count(compound)
+                alone_a = len(re.findall(rf"\b{re.escape(a['name'])}\b", corpus))
+                alone_b = len(re.findall(rf"\b{re.escape(b['name'])}\b", corpus))
+                # Nearly every mention of both names is inside the compound.
+                if together and together >= 0.8 * min(alone_a, alone_b):
+                    merged.update({a["name"], b["name"]})
+                    out.append({**a, "name": compound, "mentions": together,
+                                "kind": a["kind"] if a["kind"] == b["kind"] else "faction"})
+                    break
+            if a["name"] in merged:
+                break
+        if a["name"] not in merged:
+            out.append(a)
+    return [c for c in out if c["name"] not in merged or c["name"] not in by_name]
 
 
 def parse(raw: str) -> list[dict]:

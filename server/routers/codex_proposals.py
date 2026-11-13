@@ -18,7 +18,7 @@ from .projects import get_project
 
 # Mounted by `_codex_proposals_first.py`, which sorts before book.py so GET /codex/proposals
 # isn't swallowed by book's GET /codex/{entry_id}. (No `router` name here, or it'd mount twice.)
-proposals_router = APIRouter(tags=["codex"])
+router = APIRouter(tags=["codex"])
 P = "/projects/{project_id}/codex/proposals"
 
 
@@ -52,7 +52,7 @@ def _get(session: Session, project_id: str, pid: str) -> CodexProposal:
     return x
 
 
-@proposals_router.get(P, response_model=list[ProposalOut])
+@router.get(P, response_model=list[ProposalOut])
 def list_proposals(project_id: str, session: Session = Depends(get_session)):
     get_project(session, project_id)
     rows = session.exec(select(CodexProposal).where(CodexProposal.project_id == project_id,
@@ -61,7 +61,7 @@ def list_proposals(project_id: str, session: Session = Depends(get_session)):
     return [_out(x) for x in rows]
 
 
-@proposals_router.post(P, status_code=202)
+@router.post(P, status_code=202)
 def find_proposals(project_id: str, body: ProposeIn | None = None, session: Session = Depends(get_session)):
     get_project(session, project_id)
     try:
@@ -71,7 +71,7 @@ def find_proposals(project_id: str, body: ProposeIn | None = None, session: Sess
     return {"run_id": run.id}
 
 
-@proposals_router.post(P + "/{pid}/accept")
+@router.post(P + "/{pid}/accept")
 def accept(project_id: str, pid: str, session: Session = Depends(get_session)):
     x = _get(session, project_id, pid)
     e = CodexEntry(project_id=project_id, kind=x.kind, name=x.name, summary=x.summary,
@@ -89,7 +89,7 @@ def accept(project_id: str, pid: str, session: Session = Depends(get_session)):
     return {"proposal": _out(x), "entry": e.model_dump(mode="json")}
 
 
-@proposals_router.post(P + "/{pid}/dismiss", response_model=ProposalOut)
+@router.post(P + "/{pid}/dismiss", response_model=ProposalOut)
 def dismiss(project_id: str, pid: str, session: Session = Depends(get_session)):
     x = _get(session, project_id, pid)
     x.status = "dismissed"  # the row stays, so the name is never proposed again

@@ -113,3 +113,14 @@ def test_dismissed_name_not_reproposed(client, project, monkeypatch):
     client.post(base(pid), json={})
     assert client.get(base(pid)).json() == []
     assert calls == []  # nothing left to classify, so no model call
+
+
+def test_compound_names_are_one_entity():
+    from server.agents.extract import join_compound_names
+    cands = [{"name": "Marsh", "kind": "faction", "mentions": 3},
+             {"name": "Cole", "kind": "faction", "mentions": 3},
+             {"name": "Bramley", "kind": "item", "mentions": 2}]
+    texts = {1: "The agent from Marsh and Cole came. Marsh and Cole wrote again. Bramley trees.",
+             2: "A letter from Marsh and Cole. The Bramley held."}
+    names = [c["name"] for c in join_compound_names(cands, texts)]
+    assert names == ["Marsh and Cole", "Bramley"]

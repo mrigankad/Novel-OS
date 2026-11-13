@@ -43,6 +43,16 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+def _static_routes_first(app: FastAPI) -> None:
+    """Routers mount alphabetically, so /codex/{entry_id} could shadow /codex/proposals.
+    Within each method, try more literal paths first: fewer {params}, then longer.
+    Stable sort keeps the original order for everything else."""
+    def key(route) -> tuple[int, int]:
+        path = getattr(route, "path", "")
+        return (path.count("{"), -len(path.split("{")[0]))
+    app.router.routes.sort(key=key)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Novel OS", version=VERSION, lifespan=lifespan)
     app.add_middleware(_GZipExceptStreams, minimum_size=1024)
@@ -57,6 +67,8 @@ def create_app() -> FastAPI:
         module = importlib.import_module(f"{routers.__name__}.{mod.name}")
         if hasattr(module, "router"):
             app.include_router(module.router, prefix="/api")
+
+    _static_routes_first(app)
 
     @app.get("/api/health")
     def health() -> dict:
