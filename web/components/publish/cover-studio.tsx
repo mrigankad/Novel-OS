@@ -8,6 +8,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/page";
+import { Select as Dropdown } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import { projectsApi, qk } from "@/lib/api";
 import {
@@ -286,13 +287,11 @@ function CoverEditor({ projectId, cover, spec, onSaved }: { projectId: string; c
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: readonly string[]; onChange: (v: string) => void }) {
   return (
-    <label className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1">
       <span className="text-[12px] font-semibold text-ink">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-[10px] border border-rule-strong bg-paper px-2 text-[13px] text-ink outline-none focus:border-gall">
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </label>
+      <Dropdown aria-label={label} value={value} onChange={onChange} className="w-full"
+        options={options.map((o) => ({ value: o, label: o }))} />
+    </div>
   );
 }
 

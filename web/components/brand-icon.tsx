@@ -16,7 +16,7 @@ const FILES: Record<string, string> = {
   xai: "xai", perplexity: "perplexity-color", together: "together-color", fireworks: "fireworks-color",
   nvidia: "nvidia-color", kimi: "kimi-color", moonshot: "kimi-color", lmstudio: "lmstudio",
   // image generation
-  runway: "runway", nanobanana: "nanobanana-color",
+  runway: "runway", nanobanana: "nanobanana-color", google_flow: "google-color",
   // tools that connect over MCP / files
   claude_code: "claudecode-color", codex: "codex-color", cursor: "cursor",
   copilot: "githubcopilot", windsurf: "windsurf", cline: "cline", obsidian: "obsidian-color",
@@ -27,7 +27,7 @@ export const BRAND_LABELS: Record<string, string> = {
   openai: "OpenAI", azure: "Azure OpenAI", bedrock: "AWS Bedrock", gemini: "Google Gemini",
   openrouter: "OpenRouter", groq: "Groq", deepseek: "DeepSeek", mistral: "Mistral", xai: "xAI Grok",
   perplexity: "Perplexity", together: "Together AI", fireworks: "Fireworks", nvidia: "NVIDIA NIM",
-  kimi: "Kimi", lmstudio: "LM Studio", runway: "Runway", higgsfield: "Higgsfield", nanobanana: "Nano Banana", openai_compatible: "Custom endpoint",
+  kimi: "Kimi", lmstudio: "LM Studio", runway: "Runway", higgsfield: "Higgsfield", google_flow: "Google Flow", nanobanana: "Nano Banana", openai_compatible: "Custom endpoint",
   claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", copilot: "GitHub Copilot",
   windsurf: "Windsurf", cline: "Cline", obsidian: "Obsidian",
 };

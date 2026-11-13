@@ -10,6 +10,8 @@ immediately usable as cover art or Codex portraits.
   openai      gpt-image-1 via the Images API.
   runway      Runway API: POST /v1/text_to_image, poll /v1/tasks/{id}.
   higgsfield  Higgsfield Cloud API: POST /<model>, poll /requests/{id}/status.
+  google_flow Google Flow through useapi.net (UNOFFICIAL: Google has no Flow API;
+              useapi.net drives your own Flow account, using your Google AI plan's credits).
 
 Credentials come from the matching Connection row (provider ids "gemini",
 "openai", "runway", "higgsfield"); keys never leave the server.
@@ -51,6 +53,10 @@ PROVIDERS: dict[str, ImageProvider] = {
                             "Uses your OpenAI API key."),
     "runway": ImageProvider("runway", "Runway", "gen4_image", ("gen4_image",),
                             "Runway API key from dev.runwayml.com."),
+    "google_flow": ImageProvider("google_flow", "Google Flow (via useapi.net)", "nano-banana-2",
+                                 ("nano-banana-2", "nano-banana-pro", "nano-banana-2-lite"),
+                                 "Unofficial: useapi.net drives your own Google Flow account with your Google AI "
+                                 "plan's credits. Needs a useapi.net token. Google may rate-limit the account."),
     "higgsfield": ImageProvider("higgsfield", "Higgsfield", "higgsfield-ai/soul/v2/standard",
                                 ("higgsfield-ai/soul/v2/standard",),
                                 "Key ID and secret from cloud.higgsfield.ai, entered as KEY_ID:KEY_SECRET."),
@@ -59,6 +65,8 @@ PROVIDERS: dict[str, ImageProvider] = {
 # Runway takes pixel ratios, not aspect names.
 RUNWAY_RATIOS = {"1:1": "1024:1024", "2:3": "1080:1620", "3:2": "1620:1080", "3:4": "1080:1440",
                  "4:3": "1440:1080", "9:16": "1080:1920", "16:9": "1920:1080"}
+# Flow only has these shapes; map ours to the nearest.
+FLOW_ASPECTS = {"1:1": "1:1", "2:3": "3:4", "3:4": "3:4", "9:16": "9:16", "3:2": "4:3", "4:3": "4:3", "16:9": "16:9"}
 OPENAI_SIZES = {"1:1": "1024x1024", "2:3": "1024x1536", "3:4": "1024x1536", "9:16": "1024x1536",
                 "3:2": "1536x1024", "4:3": "1536x1024", "16:9": "1536x1024"}
 
@@ -92,6 +100,8 @@ def generate(provider: str, prompt: str, *, aspect: str = "2:3", model: str = ""
         own = http is None
         client = http or httpx.Client(timeout=30.0)
         try:
+            if provider == "google_flow":
+                return _google_flow(client, prompt, aspect, model, api_key, base_url, download)
             if provider == "runway":
                 return _runway(client, prompt, aspect, model, api_key, sleep, download)
             return _higgsfield(client, prompt, model, api_key, sleep, download)
@@ -150,6 +160,29 @@ def _openai(prompt: str, aspect: str, model: str, key: str, base_url: str) -> by
     if getattr(item, "url", None):
         return _download(item.url)
     raise ImageGenError("OpenAI returned no image.")
+
+
+def _google_flow(c: httpx.Client, prompt: str, aspect: str, model: str, token: str, account: str,
+                 download) -> bytes:
+    """useapi.net's Flow wrapper. Synchronous: the response already holds the image.
+    `account` (the connection's base_url field) optionally pins one Google account email."""
+    body: dict = {"prompt": prompt, "model": model, "aspectRatio": FLOW_ASPECTS[aspect], "count": 1}
+    if account and "@" in account:
+        body["email"] = account.strip()
+    r = c.post("https://api.useapi.net/v1/google-flow/images", json=body, timeout=180.0,
+               headers={"Authorization": f"Bearer {token}"})
+    if r.status_code == 429:
+        raise ImageGenError("Google is rate-limiting your Flow account right now. Try again in a few minutes.")
+    r.raise_for_status()
+    media = (r.json() or {}).get("media") or []
+    img = (media[0].get("image") or {}).get("generatedImage") if media else None
+    if not img:
+        raise ImageGenError("Google Flow returned no image (the prompt may have been blocked).")
+    if img.get("fifeUrl"):
+        return download(img["fifeUrl"])
+    if img.get("encodedImage"):
+        return base64.b64decode(img["encodedImage"])
+    raise ImageGenError("Google Flow returned an image with no data.")
 
 
 def _runway(c: httpx.Client, prompt: str, aspect: str, model: str, key: str, sleep, download) -> bytes:

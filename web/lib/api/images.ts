@@ -4,7 +4,7 @@ export type ImageKind = "cover" | "portrait" | "map" | "image" | "reference";
 export const ASPECTS = ["2:3", "3:4", "1:1", "4:3", "3:2", "16:9", "9:16"] as const;
 
 export interface ImageProvider {
-  id: "gemini" | "openai" | "runway" | "higgsfield";
+  id: "google_flow" | "gemini" | "openai" | "runway" | "higgsfield";
   label: string;
   models: string[];
   default_model: string;

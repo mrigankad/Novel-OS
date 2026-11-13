@@ -4,6 +4,7 @@ import { use, useCallback, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { SamplesModal } from "@/components/voice/samples-modal";
@@ -98,16 +99,10 @@ export default function VoiceLabPage({ params }: { params: Promise<{ id: string 
         <>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <label htmlFor="voice-chapter" className="text-[13px] font-semibold text-ink">Compare draft</label>
-            <select id="voice-chapter" value={chapter ?? ""} disabled={!scores.data?.length}
-              onChange={(e) => setPicked(Number(e.target.value))}
-              className="h-9 rounded-[10px] border border-rule-strong bg-paper px-3 text-[13px] text-ink outline-none focus:border-gall">
-              {!scores.data?.length && <option value="">No drafted chapters yet</option>}
-              {scores.data?.map((c) => (
-                <option key={c.chapter} value={c.chapter}>
-                  Ch {c.chapter}{c.title ? `: ${c.title}` : ""} · {c.score}%
-                </option>
-              ))}
-            </select>
+            <Select<number> id="voice-chapter" aria-label="Compare draft" size="sm" value={chapter} disabled={!scores.data?.length}
+              onChange={(v) => setPicked(v)} className="min-w-[14rem]"
+              placeholder={scores.data?.length ? "Choose a chapter…" : "No drafted chapters yet"}
+              options={(scores.data ?? []).map((c) => ({ value: c.chapter, label: `Ch ${c.chapter}${c.title ? `: ${c.title}` : ""} · ${c.score}%` }))} />
             {!p?.exists && <span className="text-[13px] text-body">Traits are measured live. Re-learn to extract signature moves.</span>}
           </div>
 

@@ -7,6 +7,7 @@ import { use, useMemo, useState } from "react";
 import { fmt } from "@/components/manuscript/bits";
 import { diffStats, wordDiff } from "@/components/manuscript/word-diff";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { bk, bookApi, type Version } from "@/lib/api/book";
@@ -49,10 +50,8 @@ export default function VersionsPage({ params }: { params: Promise<{ id: string 
 
       <div className="mt-8 flex items-center gap-3">
         <label htmlFor="chapter" className="text-[13px] font-semibold">Chapter</label>
-        <select id="chapter" value={n ?? ""} onChange={(e) => { setPicked(Number(e.target.value)); setSelectedId(null); }}
-          className="h-10 rounded-[10px] border border-rule-strong bg-paper px-3 text-[14px]">
-          {chapters.data?.map((c) => <option key={c.id} value={c.number}>{c.number}. {c.title || "Untitled"}</option>)}
-        </select>
+        <Select<number> id="chapter" aria-label="Chapter" value={n} onChange={(v) => { setPicked(v); setSelectedId(null); }} className="min-w-[14rem]"
+          options={(chapters.data ?? []).map((c) => ({ value: c.number, label: `${c.number}. ${c.title || "Untitled"}` }))} />
       </div>
 
       {chapters.data?.length === 0 && <div className="mt-8"><EmptyState title="No chapters yet" /></div>}

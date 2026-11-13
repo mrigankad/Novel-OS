@@ -6,6 +6,7 @@ import { Pencil, Pin, Plus, Search, Trash2 } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Page, PageHeader, SectionLabel, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { agentKeys, agentsApi, MEMORY_KINDS, type Agent, type Memory, type MemoryKind } from "@/lib/api/agents";
@@ -16,7 +17,6 @@ const KIND_LABEL: Record<MemoryKind, string> = {
   summary: "Chapter summaries", research: "Research", episode: "What happened in runs",
 };
 
-const selectClass = "h-10 rounded-[10px] border border-rule-strong bg-paper px-3 text-[14px] text-ink";
 
 function MemoryRow({ m, agent, onPatch, onDelete }: {
   m: Memory; agent?: Agent; onPatch: (b: Partial<Memory>) => void; onDelete: () => void;
@@ -121,18 +121,15 @@ export default function MemoryScreen({ projectId }: { projectId: string }) {
         <form className="mt-8 grid gap-4 rounded-[16px] bg-sheet p-5 sm:grid-cols-[160px_1fr_160px_100px]"
           onSubmit={(e) => { e.preventDefault(); if (draft.content.trim()) add.mutate(); }}>
           <Field label="Kind">
-            <select className={selectClass} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as MemoryKind })}>
-              {MEMORY_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
+            <Select<MemoryKind> aria-label="Kind" className="w-full" value={draft.kind} onChange={(v) => setDraft({ ...draft, kind: v })}
+              options={MEMORY_KINDS.map((k) => ({ value: k, label: k }))} />
           </Field>
           <Field label="What to remember">
             <Input value={draft.content} autoFocus placeholder="Iris never swears." onChange={(e) => setDraft({ ...draft, content: e.target.value })} />
           </Field>
           <Field label="Who">
-            <select className={selectClass} value={draft.agent_id} onChange={(e) => setDraft({ ...draft, agent_id: e.target.value })}>
-              <option value="">Shared</option>
-              {(agents.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            <Select aria-label="Who" className="w-full" value={draft.agent_id} onChange={(v) => setDraft({ ...draft, agent_id: v })}
+              options={[{ value: "", label: "Shared" }, ...(agents.data ?? []).map((a) => ({ value: a.id, label: a.name }))]} />
           </Field>
           <Field label="Chapter">
             <Input type="number" min={1} value={draft.chapter} onChange={(e) => setDraft({ ...draft, chapter: e.target.value })} />
@@ -149,15 +146,10 @@ export default function MemoryScreen({ projectId }: { projectId: string }) {
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" strokeWidth={1.75} />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search memories" className="pl-9" />
         </div>
-        <select className={selectClass} value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)} aria-label="Agent">
-          <option value="">Every agent</option>
-          <option value="shared">Shared only</option>
-          {(agents.data ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </select>
-        <select className={selectClass} value={kindFilter} onChange={(e) => setKindFilter(e.target.value)} aria-label="Kind">
-          <option value="">Every kind</option>
-          {MEMORY_KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-        </select>
+        <Select className="w-44" value={agentFilter} onChange={(v) => setAgentFilter(v)} aria-label="Agent"
+          options={[{ value: "", label: "Every agent" }, { value: "shared", label: "Shared only" }, ...(agents.data ?? []).map((a) => ({ value: a.id, label: a.name }))]} />
+        <Select className="w-44" value={kindFilter} onChange={(v) => setKindFilter(v)} aria-label="Kind"
+          options={[{ value: "", label: "Every kind" }, ...MEMORY_KINDS.map((k) => ({ value: k as string, label: KIND_LABEL[k] }))]} />
       </div>
 
       {memories.isLoading ? <Skeleton className="mt-8 h-64" /> : groups.length === 0 ? (

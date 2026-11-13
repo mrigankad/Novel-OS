@@ -16,6 +16,7 @@ import { SuggestionsPanel, useSuggestions } from "@/components/manuscript/sugges
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Drawer } from "@/components/ui/drawer";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { actLabel, bk, bookApi, type Chapter, type ChapterPatch } from "@/lib/api/book";
@@ -250,10 +251,8 @@ function PlanFields({ c, queue }: { c: Chapter; queue: (p: ChapterPatch) => void
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Point of view"><Input value={pov} onChange={(e) => { setPov(e.target.value); queue({ pov: e.target.value }); }} placeholder="Whose eyes?" /></Field>
         <Field label="Status">
-          <select value={status} onChange={(e) => { setStatus(e.target.value); queue({ status: e.target.value }); }}
-            className="h-10 rounded-[10px] border border-rule-strong bg-paper px-3 text-[14px]">
-            {["planned", "drafting", "drafted", "revising", "final"].map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <Select aria-label="Status" value={status} onChange={(v) => { setStatus(v); queue({ status: v }); }} className="w-full"
+            options={["planned", "drafting", "drafted", "revising", "final"].map((s) => ({ value: s, label: s, icon: <StatusDot status={s} /> }))} />
         </Field>
         <Field label="Target words"><Input inputMode="numeric" value={target} onChange={(e) => {
           const v = e.target.value.replace(/\D/g, ""); setTarget(v); if (v) queue({ target_words: Number(v) });

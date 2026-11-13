@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Badge, EmptyState, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { agentKeys, agentsApi, type Agent, type Autonomy, type Message, type Run } from "@/lib/api/agents";
@@ -208,14 +209,14 @@ export default function Room() {
           {view === "room" && <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" aria-label="Previous chapter" disabled={idx <= 0}
               onClick={() => go(list[idx - 1].number)}><ChevronLeft className="h-4 w-4" strokeWidth={1.75} /></Button>
-            <select
+            <Select<number>
               aria-label="Chapter"
-              value={chapter ?? ""}
-              onChange={(e) => go(Number(e.target.value))}
-              className="h-8 rounded-[8px] border border-rule-strong bg-paper px-2 text-[13px] font-semibold text-ink"
-            >
-              {list.map((c) => <option key={c.number} value={c.number}>Chapter {c.number}{c.title ? ` · ${c.title}` : ""}</option>)}
-            </select>
+              size="sm"
+              value={chapter}
+              onChange={(v) => go(v)}
+              className="min-w-[12rem] max-w-[18rem]"
+              options={list.map((c) => ({ value: c.number, label: `Chapter ${c.number}${c.title ? ` · ${c.title}` : ""}` }))}
+            />
             <Button size="sm" variant="ghost" aria-label="Next chapter" disabled={idx < 0 || idx >= list.length - 1}
               onClick={() => go(list[idx + 1].number)}><ChevronRight className="h-4 w-4" strokeWidth={1.75} /></Button>
           </div>}

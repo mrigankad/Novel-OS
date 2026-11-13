@@ -8,6 +8,7 @@ import { fmt, ProgressBar, StatusDot } from "@/components/manuscript/bits";
 import { PlotThreads } from "@/components/manuscript/plot-threads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Page, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { projectsApi, qk } from "@/lib/api";
@@ -186,10 +187,8 @@ function AddChapter({ id, defaultAct }: { id: string; defaultAct: number }) {
     <form className="mt-8 flex items-center gap-3" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate(); }}>
       <Plus className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} />
       <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a chapter…" className="flex-1 border-transparent px-0 hover:border-transparent focus:border-transparent" />
-      <select aria-label="Act" value={act ?? defaultAct} onChange={(e) => setAct(Number(e.target.value))}
-        className="h-10 rounded-[10px] border border-rule-strong bg-paper px-2 text-[13px]">
-        {[1, 2, 3, 4, 5].map((a) => <option key={a} value={a}>{actLabel(a)}</option>)}
-      </select>
+      <Select<number> aria-label="Act" size="sm" value={act ?? defaultAct} onChange={(v) => setAct(v)} className="w-36"
+        options={[1, 2, 3, 4, 5].map((a) => ({ value: a, label: actLabel(a) }))} />
       <Button type="submit" variant="secondary" disabled={!title.trim() || add.isPending}>Add</Button>
     </form>
   );

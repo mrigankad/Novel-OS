@@ -8,6 +8,7 @@ import { Suspense, use, useMemo, useState } from "react";
 import { ProposalsStrip } from "@/components/transfer/proposals-strip";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { bk, bookApi, type CodexEntry } from "@/lib/api/book";
@@ -147,9 +148,8 @@ function EntryEditor({ id, entry, all, onDeleted }: { id: string; entry: CodexEn
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <Field label="Kind">
-          <select value={kind} onChange={(e) => touch(setKind)(e.target.value)} className="h-10 rounded-[10px] border border-rule-strong bg-paper px-3 text-[14px]">
-            {TABS.slice(1).map((t) => <option key={t.kind} value={t.kind}>{kindLabel(t.kind)}</option>)}
-          </select>
+          <Select aria-label="Kind" value={kind} onChange={(v) => touch(setKind)(v)} className="w-full"
+            options={TABS.slice(1).map((t) => ({ value: t.kind, label: kindLabel(t.kind) }))} />
         </Field>
         <Field label="Role"><Input value={role} onChange={(e) => touch(setRole)(e.target.value)} placeholder="protagonist, minor…" /></Field>
         <Field label="Aliases" hint="comma separated"><Input value={aliases} onChange={(e) => touch(setAliases)(e.target.value)} /></Field>
@@ -226,10 +226,8 @@ function Links({ id, entry, all }: { id: string; entry: CodexEntry; all: CodexEn
       </ul>
       <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (target) add.mutate(); }}>
         <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="sister, owns, located in…" className="w-48" />
-        <select aria-label="Link to" value={target} onChange={(e) => setTarget(e.target.value)} className="h-10 min-w-0 flex-1 rounded-[10px] border border-rule-strong bg-paper px-3 text-[14px]">
-          <option value="">Choose an entry…</option>
-          {all.filter((e) => e.id !== entry.id).map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-        </select>
+        <Select aria-label="Link to" value={target || null} onChange={(v) => setTarget(v)} className="min-w-0 flex-1" placeholder="Choose an entry…"
+          options={all.filter((e) => e.id !== entry.id).map((e) => ({ value: e.id, label: e.name }))} />
         <Button type="submit" variant="secondary" disabled={!target || add.isPending}>Link</Button>
       </form>
     </section>

@@ -6,6 +6,7 @@ import { Check, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { bk, bookApi, type PlotThread } from "@/lib/api/book";
@@ -117,10 +118,8 @@ function AddThread({ id, lastChapter, onDone }: { id: string; lastChapter: numbe
       <Plus className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.75} />
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a plot thread…"
         className="flex-1 border-transparent px-0 hover:border-transparent focus:border-transparent" />
-      <select aria-label="Thread kind" value={kind} onChange={(e) => setKind(e.target.value)}
-        className="h-10 rounded-[10px] border border-rule-strong bg-paper px-2 text-[13px]">
-        {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-      </select>
+      <Select aria-label="Thread kind" value={kind} onChange={(v) => setKind(v)} className="w-36"
+        options={KINDS.map((k) => ({ value: k as string, label: k }))} />
       <Button type="submit" variant="secondary" disabled={!name.trim() || add.isPending}>Add</Button>
     </form>
   );

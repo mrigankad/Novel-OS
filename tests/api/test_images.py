@@ -114,3 +114,29 @@ def test_image_services_never_become_the_writing_default(client):
 def test_no_image_service_connected_is_explained(client, project):
     r = client.post(f"/api/projects/{project['id']}/images", json={"prompt": "a cover please"})
     assert r.status_code == 400 and "Connect an image service" in r.json()["detail"]
+
+
+def test_google_flow_via_useapi_reads_fife_url_and_pins_account():
+    client, calls = transport({
+        ("POST", "/v1/google-flow/images"): {"jobId": "j1", "media": [
+            {"image": {"generatedImage": {"fifeUrl": "https://flow/signed.png", "seed": 7}}}]},
+    })
+    got = imagegen.generate("google_flow", "frost on glass apples", aspect="2:3", api_key="tok",
+                            base_url="iris@example.com", http=client, download=lambda url: PNG)
+    assert got == PNG
+    body = json.loads(calls[0].content)
+    assert body == {"prompt": "frost on glass apples", "model": "nano-banana-2", "aspectRatio": "3:4",
+                    "count": 1, "email": "iris@example.com"}
+    assert calls[0].headers["Authorization"] == "Bearer tok"
+
+
+def test_google_flow_base64_and_rate_limit():
+    import base64 as b64
+    client, _ = transport({
+        ("POST", "/v1/google-flow/images"): {"media": [{"image": {"generatedImage": {"encodedImage": b64.b64encode(PNG).decode()}}}]},
+    })
+    assert imagegen.generate("google_flow", "a map", api_key="tok", http=client) == PNG
+
+    limited = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(429, json={})))
+    with pytest.raises(imagegen.ImageGenError, match="rate-limiting"):
+        imagegen.generate("google_flow", "a map", api_key="tok", http=limited)

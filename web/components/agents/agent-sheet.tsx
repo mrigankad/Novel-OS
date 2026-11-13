@@ -7,8 +7,9 @@ import { createElement, useMemo, useState, type ReactNode } from "react";
 import { BrandIcon } from "@/components/brand-icon";
 import { Sheet } from "@/components/settings/sheet";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Textarea, inputClass } from "@/components/ui/field";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import { Badge, Skeleton } from "@/components/ui/page";
+import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
 import {
   ALL_ROLES, CORE_ROLES, agentKeys, agentsApi, type Agent, type Autonomy, type RoomChapter, type Run,
@@ -88,13 +89,11 @@ function ChapterChips({ chosen, chapters, onAdd, onRemove, busy }: {
       ))}
       {free.length > 0 && (
         <span className="relative inline-flex items-center">
-          <Plus className="pointer-events-none absolute left-2 h-3 w-3 text-body" strokeWidth={1.75} />
-          <select aria-label="Assign a chapter" value="" disabled={busy}
-            onChange={(e) => e.target.value && onAdd(Number(e.target.value))}
-            className="h-6 appearance-none rounded-full border border-dashed border-rule-strong bg-paper pl-6 pr-2.5 text-[12px] font-semibold text-body hover:border-body">
-            <option value="">Add chapter</option>
-            {free.map((c) => <option key={c.number} value={c.number}>Chapter {c.number}{c.title ? ` · ${c.title}` : ""}</option>)}
-          </select>
+          <Plus className="pointer-events-none absolute left-2 z-10 h-3 w-3 text-body" strokeWidth={1.75} />
+          <Select<number> aria-label="Assign a chapter" value={null} disabled={busy} size="sm" placeholder="Add chapter"
+            onChange={(v) => onAdd(v)} menuClassName="w-64"
+            className="[&>button]:h-6 [&>button]:rounded-full [&>button]:border-dashed [&>button]:pl-6 [&>button]:pr-2 [&>button]:text-[12px] [&>button]:font-semibold [&>button>span]:text-body"
+            options={free.map((c) => ({ value: c.number, label: `Chapter ${c.number}${c.title ? ` · ${c.title}` : ""}` }))} />
         </span>
       )}
     </div>
@@ -123,37 +122,31 @@ function ModelPicker({ agent, draft, set }: { agent?: Agent; draft: Draft; set: 
   });
   const modelIds = models.data?.models.map((m) => m.id) ?? [];
   if (draft.model && !modelIds.includes(draft.model)) modelIds.unshift(draft.model);
-  const icon = source === ROLE ? (roleDefault?.provider ?? studio?.provider ?? agent?.route_provider)
-    : source === STUDIO ? studio?.provider : draft.provider;
+  const roleIcon = roleDefault?.provider ?? studio?.provider ?? agent?.route_provider;
   const dirty = agent && (agent.provider !== draft.provider || agent.model !== draft.model);
 
   return (
     <div className="flex flex-col gap-2">
       <Label>Model</Label>
-      <div className="relative">
-        {icon && <BrandIcon id={icon} size="xs" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />}
-        <select aria-label="Connection" value={source}
-          onChange={(e) => {
-            const v = e.target.value;
+      <Select aria-label="Connection" value={source} className="w-full"
+          onChange={(v) => {
             if (v === ROLE) set({ provider: "", model: "" });
             else if (v === STUDIO) set({ provider: studio?.provider ?? "", model: "" });
             else set({ provider: list.find((c) => c.id === v)?.provider ?? "", model: "" });
           }}
-          className={clsx(inputClass, "h-10", icon && "pl-9")}>
-          <option value={ROLE}>
-            Use role default{roleDefault ? ` (${roleDefault.provider}${roleDefault.model ? ` · ${roleDefault.model}` : ""})` : ""}
-          </option>
-          {studio && <option value={STUDIO}>Use studio default ({studio.label || studio.provider})</option>}
-          {list.map((c) => <option key={c.id} value={c.id}>{c.label || c.provider}</option>)}
-          {draft.provider && !conn && <option value={draft.provider}>{draft.provider} (not connected)</option>}
-        </select>
-      </div>
+          options={[
+            { value: ROLE, label: `Use role default${roleDefault ? ` (${roleDefault.provider}${roleDefault.model ? ` · ${roleDefault.model}` : ""})` : ""}`,
+              icon: roleIcon ? <BrandIcon id={roleIcon} size="xs" /> : undefined },
+            ...(studio ? [{ value: STUDIO, label: `Use studio default (${studio.label || studio.provider})`, icon: <BrandIcon id={studio.provider} size="xs" /> }] : []),
+            ...list.map((c) => ({ value: c.id, label: c.label || c.provider, icon: <BrandIcon id={c.provider} size="xs" /> })),
+            ...(draft.provider && !conn ? [{ value: draft.provider, label: `${draft.provider} (not connected)`, icon: <BrandIcon id={draft.provider} size="xs" /> }] : []),
+          ]} />
       {source !== ROLE && source !== STUDIO && (
-        <select aria-label="Model" value={draft.model} onChange={(e) => set({ model: e.target.value })}
-          className={clsx(inputClass, "h-10")} disabled={models.isLoading}>
-          <option value="">{models.isLoading ? "Loading models…" : `Connection default${conn?.default_model ? ` (${conn.default_model})` : ""}`}</option>
-          {modelIds.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <Select aria-label="Model" value={draft.model} onChange={(v) => set({ model: v })} className="w-full" disabled={models.isLoading}
+          options={[
+            { value: "", label: models.isLoading ? "Loading models…" : `Connection default${conn?.default_model ? ` (${conn.default_model})` : ""}` },
+            ...modelIds.map((m) => ({ value: m, label: m })),
+          ]} />
       )}
       {models.data?.error && <p className="text-[12px] text-warn">{models.data.error}</p>}
       {agent && (

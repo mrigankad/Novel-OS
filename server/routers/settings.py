@@ -95,6 +95,12 @@ PROVIDERS: list[dict[str, Any]] = [
     {"id": "runway", "label": "Runway", "description": "Image generation for covers, portraits and scenes.",
      "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "images",
      "default_model": "gen4_image", "help_url": "https://dev.runwayml.com"},
+    {"id": "google_flow", "label": "Google Flow (useapi.net)",
+     "description": "Unofficial: generates images with your own Google Flow account through useapi.net. "
+                    "Needs a useapi.net token and a Google AI plan; Google may rate-limit the account.",
+     "fields": ["api_key", "base_url"], "needs_key": True, "default_base_url": "", "capability": "images",
+     "labels": {"api_key": "useapi.net API token", "base_url": "Google account email (optional)"},
+     "default_model": "nano-banana-2", "help_url": "https://useapi.net/docs/start-here/setup-google-flow"},
     {"id": "higgsfield", "label": "Higgsfield", "description": "Image generation (Soul models). Key as KEY_ID:KEY_SECRET.",
      "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "images",
      "labels": {"api_key": "Key ID:Secret"},

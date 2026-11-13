@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { inputClass } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { BrandIcon } from "@/components/brand-icon";
@@ -108,22 +108,21 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
       </td>
       <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
         <span className="label mb-1 block md:hidden">Connection</span>
-        <div className="flex items-center gap-2">
-          <BrandIcon id={row.provider || fallback?.provider || "openai_compatible"} size="xs" tile />
-          <select aria-label={`${meta.label} connection`} className={`${inputClass} h-10`} value={row.provider}
-            onChange={(e) => save.mutate({ ...row, provider: e.target.value, model: "" })}>
-            <option value="">Studio default{fallback ? ` (${fallback.label})` : ""}</option>
-            {connections.map((c) => <option key={c.id} value={c.provider}>{c.label}</option>)}
-          </select>
-        </div>
+        <Select aria-label={`${meta.label} connection`} className="w-full" value={row.provider}
+          onChange={(v) => save.mutate({ ...row, provider: v, model: "" })}
+          options={[
+            { value: "", label: `Studio default${fallback ? ` (${fallback.label})` : ""}`, icon: <BrandIcon id={fallback?.provider || "openai_compatible"} size="xs" /> },
+            ...connections.map((c) => ({ value: c.provider, label: c.label, icon: <BrandIcon id={c.provider} size="xs" /> })),
+          ]} />
       </td>
       <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
         <span className="label mb-1 block md:hidden">Model</span>
-        <select aria-label={`${meta.label} model`} className={`${inputClass} h-10`} value={row.model}
-          disabled={!conn} onChange={(e) => save.mutate({ ...row, model: e.target.value })}>
-          <option value="">{effectiveModel ? `Connection default (${conn?.default_model || "auto"})` : "Connection default"}</option>
-          {modelIds.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <Select aria-label={`${meta.label} model`} className="w-full" value={row.model}
+          disabled={!conn} onChange={(v) => save.mutate({ ...row, model: v })}
+          options={[
+            { value: "", label: effectiveModel ? `Connection default (${conn?.default_model || "auto"})` : "Connection default" },
+            ...modelIds.map((m) => ({ value: m, label: m })),
+          ]} />
         {models.data && !models.data.ok && <p className="mt-1 text-[12px] text-fail">{models.data.error}</p>}
       </td>
       <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">

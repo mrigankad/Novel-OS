@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { ASPECTS, imageKeys, imagesApi, type ImageKind } from "@/lib/api/images";
 
 // Google's image service is Nano Banana (the models behind Google Flow).
-const ICON: Record<string, string> = { gemini: "nanobanana", openai: "openai", runway: "runway", higgsfield: "higgsfield" };
+const ICON: Record<string, string> = { google_flow: "google_flow", gemini: "nanobanana", openai: "openai", runway: "runway", higgsfield: "higgsfield" };
 
 /**
  * Generate an image with a connected service (Google Nano Banana, OpenAI,
@@ -91,8 +91,8 @@ export function GenerateImageSheet({
           {providers.isLoading ? <p className="text-[13px] text-muted">Checking your connections…</p>
             : connected.length === 0 ? (
               <p className="text-[14px] leading-relaxed text-body">
-                No image service connected yet. Add Google (your Gemini key runs the Nano Banana models that power
-                Google Flow), OpenAI, Runway or Higgsfield in{" "}
+                No image service connected yet. Add Google Flow (via useapi.net), Google Nano Banana (your Gemini key),
+                OpenAI, Runway or Higgsfield in{" "}
                 <Link href="/settings/connections" className="font-semibold text-gall hover:underline">Connections</Link>.
               </p>
             ) : (
