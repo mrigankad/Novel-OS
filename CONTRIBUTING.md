@@ -1,104 +1,91 @@
-# Contributing
+# Contributing to Novel OS
 
-Thanks for considering it. This file exists so you don't have to guess what I'll
-ask for in review.
+Thanks for helping. Novel OS is licensed under **AGPL-3.0-or-later**, and contributions are
+accepted under the same license.
 
-## Running it
+## Setup
+
+Requires Python 3.10+ and Node 20+ (CI uses 22).
 
 ```bash
-# Engine + API
-pip install -r requirements-dev.txt
-uvicorn api.main:app --reload --port 8000
+python -m pip install -r requirements-dev.txt   # server + test deps
+pip install -e .                                # optional: adds the `novel-os` command
+python -m novel_os                              # API :8000 + studio :3000, opens the browser
+```
 
-# Studio, in a second terminal
+The launcher checks prerequisites, offers `npm install` in `web/`, prefixes logs with `[api]` and
+`[web]`, and stops both on Ctrl+C. Flags: `--api-port`, `--web-port`, `--no-browser`, `--reload`,
+`--yes`. It works the same in PowerShell, Git Bash, macOS and Linux.
+
+Manual start, if you prefer two terminals:
+
+```bash
+uvicorn server.main:app --port 8000 --reload
 cd web && npm install && npm run dev
 ```
 
-Windows PowerShell uses `$env:NAME = "value"` instead of `export`.
+Copy `.env.example` to `.env` for keys, or add connections in the studio.
 
-## The four checks
+## The build contract
 
-CI runs these on every pull request, and they're the same four commands I run
-locally. Nothing merges red.
+Read [`docs/BUILD.md`](docs/BUILD.md) first. In short: routers in `server/routers/*.py` are
+auto-mounted; every model call goes through `server/llm.py`; long work goes through
+`jobs.submit`; events are `<domain>.<verb>` and query keys are `["p", id, "<domain>"]`;
+secrets never reach the browser. Agent behaviour is described in [`AGENTS.md`](AGENTS.md).
+
+## Tests
 
 ```bash
-pytest -q                 # engine + API
-cd web
-npx tsc -b                # types
-npm run lint              # eslint, zero errors
-npm test                  # vitest
-npm run build             # production build
+python -m pytest tests -q                         # all server tests, incl. tests/api
+cd web && npm run typecheck && npm run lint && npx vitest run && npx next build
 ```
 
-## What I'll ask about in review
+Tests never reach a network: stub models by monkeypatching `server.llm.complete`. API tests go in
+`tests/api/test_<area>.py` using the `client` and `project` fixtures. CI
+(`.github/workflows/ci.yml`) runs all of the above on Python 3.10, 3.11 and 3.13, plus an
+`alembic upgrade head` on a fresh SQLite database.
 
-These aren't style preferences; each one is a rule the architecture depends on.
+`fastapi` is capped below 0.120 and `mcp` below 2 in `requirements.txt` until a route-order issue and a test import are updated; see the comments there.
 
-**Files are the story, SQL is an index.** Each project's
-`outputs/state/story_state.json` and its per-chapter markdown are the truth. If
-the database were deleted, the CLI and the tests must still produce the novel
-from disk. A change that makes SQL the only home for a chapter is the wrong
-change.
+## Migrations
 
-**Only Final is editable.** `outline`, `draft` and `revised` are immutable
-provenance — a record of what each agent produced. Final is the manuscript.
+Schema changes go through Alembic; the server applies them on startup.
 
-**AI proposes, the human disposes.** Every AI output needs a review surface with
-accept and reject. Nothing an agent produces may overwrite a writer's words
-silently. This is enforced in storage rather than in the UI: the markdown
-projection of a document is the *reject-all* view, so a pending suggestion is
-never handed to an agent or an export as though it had been accepted.
+```bash
+python -m alembic revision --autogenerate -m "describe the change"
+python -m alembic upgrade head
+```
 
-**Agents never run inside an HTTP request.** They go through the job registry in
-`api/jobs.py`. A handler that blocks on a model is a timeout waiting to happen.
+Review the generated file. `tests/api/test_migrations.py` fails if a model changes without a
+migration. New tables go in `server/models/<area>_extra.py`; don't change existing columns.
 
-**Agent prompts are not rewritten to suit the UI.** If the interface needs
-different context, that's a `core/context_pack.py` change, not an
-`agents/*/prompt.md` change.
+## Design rules
 
-**Deterministic beats inferred.** If a check can be computed from state, compute
-it — it's free, instant and always right. AI inference is labelled `predicted`
-and never presented as fact.
+- **No monospace anywhere**, including numbers and code-like labels.
+- Use the design tokens (CSS variables) rather than raw colours; the one accent (gall) is
+  reserved for AI. Every screen must work in **dark mode** ("inkwell at night") and at phone width.
+- Urbanist for display, Inter Tight for UI, Newsreader for book prose.
+- Icons from `lucide-react` at `strokeWidth={1.75}`. Use the shared `web/components/ui` parts and
+  the custom dropdown, not native `<select>`.
+- Prefer text on surfaces to boxing everything in cards.
 
-**No chart libraries.** Analytics visuals are in-house SVG.
+## Adding a model provider
 
-**Backends are added, not swapped.** `llm_client.py` is provider-agnostic on
-purpose. New providers are welcome; removing an existing path is not — the
-`claude_cli` backend in particular is the reason the project can run with no API
-key and no per-token cost.
+1. OpenAI-compatible: add an entry to the provider table in `core/llm_client.py`
+   (base URL, default model, env key) and its env var to `server/llm.py`'s key map.
+   Anything else: add a client branch in `core/llm_client.py`.
+2. Make it selectable in Connections (provider list and icon in the web settings).
+3. Document the env var in `.env.example`, and add a test with a fake transport.
+
+## Adding an image service
+
+1. Add an `ImageProvider` to `PROVIDERS` in `server/imagegen.py` (id = `Connection.provider`).
+2. Write an adapter `_yourservice(client, prompt, aspect, model, key, ...) -> bytes` and route to it
+   in `generate`. Map aspect ratios; turn HTTP errors into readable `ImageGenError`s.
+3. Test it in `tests/api/test_images.py` with an `httpx.MockTransport`; document the key format
+   in `.env.example`.
 
 ## Pull requests
 
-**Small and focused beats comprehensive.** One idea per PR. A 500-line PR gets
-reviewed in days; a 15,000-line one across 90 files can't honestly be reviewed at
-all, however good the code is.
-
-Tests come with behaviour changes. If you're fixing a bug, the ideal shape is a
-test that fails before your fix and passes after — I'd rather see the bug pinned
-than described.
-
-Commit messages: say *why*, not just what. The diff already says what.
-
-## Where things live
-
-| Path | What it is |
-|---|---|
-| `core/` | The engine. File-based, no web dependencies, runs headless |
-| `api/` | FastAPI. `routes` → `services` → engine. `ProjectService` is the only thing that touches both stores |
-| `web/` | React 19 · Vite · Tailwind v4 · TipTap |
-| `agents/` | One `prompt.md` per agent, each with an OUTPUT CONTRACT |
-| `tests/` | pytest. `web/src/test/` for vitest |
-
-Longer reasoning lives in [`PLAN.md`](PLAN.md) (what's shipped and what's next),
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (the layers and the two stores),
-and the design notes linked from the README.
-
-## Reporting a bug
-
-Tell me what you expected, what happened, and your OS plus Python and Node
-versions. If it's in the studio, the browser console usually holds the real
-error — a blank page with data missing is almost always CORS
-(`NOVEL_OS_CORS_ORIGINS`).
-
-Please don't run scripts posted in issue comments. Everything this project needs
-is in `requirements.txt` and `web/package.json`.
+Keep changes in your area, write a clear message, add a `CHANGELOG.md` line under "Unreleased",
+and make sure CI is green. Don't commit `web/package-lock.json` unless you changed dependencies.

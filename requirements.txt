@@ -1,5 +1,5 @@
 # Novel OS 2 server
-fastapi>=0.115
+fastapi>=0.115,<0.120   # 0.120+ matches /codex/{entry_id} before /codex/proposals (route-order bug in server/routers)
 uvicorn[standard]>=0.30
 sqlmodel>=0.0.22
 alembic>=1.13
@@ -13,7 +13,7 @@ openai>=1.50.0
 google-genai>=0.3.0
 
 # Claude Code / MCP connector
-mcp>=1.25.0
+mcp>=1.25.0,<2          # mcp 2 removed create_connected_server_and_client_session (tests)
 
 # Voice Lab
 python-docx>=1.1

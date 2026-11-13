@@ -6,11 +6,14 @@ Read this before changing anything. It's the agreement every part of the app bui
 
 ```bash
 pip install -r requirements.txt
-uvicorn server.main:app --port 8000 --reload     # API + agents (FastAPI)
-cd web && npm install && npm run dev             # Studio on http://localhost:3000
+python -m novel_os                                # API :8000 + studio :3000 together
 ```
 
-Next proxies `/api/*` to port 8000 (see `web/next.config.ts`), so the browser only ever talks to :3000.
+Or by hand: `uvicorn server.main:app --port 8000 --reload` and `cd web && npm install && npm run dev`.
+`python -m novel_os --api-port 8101 --web-port 3101 --no-browser` runs a second copy beside the first.
+
+Next proxies `/api/*` to `NOVEL_OS_API_URL` (default port 8000, see `web/next.config.ts`), so the browser only
+ever talks to the studio port. Docker: `docker compose up --build` (see `docs/DOCKER.md`).
 
 ## Layout
 
