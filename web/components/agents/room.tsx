@@ -1,0 +1,220 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { clsx } from "clsx";
+import { ChevronLeft, ChevronRight, Globe, Play } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge, EmptyState, Skeleton } from "@/components/ui/page";
+import { useToast } from "@/components/ui/toast";
+import { agentKeys, agentsApi, type Agent, type Autonomy, type Message } from "@/lib/api/agents";
+import { AgentGlyph } from "./agent-icon";
+import { Composer } from "./composer";
+import { RoomMessage } from "./room-messages";
+
+const STATUS_TONE = { writing: "ai", idle: "neutral", objection: "fail" } as const;
+
+function CastCard({ a, selected }: { a: Agent; selected: boolean }) {
+  return (
+    <li className={clsx(
+      "rounded-[14px] border p-3 transition-colors",
+      selected ? "border-gall ring-1 ring-gall" : "border-rule",
+      !a.enabled && "opacity-50",
+    )}>
+      <div className="flex items-start gap-3">
+        <AgentGlyph role={a.role} tone={a.status === "objection" ? "fail" : "soft"} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-[14px] font-semibold text-ink">{a.name}</p>
+            <Badge tone={STATUS_TONE[a.status]} dot>{a.status}</Badge>
+          </div>
+          <p className="truncate text-[12px] text-muted" title={a.model_line}>{a.model_line}</p>
+        </div>
+      </div>
+      {a.chapters.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1 pl-12">
+          {a.chapters.map((n) => (
+            <span key={n} className="rounded-full bg-sheet px-2 py-0.5 text-[11px] font-semibold text-body">Ch {n}</span>
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function Segmented({ value, onChange }: { value: Autonomy; onChange: (v: Autonomy) => void }) {
+  const opts: [Autonomy, string][] = [["ask", "Ask before acting"], ["autopilot", "Autopilot"]];
+  return (
+    <div className="inline-flex rounded-[10px] bg-sheet p-0.5" role="radiogroup" aria-label="Autonomy">
+      {opts.map(([v, label]) => (
+        <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+          className={clsx("h-8 rounded-[8px] px-3 text-[12px] font-semibold transition-colors",
+            value === v ? "bg-paper text-ink shadow-[0_1px_2px_rgba(20,19,26,0.08)]" : "text-body hover:text-ink")}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function Room() {
+  const { id } = useParams<{ id: string }>();
+  const search = useSearchParams();
+  const router = useRouter();
+  const qc = useQueryClient();
+  const toast = useToast();
+
+  const agents = useQuery({ queryKey: agentKeys.agents(id), queryFn: () => agentsApi.list(id) });
+  const chapters = useQuery({ queryKey: agentKeys.chapters(id), queryFn: () => agentsApi.chapters(id) });
+  const research = useQuery({ queryKey: agentKeys.research(id), queryFn: () => agentsApi.research(id), retry: false });
+
+  const list = chapters.data ?? [];
+  const requested = Number(search.get("chapter"));
+  const chapter = list.find((c) => c.number === requested)?.number ?? list[0]?.number;
+  const idx = list.findIndex((c) => c.number === chapter);
+  const go = (n: number) => router.replace(`/p/${id}/room?chapter=${n}`);
+
+  const thread = useQuery({
+    queryKey: agentKeys.thread(id, chapter ?? -1),
+    queryFn: () => agentsApi.chapterThread(id, chapter!),
+    enabled: chapter !== undefined,
+  });
+  const tid = thread.data?.id;
+  const messages = useQuery({
+    queryKey: agentKeys.messages(id, tid ?? "none"),
+    queryFn: () => agentsApi.messages(id, tid!),
+    enabled: !!tid,
+  });
+
+  const byId = useMemo(() => new Map((agents.data ?? []).map((a) => [a.id, a])), [agents.data]);
+  const current = list.find((c) => c.number === chapter);
+  const cast = agents.data ?? [];
+  const autonomy: Autonomy = cast.length && cast.every((a) => a.autonomy === "autopilot") ? "autopilot" : "ask";
+
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["p", id, "message"] });
+    void qc.invalidateQueries({ queryKey: ["p", id, "agent"] });
+    void qc.invalidateQueries({ queryKey: ["p", id, "run"] });
+  };
+  const send = useMutation({
+    mutationFn: (body: string) => agentsApi.send(id, tid!, body),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast(e.message, "error"),
+  });
+  const act = useMutation({
+    mutationFn: ({ m, action }: { m: Message; action: string }) => agentsApi.act(id, m.thread_id, m.id, action),
+    onSuccess: (r) => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: ["p", id, "memory"] });
+      if (r.note) toast(r.note, "success");
+    },
+    onError: (e: Error) => toast(e.message, "error"),
+  });
+  const setAutonomy = useMutation({
+    mutationFn: (v: Autonomy) => agentsApi.setAutonomy(id, v),
+    onSuccess: (data) => qc.setQueryData(agentKeys.agents(id), data),
+  });
+  const pipeline = useMutation({
+    mutationFn: () => agentsApi.pipeline(id, chapter!),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast(e.message, "error"),
+  });
+
+  const endRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.data?.length]);
+
+  return (
+    <div className="flex h-screen min-h-0">
+      {/* The cast */}
+      <section className="flex w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-rule px-5 py-6">
+        <div>
+          <p className="eyebrow mb-1">Agents</p>
+          <h2 className="font-display text-[24px] font-bold tracking-[-0.02em] text-ink">The cast</h2>
+        </div>
+        {agents.isLoading ? <Skeleton className="h-64" /> : (
+          <ul className="flex flex-col gap-2">
+            {cast.map((a) => (
+              <CastCard key={a.id} a={a} selected={chapter !== undefined && (current?.assigned_agent_id === a.id)} />
+            ))}
+          </ul>
+        )}
+        <Link href="/settings/agents" className="text-[12px] font-semibold text-gall hover:underline">Agents and models</Link>
+      </section>
+
+      {/* Writers' room */}
+      <section className="flex min-w-0 flex-1 flex-col">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-8 py-4">
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" aria-label="Previous chapter" disabled={idx <= 0}
+              onClick={() => go(list[idx - 1].number)}><ChevronLeft className="h-4 w-4" strokeWidth={1.75} /></Button>
+            <select
+              aria-label="Chapter"
+              value={chapter ?? ""}
+              onChange={(e) => go(Number(e.target.value))}
+              className="h-8 rounded-[8px] border border-rule-strong bg-paper px-2 text-[13px] font-semibold text-ink"
+            >
+              {list.map((c) => <option key={c.number} value={c.number}>Chapter {c.number}{c.title ? ` · ${c.title}` : ""}</option>)}
+            </select>
+            <Button size="sm" variant="ghost" aria-label="Next chapter" disabled={idx < 0 || idx >= list.length - 1}
+              onClick={() => go(list[idx + 1].number)}><ChevronRight className="h-4 w-4" strokeWidth={1.75} /></Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Segmented value={autonomy} onChange={(v) => setAutonomy.mutate(v)} />
+            <Button size="sm" variant="ai" disabled={chapter === undefined || pipeline.isPending} onClick={() => pipeline.mutate()}>
+              <Play className="h-3.5 w-3.5" strokeWidth={1.75} /> Run pipeline
+            </Button>
+          </div>
+        </header>
+        <div className="px-8 pt-6">
+          <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.03em] text-ink">
+            Writers&apos; room{chapter !== undefined && <span className="text-muted"> · Chapter {chapter}</span>}
+          </h1>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+          {chapters.isLoading ? <Skeleton className="h-40" /> : list.length === 0 ? (
+            <EmptyState title="No chapters yet" body="Add a chapter in the manuscript, then bring the cast in here to plan and draft it." />
+          ) : messages.data?.length === 0 ? (
+            <EmptyState title="The room is quiet" body="Ask an agent something with @, or run the pipeline to plan, draft, edit and check this chapter." />
+          ) : (
+            <div className="mx-auto flex max-w-3xl flex-col gap-5">
+              {messages.data?.map((m) => (
+                <RoomMessage key={m.id} m={m} agents={byId} busy={act.isPending}
+                  onAction={(msg, action) => act.mutate({ m: msg, action })} />
+              ))}
+              <div ref={endRef} />
+            </div>
+          )}
+        </div>
+        <div className="border-t border-rule px-8 py-4">
+          <div className="mx-auto max-w-3xl">
+            <Composer agents={cast} disabled={!tid || send.isPending} onSend={(b) => send.mutate(b)} />
+          </div>
+        </div>
+      </section>
+
+      {/* Research swarm */}
+      <section className="hidden w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule px-5 py-6 xl:flex">
+        <p className="flex items-center gap-2 text-[14px] font-semibold text-ink">
+          <Globe className="h-4 w-4 text-gall" strokeWidth={1.75} /> Research swarm
+        </p>
+        {research.isLoading ? <Skeleton className="h-24" /> : (research.data ?? []).length === 0 ? (
+          <p className="text-[13px] leading-relaxed text-body">
+            No research running. Ask <span className="font-semibold text-ink">@Researcher</span> in the room, or open the swarm.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {research.data!.slice(0, 8).map((r) => (
+              <li key={r.id} className="text-[13px]">
+                <p className="line-clamp-2 text-ink">{r.question ?? r.title ?? "Research task"}</p>
+                {r.status && <p className="text-[11px] text-muted">{r.status}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link href={`/p/${id}/research`} className="text-[12px] font-semibold text-gall hover:underline">Open research</Link>
+      </section>
+    </div>
+  );
+}
