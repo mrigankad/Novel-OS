@@ -1,13 +1,14 @@
 "use client";
 
 import { clsx } from "clsx";
-import { Cloud, HardDrive, Plus, Star } from "lucide-react";
+import { Cloud, HardDrive, Star } from "lucide-react";
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { settingsApi, settingsKeys, type Connection, type TestResult } from "@/lib/api/settings";
+import { settingsApi, type Connection, type TestResult } from "@/lib/api/settings";
+import { CloudModels, LocalModels } from "./ollama-models";
 import { BrandIcon } from "@/components/brand-icon";
 
 type Mode = "cloud" | "local";
@@ -59,13 +60,6 @@ function OllamaForm({ mode, conn }: { mode: Mode; conn?: Connection }) {
   const [apiKey, setApiKey] = useState("");
   const [result, setResult] = useState<TestResult | null>(null);
 
-  const models = useQuery({
-    queryKey: settingsKeys.models(conn?.id ?? "none"),
-    queryFn: () => settingsApi.models(conn!.id),
-    enabled: !!conn,
-    staleTime: 60_000,
-  });
-
   const refresh = () => qc.invalidateQueries({ queryKey: ["settings"] });
 
   const testIt = useMutation({
@@ -81,14 +75,7 @@ function OllamaForm({ mode, conn }: { mode: Mode; conn?: Connection }) {
     onError: (e: Error) => toast(e.message, "error"),
   });
 
-  const pick = useMutation({
-    mutationFn: (model: string) => settingsApi.update(conn!.id, { default_model: model }),
-    onSuccess: refresh,
-  });
   const makeDefault = useMutation({ mutationFn: () => settingsApi.setDefault(conn!.id), onSuccess: refresh });
-
-  const list = models.data?.ok ? models.data.models : [];
-  const current = conn?.default_model ?? "";
 
   return (
     <div className="mt-6 flex flex-col gap-5">
@@ -104,25 +91,7 @@ function OllamaForm({ mode, conn }: { mode: Mode; conn?: Connection }) {
         </Field>
       </div>
 
-      <div>
-        <p className="label mb-2">
-          {conn ? (models.isLoading ? "Looking for models…" : models.data?.ok ? `Found ${list.length} models` : "No models yet") : "Connect to see models"}
-        </p>
-        {models.data && !models.data.ok && <p className="text-[13px] text-fail">{models.data.error}</p>}
-        <div className="flex flex-wrap gap-2">
-          {list.slice(0, 18).map((m) => (
-            <button key={m.id} type="button" onClick={() => pick.mutate(m.id)}
-              className={clsx("rounded-full px-3 py-1 text-[13px] font-medium transition-colors",
-                m.id === current ? "bg-wash text-gall ring-1 ring-gall" : "bg-sheet text-body hover:text-ink")}>
-              {m.id}
-            </button>
-          ))}
-        </div>
-        <p className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-muted">
-          <Plus size={13} strokeWidth={1.75} />
-          {mode === "local" ? "Pull a model: run “ollama pull qwen3:32b” in a terminal." : "Pull a model: cloud models appear here as ollama.com offers them."}
-        </p>
-      </div>
+      {mode === "local" ? <LocalModels conn={conn} /> : <CloudModels conn={conn} />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
         <p className={clsx("text-[13px]", result ? (result.ok ? "text-pass" : "text-fail") : "text-body")}>
