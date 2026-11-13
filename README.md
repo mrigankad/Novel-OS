@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/readme/01-hero.png" alt="Novel OS, an open-source AI writing studio. Headline: Write the book. It remembers. Six agents, 13 tools replaced, MIT licensed, beside the chapter editor with a Guardian continuity warning about the grafting knife."></p>
+<p align="center"><img src="docs/readme/01-hero.png" alt="Novel OS, an open-source AI writing studio. Headline: Write the book. It remembers. Six agents, 13 tools replaced, open source under the AGPL, beside the chapter editor with a Guardian continuity warning about the grafting knife."></p>
 
 <h1 align="center">Novel OS</h1>
 <p align="center"><strong>The writing studio that remembers chapter 3.</strong><br>
@@ -32,7 +32,7 @@ A team of AI agents with real memory, a research swarm that cites its sources, a
 
 ## Run it
 
-<p align="center"><img src="docs/readme/07-quick-start.png" alt="Quick start in three steps: pip install -r requirements.txt, run uvicorn on port 8000, then npm run dev in web for the studio on port 3000. MIT licensed."></p>
+<p align="center"><img src="docs/readme/07-quick-start.png" alt="Quick start in three steps: pip install -r requirements.txt, run uvicorn on port 8000, then npm run dev in web for the studio on port 3000. Licensed under the GNU AGPL v3."></p>
 
 ```bash
 pip install -r requirements.txt
@@ -62,4 +62,10 @@ python -m pytest
 cd web && npm run typecheck && npm run lint && npx next build
 ```
 
-MIT licensed.
+## License
+
+Novel OS is free software, licensed under the **GNU Affero General Public License v3.0 or later** ([LICENSE](LICENSE)).
+You can use, study, change and share it. If you modify Novel OS and let people use it over a network
+(for example, hosting it as a service), you must offer them the source of your modified version under the same license.
+
+Copyright (c) 2026 Mriganka Dey.
