@@ -13,3 +13,6 @@ google-genai>=0.3.0
 
 # Claude Code / MCP connector
 mcp>=1.25.0
+
+# Research swarm (optional: headless Chromium for JS-heavy pages; run `playwright install chromium`)
+# playwright>=1.48
