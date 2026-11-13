@@ -2,29 +2,34 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, ChevronRight, Globe, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Globe, Pencil, Play, Plus, Square } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
-import { agentKeys, agentsApi, type Agent, type Autonomy, type Message } from "@/lib/api/agents";
+import { agentKeys, agentsApi, type Agent, type Autonomy, type Message, type Run } from "@/lib/api/agents";
 import { AgentGlyph } from "./agent-icon";
+import { AgentSheet } from "./agent-sheet";
+import { Assignments } from "./assignments";
 import { Composer } from "./composer";
 import { RoomMessage } from "./room-messages";
 import { BrandIcon } from "@/components/brand-icon";
 
 const STATUS_TONE = { writing: "ai", idle: "neutral", objection: "fail" } as const;
 
-function CastCard({ a, selected }: { a: Agent; selected: boolean }) {
+function CastCard({ a, selected, onOpen, run, onStop }: {
+  a: Agent; selected: boolean; onOpen: () => void; run?: Run; onStop: (rid: string) => void;
+}) {
   return (
     <li className={clsx(
-      "rounded-[14px] border p-3 transition-colors",
+      "group relative rounded-[14px] border p-3 transition-colors hover:border-rule-strong",
       selected ? "border-gall ring-1 ring-gall" : "border-rule",
       !a.enabled && "opacity-50",
     )}>
-      <div className="flex items-start gap-3">
+      <button type="button" onClick={onOpen} aria-label={`Edit ${a.name}`} className="absolute inset-0 rounded-[14px]" />
+      <div className="pointer-events-none relative flex items-start gap-3">
         <AgentGlyph role={a.role} tone={a.status === "objection" ? "fail" : "soft"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
@@ -38,12 +43,24 @@ function CastCard({ a, selected }: { a: Agent; selected: boolean }) {
         </div>
       </div>
       {a.chapters.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1 pl-12">
+        <div className="pointer-events-none relative mt-2 flex flex-wrap gap-1 pl-12">
           {a.chapters.map((n) => (
             <span key={n} className="rounded-full bg-sheet px-2 py-0.5 text-[11px] font-semibold text-body">Ch {n}</span>
           ))}
         </div>
       )}
+      <div className="relative mt-2 flex items-center gap-1 pl-12">
+        {run && (
+          <button type="button" onClick={() => onStop(run.id)}
+            className="inline-flex h-6 items-center gap-1 rounded-full border border-rule-strong px-2 text-[11px] font-semibold text-ink hover:border-ink">
+            <Square className="h-2.5 w-2.5" strokeWidth={1.75} /> Stop {run.task}
+          </button>
+        )}
+        <button type="button" onClick={onOpen}
+          className="inline-flex h-6 items-center gap-1 rounded-full px-2 text-[11px] font-semibold text-body opacity-0 transition-opacity hover:text-ink focus:opacity-100 group-hover:opacity-100">
+          <Pencil className="h-3 w-3" strokeWidth={1.75} /> Edit
+        </button>
+      </div>
     </li>
   );
 }
@@ -79,7 +96,6 @@ export default function Room() {
   const chapter = list.find((c) => c.number === requested)?.number ?? list[0]?.number;
   const idx = list.findIndex((c) => c.number === chapter);
   const go = (n: number) => router.replace(`/p/${id}/room?chapter=${n}`);
-
   const thread = useQuery({
     queryKey: agentKeys.thread(id, chapter ?? -1),
     queryFn: () => agentsApi.chapterThread(id, chapter!),
@@ -126,6 +142,29 @@ export default function Room() {
     onError: (e: Error) => toast(e.message, "error"),
   });
 
+  const runs = useQuery({ queryKey: agentKeys.activeRuns(id), queryFn: () => agentsApi.runs(id) });
+  const active = useMemo(() => (runs.data ?? []).filter((r) => r.status === "queued" || r.status === "running"), [runs.data]);
+  const activeByAgent = useMemo(() => {
+    const m = new Map<string, Run>();
+    for (const r of active) if (r.agent_id && !m.has(r.agent_id)) m.set(r.agent_id, r);
+    return m;
+  }, [active]);
+  const activeIds = useMemo(() => new Set(active.map((r) => r.id)), [active]);
+  const stop = useMutation({
+    mutationFn: (rid: string) => agentsApi.cancel(id, rid),
+    onSuccess: (r) => { invalidate(); toast(r.status === "cancelled" ? "Stopped" : "Stopping…"); },
+    onError: (e: Error) => toast(e.message, "error"),
+  });
+
+  const view = search.get("view") === "assignments" ? "assignments" : "room";
+  const setView = (v: "room" | "assignments") => {
+    const qs = new URLSearchParams(search.toString());
+    if (v === "room") qs.delete("view"); else qs.set("view", v);
+    router.replace(`/p/${id}/room?${qs.toString()}`);
+  };
+  const [sheet, setSheet] = useState<{ open: boolean; agentId?: string }>({ open: false });
+  const editing = sheet.agentId ? byId.get(sheet.agentId) : undefined;
+
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.data?.length]);
 
@@ -133,14 +172,21 @@ export default function Room() {
     <div className="flex h-screen min-h-0">
       {/* The cast */}
       <section className="flex w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-rule px-5 py-6">
-        <div>
-          <p className="eyebrow mb-1">Agents</p>
-          <h2 className="font-display text-[24px] font-bold tracking-[-0.02em] text-ink">The cast</h2>
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className="eyebrow mb-1">Agents</p>
+            <h2 className="font-display text-[24px] font-bold tracking-[-0.02em] text-ink">The cast</h2>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => setSheet({ open: true })}>
+            <Plus className="h-3.5 w-3.5" strokeWidth={1.75} /> New agent
+          </Button>
         </div>
         {agents.isLoading ? <Skeleton className="h-64" /> : (
           <ul className="flex flex-col gap-2">
             {cast.map((a) => (
-              <CastCard key={a.id} a={a} selected={chapter !== undefined && (current?.assigned_agent_id === a.id)} />
+              <CastCard key={a.id} a={a} selected={chapter !== undefined && (current?.assigned_agent_id === a.id)}
+                onOpen={() => setSheet({ open: true, agentId: a.id })}
+                run={activeByAgent.get(a.id)} onStop={(rid) => stop.mutate(rid)} />
             ))}
           </ul>
         )}
@@ -150,7 +196,16 @@ export default function Room() {
       {/* Writers' room */}
       <section className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-8 py-4">
-          <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-[10px] bg-sheet p-0.5" role="tablist" aria-label="View">
+            {([["room", "Room"], ["assignments", "Assignments"]] as const).map(([v, label]) => (
+              <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}
+                className={clsx("h-8 rounded-[8px] px-3 text-[12px] font-semibold transition-colors",
+                  view === v ? "bg-paper text-ink shadow-[0_1px_2px_rgba(20,19,26,0.08)]" : "text-body hover:text-ink")}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {view === "room" && <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" aria-label="Previous chapter" disabled={idx <= 0}
               onClick={() => go(list[idx - 1].number)}><ChevronLeft className="h-4 w-4" strokeWidth={1.75} /></Button>
             <select
@@ -163,19 +218,28 @@ export default function Room() {
             </select>
             <Button size="sm" variant="ghost" aria-label="Next chapter" disabled={idx < 0 || idx >= list.length - 1}
               onClick={() => go(list[idx + 1].number)}><ChevronRight className="h-4 w-4" strokeWidth={1.75} /></Button>
-          </div>
+          </div>}
           <div className="flex items-center gap-2">
             <Segmented value={autonomy} onChange={(v) => setAutonomy.mutate(v)} />
-            <Button size="sm" variant="ai" disabled={chapter === undefined || pipeline.isPending} onClick={() => pipeline.mutate()}>
-              <Play className="h-3.5 w-3.5" strokeWidth={1.75} /> Run pipeline
-            </Button>
+            {view === "room" && (
+              <Button size="sm" variant="ai" disabled={chapter === undefined || pipeline.isPending} onClick={() => pipeline.mutate()}>
+                <Play className="h-3.5 w-3.5" strokeWidth={1.75} /> Run pipeline
+              </Button>
+            )}
           </div>
         </header>
         <div className="px-8 pt-6">
           <h1 className="font-display text-[32px] font-bold leading-tight tracking-[-0.03em] text-ink">
-            Writers&apos; room{chapter !== undefined && <span className="text-muted"> · Chapter {chapter}</span>}
+            {view === "assignments" ? "Who writes what" : <>Writers&apos; room{chapter !== undefined && <span className="text-muted"> · Chapter {chapter}</span>}</>}
           </h1>
         </div>
+        {view === "assignments" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
+            {chapters.isLoading || agents.isLoading ? <Skeleton className="h-40" /> : (
+              <Assignments projectId={id} cast={cast} chapters={list} onOpenAgent={(a) => setSheet({ open: true, agentId: a.id })} />
+            )}
+          </div>
+        ) : <>
         <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
           {chapters.isLoading ? <Skeleton className="h-40" /> : list.length === 0 ? (
             <EmptyState title="No chapters yet" body="Add a chapter in the manuscript, then bring the cast in here to plan and draft it." />
@@ -185,7 +249,8 @@ export default function Room() {
             <div className="mx-auto flex max-w-3xl flex-col gap-5">
               {messages.data?.map((m) => (
                 <RoomMessage key={m.id} m={m} agents={byId} busy={act.isPending}
-                  onAction={(msg, action) => act.mutate({ m: msg, action })} />
+                  onAction={(msg, action) => act.mutate({ m: msg, action })}
+                  onStop={(rid) => stop.mutate(rid)} runActive={!!m.run_id && activeIds.has(m.run_id)} />
               ))}
               <div ref={endRef} />
             </div>
@@ -196,7 +261,11 @@ export default function Room() {
             <Composer agents={cast} disabled={!tid || send.isPending} onSend={(b) => send.mutate(b)} />
           </div>
         </div>
+        </>}
       </section>
+
+      <AgentSheet projectId={id} open={sheet.open} agent={editing} cast={cast} chapters={list}
+        onClose={() => setSheet({ open: false })} />
 
       {/* Research swarm */}
       <section className="hidden w-[260px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-rule px-5 py-6 xl:flex">

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { AlertTriangle, CheckCircle2, Circle, Loader2, Play, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Loader2, Play, Square, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/page";
@@ -44,6 +44,11 @@ export default function ChapterAgentPanel({ projectId, chapter }: { projectId: s
   const pipeline = useMutation({
     mutationFn: () => agentsApi.pipeline(projectId, chapter),
     onSuccess: () => { refresh(); toast("Pipeline started"); },
+    onError: (e: Error) => toast(e.message, "error"),
+  });
+  const stop = useMutation({
+    mutationFn: (rid: string) => agentsApi.cancel(projectId, rid),
+    onSuccess: (r) => { refresh(); toast(r.status === "cancelled" ? "Stopped" : "Stopping…"); },
     onError: (e: Error) => toast(e.message, "error"),
   });
   const act = useMutation({
@@ -90,6 +95,12 @@ export default function ChapterAgentPanel({ projectId, chapter }: { projectId: s
                     {st.status === "running" && <div className="mt-1 h-1 overflow-hidden rounded-full bg-sheet"><div className="h-full w-1/2 animate-pulse rounded-full bg-gall" /></div>}
                     {st.error && <p className="truncate text-[11px] text-fail" title={st.error}>{st.error}</p>}
                   </div>
+                  {(st.status === "running" || st.status === "queued") && st.run_id && (
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-[12px]" disabled={stop.isPending}
+                      aria-label={`Stop ${STAGE_LABEL[st.task]}`} onClick={() => stop.mutate(st.run_id!)}>
+                      <Square className="h-3 w-3" strokeWidth={1.75} /> Stop
+                    </Button>
+                  )}
                   <StageIcon status={st.status} />
                 </li>
               );
