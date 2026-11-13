@@ -9,6 +9,8 @@ export interface ProviderInfo {
   default_base_url: string;
   default_model: string;
   help_url: string;
+  /** Per-provider field names, e.g. Azure "Endpoint", Bedrock "AWS region". */
+  labels?: Partial<Record<"base_url" | "api_key" | "default_model", string>>;
 }
 
 export interface Connection {

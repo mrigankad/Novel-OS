@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { settingsApi, settingsKeys, type Connection, type TestResult } from "@/lib/api/settings";
+import { BrandIcon } from "@/components/brand-icon";
 
 type Mode = "cloud" | "local";
 const DEFAULT_BASE: Record<Mode, string> = { cloud: "https://ollama.com", local: "http://localhost:11434" };
@@ -23,7 +24,9 @@ export function OllamaCard({ connections }: { connections: Connection[] }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-display text-[24px] font-bold tracking-[-0.02em] text-ink">Ollama</h3>
+            <h3 className="flex items-center gap-3 font-display text-[24px] font-bold tracking-[-0.02em] text-ink">
+              <BrandIcon id="ollama" size="sm" tile /> Ollama
+            </h3>
             {conn?.is_default && (
               <span className="rounded-full bg-wash px-2 py-0.5 text-[11px] font-semibold text-gall">Default</span>
             )}

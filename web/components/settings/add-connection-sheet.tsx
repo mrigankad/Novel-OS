@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { BrandIcon } from "@/components/brand-icon";
 import { useToast } from "@/components/ui/toast";
 import { settingsApi, type Connection, type ProviderInfo } from "@/lib/api/settings";
 import { Sheet } from "./sheet";
@@ -42,10 +43,13 @@ function Form({ provider, existing, onClose }: { provider: ProviderInfo; existin
 
   return (
     <form className="flex flex-col gap-5" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
-      <p className="text-[14px] text-body">{provider.description}</p>
+      <div className="flex items-center gap-3">
+        <BrandIcon id={provider.id} size="md" tile />
+        <p className="text-[14px] text-body">{provider.description}</p>
+      </div>
       {provider.fields.includes("base_url") && (
-        <Field label="Base URL">
-          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://…/v1" />
+        <Field label={provider.labels?.base_url ?? "Base URL"}>
+          <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={provider.default_base_url || "https://…/v1"} />
         </Field>
       )}
       {provider.fields.includes("api_key") && (
@@ -54,8 +58,8 @@ function Form({ provider, existing, onClose }: { provider: ProviderInfo; existin
             placeholder={existing?.has_key ? "Leave empty to keep the saved key" : "Paste your key"} />
         </Field>
       )}
-      <Field label="Default model">
-        <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="model id" />
+      <Field label={provider.labels?.default_model ?? "Default model"}>
+        <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder={provider.default_model || "model id"} />
       </Field>
       <a href={provider.help_url} target="_blank" rel="noreferrer"
         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gall hover:underline">

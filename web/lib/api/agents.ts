@@ -12,6 +12,7 @@ export interface Agent {
   provider: string;
   model: string;
   model_line: string;
+  route_provider: string;
   temperature: number;
   use_voice_dna: boolean;
   autonomy: Autonomy;

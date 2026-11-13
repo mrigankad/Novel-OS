@@ -1,0 +1,2 @@
+AI provider and tool marks in this folder are from LobeHub Icons (MIT): https://github.com/lobehub/lobe-icons
+Trademarks belong to their owners; used only to identify the matching integration.

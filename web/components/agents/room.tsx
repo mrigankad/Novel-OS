@@ -13,6 +13,7 @@ import { agentKeys, agentsApi, type Agent, type Autonomy, type Message } from "@
 import { AgentGlyph } from "./agent-icon";
 import { Composer } from "./composer";
 import { RoomMessage } from "./room-messages";
+import { BrandIcon } from "@/components/brand-icon";
 
 const STATUS_TONE = { writing: "ai", idle: "neutral", objection: "fail" } as const;
 
@@ -30,7 +31,10 @@ function CastCard({ a, selected }: { a: Agent; selected: boolean }) {
             <p className="truncate text-[14px] font-semibold text-ink">{a.name}</p>
             <Badge tone={STATUS_TONE[a.status]} dot>{a.status}</Badge>
           </div>
-          <p className="truncate text-[12px] text-muted" title={a.model_line}>{a.model_line}</p>
+          <p className="flex items-center gap-1.5 truncate text-[12px] text-muted" title={a.model_line}>
+            {a.route_provider && <BrandIcon id={a.route_provider} size="xs" className="opacity-80" />}
+            <span className="truncate">{a.model_line}</span>
+          </p>
         </div>
       </div>
       {a.chapters.length > 0 && (

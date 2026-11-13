@@ -10,6 +10,7 @@ import { settingsApi, settingsKeys, type Connection, type ProviderInfo } from "@
 import { AddConnectionSheet } from "./add-connection-sheet";
 import { CopyButton } from "./copy-button";
 import { OllamaCard } from "./ollama-card";
+import { BrandIcon } from "@/components/brand-icon";
 
 const CLAUDE_CMD = "claude mcp add novel-os -- python -m server.mcp_server";
 const HTTP_CMD = "python -m server.mcp_server --http --port 8765";
@@ -70,7 +71,9 @@ export function ConnectionsScreen() {
           <h2 className="label mb-4">Agents · who can reach your story</h2>
           <div className="rounded-[16px] bg-ink p-6 text-white">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-[24px] font-bold tracking-[-0.02em]">Claude Code</h3>
+              <h3 className="flex items-center gap-3 font-display text-[24px] font-bold tracking-[-0.02em]">
+                <BrandIcon id="claude_code" size="sm" tile className="ring-0" /> Claude Code
+              </h3>
               <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-white/60">MCP · stdio</span>
             </div>
             <p className="mt-2 text-[14px] leading-relaxed text-white/75">
@@ -86,7 +89,8 @@ export function ConnectionsScreen() {
           </div>
 
           <ul className="mt-6 divide-y divide-rule border-y border-rule">
-            <AgentRow icon={Globe2} title="Claude Desktop · Cursor · Codex"
+            <AgentRow icon={Globe2} title="Claude Desktop · Cursor · Codex · Copilot"
+              brands={["anthropic", "cursor", "codex", "copilot", "windsurf", "cline"]}
               body={`Run “${HTTP_CMD}”, then add the server at ${HTTP_URL} (Streamable HTTP).`}
               action={<CopyButton text={HTTP_URL} label="Copy URL" variant="ghost" />} />
             <AgentRow icon={FolderGit2} title="Inside this repo"
@@ -120,6 +124,7 @@ function ProviderRow({ provider, conn, onAdd }: { provider: ProviderInfo; conn?:
   });
   return (
     <li className="flex items-center gap-4 py-3.5">
+      <BrandIcon id={provider.id} size="sm" tile />
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold text-ink">
           {provider.label}
@@ -168,8 +173,8 @@ function MenuItem({ children, onClick, danger }: { children: React.ReactNode; on
   );
 }
 
-function AgentRow({ icon: Icon, title, body, action }: {
-  icon: typeof Globe2; title: string; body: string; action?: React.ReactNode;
+function AgentRow({ icon: Icon, title, body, action, brands }: {
+  icon: typeof Globe2; title: string; body: string; action?: React.ReactNode; brands?: string[];
 }) {
   return (
     <li className="flex items-start gap-3 py-4">
@@ -177,6 +182,11 @@ function AgentRow({ icon: Icon, title, body, action }: {
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold text-ink">{title}</p>
         <p className="mt-0.5 text-[13px] leading-relaxed text-body">{body}</p>
+        {brands && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label="Works with">
+            {brands.map((b) => <BrandIcon key={b} id={b} size="xs" tile />)}
+          </div>
+        )}
       </div>
       {action}
     </li>

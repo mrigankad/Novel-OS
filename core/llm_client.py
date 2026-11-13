@@ -59,6 +59,8 @@ OPENAI_COMPAT_ALIASES = {
     "ollama_cloud": ("https://ollama.com/v1",         "gpt-oss:120b",                "OLLAMA_API_KEY"),
     "lmstudio":   ("http://localhost:1234/v1",        "local-model",                 "LMSTUDIO_API_KEY"),
     "nvidia":     ("https://integrate.api.nvidia.com/v1", "meta/llama-3.3-70b-instruct", "NVIDIA_API_KEY"),
+    "xai":        ("https://api.x.ai/v1",             "grok-4",                      "XAI_API_KEY"),
+    "perplexity": ("https://api.perplexity.ai",       "sonar-pro",                   "PERPLEXITY_API_KEY"),
 }
 
 def ollama_local_base() -> str:
@@ -188,6 +190,10 @@ class LLMClient:
             return backend, deployment
         if name == "gemini":
             return self._build_gemini(), model or env_model or DEFAULT_GEMINI_MODEL
+        if name == "bedrock":
+            if not (model or env_model):
+                raise LLMError("Bedrock needs a model id, e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0.")
+            return self._build_bedrock(), model or env_model
         if name in OPENAI_COMPAT_ALIASES:
             base_url, default_model, key_env = OPENAI_COMPAT_ALIASES[name]
             key = self._explicit_api_key or os.environ.get(key_env) or os.environ.get("NOVEL_OS_API_KEY") or "not-needed"
@@ -254,7 +260,7 @@ class LLMClient:
         except ImportError as e:
             raise LLMError("Install: pip install openai") from e
         key = self._explicit_api_key or os.environ.get("AZURE_OPENAI_API_KEY")
-        endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+        endpoint = self._explicit_base_url or os.environ.get("AZURE_OPENAI_ENDPOINT")
         api_version = os.environ.get("AZURE_OPENAI_API_VERSION", DEFAULT_AZURE_API_VERSION)
         if not (key and endpoint):
             raise LLMError("Azure needs AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT.")
@@ -262,6 +268,20 @@ class LLMClient:
             raise LLMError("Azure needs NOVEL_OS_MODEL set to the deployment name.")
         client = AzureOpenAI(api_key=key, api_version=api_version, azure_endpoint=endpoint)
         return client, deployment
+
+    def _build_bedrock(self):
+        """Claude on AWS Bedrock. Credentials come from the normal AWS chain
+        (env vars, ~/.aws profile, SSO); the region from base_url or AWS_REGION."""
+        try:
+            from anthropic import AnthropicBedrock  # type: ignore
+        except ImportError as e:
+            raise LLMError('Install: pip install "anthropic[bedrock]"') from e
+        region = (self._explicit_base_url or os.environ.get("AWS_REGION")
+                  or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1")
+        try:
+            return AnthropicBedrock(aws_region=region)
+        except Exception as e:  # botocore missing or bad config
+            raise LLMError(f"AWS Bedrock isn't configured: {e}") from e
 
     def _build_gemini(self):
         try:
@@ -292,7 +312,7 @@ class LLMClient:
                 self.max_tokens = saved
         if self.provider_name == "claude_cli":
             return self._complete_claude_cli(system, user)
-        if self.provider_name == "anthropic":
+        if self.provider_name in ("anthropic", "bedrock"):
             return self._complete_anthropic(system, user)
         if self.provider_name == "gemini":
             return self._complete_gemini(system, user)
@@ -303,7 +323,7 @@ class LLMClient:
         """Yield text chunks as they arrive. Anthropic and every OpenAI-shaped backend
         stream natively; other backends yield the whole completion once."""
         limit = max_tokens or self.max_tokens
-        if self.provider_name == "anthropic":
+        if self.provider_name in ("anthropic", "bedrock"):
             with self._backend.messages.stream(
                 model=self.model, max_tokens=limit, system=system,
                 messages=[{"role": "user", "content": user}], **self._temperature_kw(),

@@ -50,6 +50,7 @@ class AgentOut(BaseModel):
     provider: str
     model: str
     model_line: str
+    route_provider: str = ""  # effective provider, for the brand icon
     temperature: float
     use_voice_dna: bool
     autonomy: str
@@ -120,13 +121,14 @@ def run_out(r: Run) -> RunOut:
                   finished_at=r.finished_at.isoformat() if r.finished_at else None)
 
 
-def _model_line(s: Session, a: Agent) -> str:
+def _model_line(s: Session, a: Agent) -> tuple[str, str]:
+    """(label, effective provider). Honours agent override, then role default, then studio default."""
+    route = resolve(s, a)
     if a.provider or a.model:
-        return " · ".join(x for x in [a.provider, a.model] if x)
-    route = resolve(s, None)
+        return " · ".join(x for x in [a.provider, a.model] if x), (route.provider if route else a.provider)
     if route:
-        return "Studio default · " + " · ".join(x for x in [route.provider, route.model] if x)
-    return "Studio default"
+        return "Studio default · " + " · ".join(x for x in [route.provider, route.model] if x), route.provider
+    return "Studio default", ""
 
 
 def _outs(s: Session, pid: str, agents: list[Agent]) -> list[AgentOut]:
@@ -142,15 +144,15 @@ def _outs(s: Session, pid: str, agents: list[Agent]) -> list[AgentOut]:
         for m in s.exec(select(Message).where(Message.thread_id.in_(threads), Message.intent == "objection")).all():
             if m.actions and m.sender.startswith("agent:"):
                 objecting.add(m.sender[6:])
-    line_cache: dict[str, str] = {}
+    line_cache: dict[str, tuple[str, str]] = {}
     out = []
     for a in agents:
-        key = f"{a.provider}|{a.model}"
+        key = f"{a.role}|{a.provider}|{a.model}"
         if key not in line_cache:
             line_cache[key] = _model_line(s, a)
         status = "writing" if a.id in busy else "objection" if a.id in objecting else "idle"
         out.append(AgentOut(id=a.id, role=a.role, name=a.name, brief=a.brief, provider=a.provider, model=a.model,
-                            model_line=line_cache[key], temperature=a.temperature, use_voice_dna=a.use_voice_dna,
+                            model_line=line_cache[key][0], route_provider=line_cache[key][1], temperature=a.temperature, use_voice_dna=a.use_voice_dna,
                             autonomy=a.autonomy, enabled=a.enabled, status=status, chapters=chapters.get(a.id, [])))
     return out
 

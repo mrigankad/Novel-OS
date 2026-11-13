@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { inputClass } from "@/components/ui/field";
 import { Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
+import { BrandIcon } from "@/components/brand-icon";
 import {
   settingsApi, settingsKeys, streamPlayground, type Connection, type RoleDefault,
 } from "@/lib/api/settings";
@@ -105,11 +106,14 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
         </div>
       </td>
       <td className="py-4 pr-4">
-        <select aria-label={`${meta.label} connection`} className={`${inputClass} h-10`} value={row.provider}
-          onChange={(e) => save.mutate({ ...row, provider: e.target.value, model: "" })}>
-          <option value="">Studio default{fallback ? ` (${fallback.label})` : ""}</option>
-          {connections.map((c) => <option key={c.id} value={c.provider}>{c.label}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <BrandIcon id={row.provider || fallback?.provider || "openai_compatible"} size="xs" tile />
+          <select aria-label={`${meta.label} connection`} className={`${inputClass} h-10`} value={row.provider}
+            onChange={(e) => save.mutate({ ...row, provider: e.target.value, model: "" })}>
+            <option value="">Studio default{fallback ? ` (${fallback.label})` : ""}</option>
+            {connections.map((c) => <option key={c.id} value={c.provider}>{c.label}</option>)}
+          </select>
+        </div>
       </td>
       <td className="py-4 pr-4">
         <select aria-label={`${meta.label} model`} className={`${inputClass} h-10`} value={row.model}
