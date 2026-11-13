@@ -141,7 +141,9 @@ def dismiss(project_id: str, n: int, sid: str, session: Session = Depends(get_se
     session.commit()
     editor = sg.editor_agent(session, project_id)
     reason = f" ({x.reason})" if x.reason else ""
-    mem.remember(session, project_id, kind="preference", importance=0.4, chapter=n,
+    # "style", not "preference": a rejected edit is a taste hint the Editor recalls,
+    # not a binding author ruling (those are decisions/preferences/pins).
+    mem.remember(session, project_id, kind="style", importance=0.4, chapter=n,
                  agent_id=editor.id if editor else None, source="suggestion",
                  content=f"Author rejected an edit: '{x.quote}' → '{x.replacement}'{reason}")
     session.refresh(x)

@@ -90,7 +90,15 @@ def _work(project_id: str, chapter: int, agent_id: str, focus: str) -> Callable[
             if not ch or not ch.text.strip():
                 return {"suggestions": 0}
             pack = context.build(s, project_id, agent, "edit", chapter, instruction=focus, task_spec=TASK_SPEC)
-            raw, _route, _model = llm.complete(s, pack.system, pack.user, agent=agent)
+            raw, route, model = llm.complete(s, pack.system, pack.user, agent=agent)
+            run = s.get(Run, run_id)
+            if run:  # same accounting as other agent runs: real usage, estimate as fallback
+                usage = llm.last_usage()
+                run.provider = (route.provider if route else "") or "auto"
+                run.model = model or (route.model if route else "") or ""
+                run.tokens_in = usage.get("input") or context.est_tokens(pack.system + pack.user)
+                run.tokens_out = usage.get("output") or context.est_tokens(raw)
+                s.add(run)
             items = validate(parse(raw), ch.text)
             # A fresh pass replaces the previous open set for this chapter.
             for old in s.exec(select(Suggestion).where(Suggestion.project_id == project_id,

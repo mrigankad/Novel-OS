@@ -105,7 +105,7 @@ def test_dismiss_creates_preference(client, project, monkeypatch):
     r = client.post(f"{base(pid)}/{sid}/dismiss")
     assert r.status_code == 200 and r.json()["status"] == "dismissed"
     with Session(engine()) as s:
-        m = s.exec(select(Memory).where(Memory.kind == "preference")).all()
+        m = s.exec(select(Memory).where(Memory.kind == "style")).all()
         assert any("Author rejected an edit: 'walked very slowly' → 'crept'" in x.content for x in m)
         assert m[0].importance == pytest.approx(0.4)
     assert len(client.get(base(pid)).json()) == 1
