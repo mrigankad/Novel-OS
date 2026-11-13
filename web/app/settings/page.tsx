@@ -1,8 +1,5 @@
-"use client";
-import dynamic from "next/dynamic";
+import { redirect } from "next/navigation";
 
-const Screen = dynamic(() => import("../../src/routes/Settings"), { ssr: false });
-
-export default function Page() {
-  return <Screen />;
+export default function SettingsIndex() {
+  redirect("/settings/connections");
 }

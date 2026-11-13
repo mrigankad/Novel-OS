@@ -1,16 +1,15 @@
-# Install only what you actually use each backend is optional.
-# NOTE: the claude_cli backend needs NO Python package just the Claude Code CLI
-#       on your PATH (https://docs.claude.com/claude-code) and `claude login`.
-anthropic>=0.40.0           # for provider=anthropic
-openai>=1.50.0              # for openai, azure, kimi, groq, together, openrouter, deepseek, mistral, fireworks, ollama, lmstudio, openai_compatible
-google-genai>=0.3.0         # for provider=gemini
-python-dotenv>=1.0.0        # optional, for .env loading
+# Novel OS 2 server
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlmodel>=0.0.22
+python-multipart>=0.0.9
+python-dotenv>=1.0
+httpx>=0.27
 
-# Web UI backend (optional only needed to run the dashboard)
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
-sqlmodel>=0.0.38             # SQLite persistence layer for the API
-python-multipart>=0.0.9      # image uploads (media storage)
+# Model providers (install what you use)
+anthropic>=0.40.0
+openai>=1.50.0
+google-genai>=0.3.0
 
-# Claude Code / MCP connector (optional - only for `python -m core.mcp_server`)
+# Claude Code / MCP connector
 mcp>=1.25.0

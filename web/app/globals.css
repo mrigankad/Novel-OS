@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Inkwell: iron-gall ink on clean paper stock. One accent, reserved for AI. */
+@theme {
+  --color-paper: #ffffff;
+  --color-sheet: #f7f7fa;
+  --color-rule: #ecebf1;
+  --color-rule-strong: #d9d8e2;
+  --color-ink: #14131a;
+  --color-body: #5d5b6b;
+  --color-muted: #8a8898;
+  --color-gall: #3b2be0;
+  --color-gall-hover: #2f21c4;
+  --color-wash: #e9e6ff;
+  --color-pass: #13875a;
+  --color-warn: #b26b00;
+  --color-fail: #d23f45;
+
+  --font-sans: var(--font-inter-tight), system-ui, "Segoe UI", sans-serif;
+  --font-display: var(--font-urbanist), var(--font-inter-tight), system-ui, sans-serif;
+  --font-prose: var(--font-newsreader), Georgia, serif;
+  /* No monospace in Novel OS. Code and labels use the UI sans. */
+  --font-mono: var(--font-sans);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  html, body { height: 100%; }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: color-mix(in srgb, var(--color-gall) 20%, transparent); }
+  :where(a, button, input, textarea, select, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-gall);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(20, 19, 26, 0.16); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+}
+
+@layer components {
+  .eyebrow { @apply text-[11px] font-medium uppercase tracking-[0.12em] text-gall; }
+  .label { @apply text-[11px] font-medium uppercase tracking-[0.1em] text-muted; }
+  .prose-book { font-family: var(--font-prose); font-size: 19px; line-height: 1.7; color: #2a2933; }
+  .prose-book p { margin: 0 0 1em; }
+}

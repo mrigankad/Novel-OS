@@ -1,0 +1,31 @@
+"""All tables. Importing this module registers them with SQLModel.metadata."""
+
+from .agents import Agent, Memory, Message, Run, Thread
+from .book import (
+    Chapter,
+    ChapterVersion,
+    CodexEntry,
+    CodexLink,
+    ContinuityExemption,
+    Media,
+    PlotThread,
+    Project,
+)
+from .studio import (
+    BookMetadata,
+    Connection,
+    CoverDesign,
+    Release,
+    ResearchSource,
+    ResearchTask,
+    VoiceProfile,
+    VoiceSample,
+)
+
+__all__ = [
+    "Agent", "Memory", "Message", "Run", "Thread",
+    "Chapter", "ChapterVersion", "CodexEntry", "CodexLink", "ContinuityExemption",
+    "Media", "PlotThread", "Project",
+    "BookMetadata", "Connection", "CoverDesign", "Release", "ResearchSource",
+    "ResearchTask", "VoiceProfile", "VoiceSample",
+]

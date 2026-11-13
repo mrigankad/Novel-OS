@@ -60,3 +60,6 @@ novel_os*.db
 
 # --- Uploaded media blobs (user data, not source) ---
 /media/
+
+# Novel OS 2 runtime data (SQLite DB, media)
+data/
