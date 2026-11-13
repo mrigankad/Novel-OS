@@ -1,11 +1,8 @@
-import { Page, PageHeader, EmptyState } from "@/components/ui/page";
+import type { Metadata } from "next";
+import { AgentsScreen } from "@/components/settings/agents-screen";
 
-// Placeholder. Owner: connections agent.
-export default function Placeholder() {
-  return (
-    <Page>
-      <PageHeader eyebrow="Coming together" title="Agents and models" description="Pick a model for each agent." />
-      <div className="mt-8"><EmptyState title="Being built" body="This screen is under construction." /></div>
-    </Page>
-  );
+export const metadata: Metadata = { title: "Agents and models" };
+
+export default function AgentsPage() {
+  return <AgentsScreen />;
 }

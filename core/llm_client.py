@@ -38,7 +38,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Iterator, Optional, Tuple
 
 
 DEFAULT_MAX_TOKENS = 8192
@@ -220,7 +220,10 @@ class LLMClient:
         key = self._explicit_api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not key:
             raise LLMError("ANTHROPIC_API_KEY is not set.")
-        return anthropic.Anthropic(api_key=key)
+        kwargs = {"api_key": key}
+        if self._explicit_base_url:
+            kwargs["base_url"] = self._explicit_base_url
+        return anthropic.Anthropic(**kwargs)
 
     def _build_openai_native(self):
         try:
@@ -230,7 +233,8 @@ class LLMClient:
         key = self._explicit_api_key or os.environ.get("OPENAI_API_KEY")
         if not key:
             raise LLMError("OPENAI_API_KEY is not set.")
-        return OpenAI(api_key=key)
+        base = self._explicit_base_url or os.environ.get("OPENAI_BASE_URL")
+        return OpenAI(api_key=key, base_url=base) if base else OpenAI(api_key=key)
 
     def _build_openai_compatible(self, base_url: str, api_key: str):
         try:
@@ -262,6 +266,9 @@ class LLMClient:
         key = self._explicit_api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         if not key:
             raise LLMError("GEMINI_API_KEY (or GOOGLE_API_KEY) is not set.")
+        if self._explicit_base_url:
+            from google.genai import types  # type: ignore
+            return genai.Client(api_key=key, http_options=types.HttpOptions(base_url=self._explicit_base_url))
         return genai.Client(api_key=key)
 
     # ----- public API
@@ -270,8 +277,14 @@ class LLMClient:
     def provider(self) -> str:
         return self.provider_name
 
-    def complete(self, system: str, user: str) -> str:
+    def complete(self, system: str, user: str, max_tokens: Optional[int] = None) -> str:
         """Single-turn message → assistant text."""
+        if max_tokens:
+            saved, self.max_tokens = self.max_tokens, max_tokens
+            try:
+                return self.complete(system, user)
+            finally:
+                self.max_tokens = saved
         if self.provider_name == "claude_cli":
             return self._complete_claude_cli(system, user)
         if self.provider_name == "anthropic":
@@ -280,6 +293,35 @@ class LLMClient:
             return self._complete_gemini(system, user)
         # openai, azure, openai_compatible, and all aliases share the chat-completions shape
         return self._complete_openai_shape(system, user)
+
+    def complete_stream(self, system: str, user: str, max_tokens: Optional[int] = None) -> Iterator[str]:
+        """Yield text chunks as they arrive. Anthropic and every OpenAI-shaped backend
+        stream natively; other backends yield the whole completion once."""
+        limit = max_tokens or self.max_tokens
+        if self.provider_name == "anthropic":
+            with self._backend.messages.stream(
+                model=self.model, max_tokens=limit, system=system,
+                messages=[{"role": "user", "content": user}],
+            ) as stream:
+                for text in stream.text_stream:
+                    if text:
+                        yield text
+            return
+        if self.provider_name in ("claude_cli", "gemini"):
+            yield self.complete(system, user, max_tokens=limit)
+            return
+        stream = self._backend.chat.completions.create(
+            model=self.model, max_tokens=limit, stream=True,
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        )
+        for event in stream:
+            choices = getattr(event, "choices", None) or []
+            if not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            text = getattr(delta, "content", None) if delta is not None else None
+            if text:
+                yield text
 
     def run_agent(self, agent_name: str, user: str, agents_dir: Optional[Path] = None) -> str:
         base = agents_dir or (Path(__file__).resolve().parent.parent / "agents")

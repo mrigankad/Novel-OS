@@ -2,7 +2,7 @@
   "mcpServers": {
     "novel-os": {
       "command": "python",
-      "args": ["-m", "core.mcp_server", "--projects", "./projects"]
+      "args": ["-m", "server.mcp_server"]
     }
   }
 }
