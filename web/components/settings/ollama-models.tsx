@@ -42,6 +42,7 @@ export function LocalModels({ conn }: { conn?: Connection }) {
   const [name, setName] = useState("");
   const [pulling, setPulling] = useState<{ model: string; status: string; percent: number | null } | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const [pullError, setPullError] = useState<string | null>(null);
 
   async function pull(model: string) {
     const m = model.trim();
@@ -49,14 +50,15 @@ export function LocalModels({ conn }: { conn?: Connection }) {
     const ctl = new AbortController();
     abort.current = ctl;
     setPulling({ model: m, status: "starting", percent: null });
+    setPullError(null);
     try {
       await pullModel(m, (e) => {
         if (e.event === "progress") setPulling({ model: m, status: describeProgress(e.status, e.percent), percent: e.percent });
         else if (e.event === "done") { toast(`Pulled ${m}`); setName(""); }
-        else toast(e.error, "error");
+        else setPullError(friendlyPullError(m, e.error));
       }, ctl.signal);
     } catch (e) {
-      if (!ctl.signal.aborted) toast((e as Error).message, "error");
+      if (!ctl.signal.aborted) setPullError(friendlyPullError(m, (e as Error).message));
       else toast(`Stopped pulling ${m}`);
     } finally {
       setPulling(null);
@@ -120,6 +122,9 @@ export function LocalModels({ conn }: { conn?: Connection }) {
             <Download size={14} strokeWidth={1.75} /> Pull
           </Button>
         </form>
+        {pullError && !pulling && (
+          <p role="alert" className="mt-2 text-[13px] leading-relaxed text-fail">{pullError}</p>
+        )}
         {!pulling && (
           <div className="mt-2 flex flex-wrap gap-2">
             {SUGGESTIONS.map((s) => (
@@ -178,4 +183,16 @@ export function CloudModels({ conn }: { conn?: Connection }) {
       </ul>
     </div>
   );
+}
+
+/** Ollama's raw errors are registry plumbing; say what it means for the writer. */
+function friendlyPullError(model: string, raw: string): string {
+  const r = raw.toLowerCase();
+  if (r.includes("file does not exist") || r.includes("not found") || r.includes("manifest unknown"))
+    return `Ollama couldn't find "${model}". Check the name on ollama.com/library.`;
+  if (r.includes("503") || r.includes("connect") || r.includes("timeout") || r.includes("network"))
+    return `Ollama couldn't reach its model registry, so "${model}" wasn't downloaded. Check your internet connection or proxy, then try again. (${raw})`;
+  if (r.includes("space") || r.includes("disk"))
+    return `Not enough disk space to download "${model}".`;
+  return `Couldn't pull "${model}": ${raw}`;
 }
