@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Plus, Search, Trash2, X } from "lucide-react";
+import { Plus, Search, Sparkles, Trash2, X } from "lucide-react";
+import { GenerateImageSheet } from "@/components/images/generate-image-sheet";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useMemo, useState } from "react";
 import { ProposalsStrip } from "@/components/transfer/proposals-strip";
@@ -84,10 +85,16 @@ function Codex({ id }: { id: string }) {
             {entries.map((e) => (
               <li key={e.id}>
                 <button type="button" onClick={() => select(e.id)}
-                  className={clsx("w-full rounded-[10px] px-3 py-2.5 text-left transition-colors",
+                  className={clsx("flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-left transition-colors",
                     e.id === selected ? "bg-sheet" : "hover:bg-sheet")}>
-                  <span className="block text-[15px] font-semibold text-ink">{e.name}</span>
-                  <span className="block truncate text-[12px] text-body">{kindLabel(e.kind)}{e.role && ` · ${e.role}`}{e.summary && ` · ${e.summary}`}</span>
+                  {e.image_media_id && (
+                    <img src={`/api/media/${e.image_media_id}`} alt="" loading="lazy"
+                      className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-rule" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-ink">{e.name}</span>
+                    <span className="block truncate text-[12px] text-body">{kindLabel(e.kind)}{e.role && ` · ${e.role}`}{e.summary && ` · ${e.summary}`}</span>
+                  </span>
                 </button>
               </li>
             ))}
@@ -118,6 +125,7 @@ function EntryEditor({ id, entry, all, onDeleted }: { id: string; entry: CodexEn
   const [notes, setNotes] = useState(entry.notes);
   const [facts, setFacts] = useState<FactRow[]>(Object.entries(entry.facts ?? {}).map(([k, v]) => ({ k, v: String(v) })));
   const [dirty, setDirty] = useState(false);
+  const [portrait, setPortrait] = useState(false);
   const touch = <T,>(set: (v: T) => void) => (v: T) => { set(v); setDirty(true); };
 
   const invalidate = () => qc.invalidateQueries({ queryKey: bk.codexAll(id) });
@@ -139,6 +147,21 @@ function EntryEditor({ id, entry, all, onDeleted }: { id: string; entry: CodexEn
   return (
     <div className="max-w-2xl">
       <div className="flex items-start justify-between gap-4">
+        <button type="button" onClick={() => setPortrait(true)}
+          aria-label={entry.image_media_id ? `Regenerate ${entry.name}'s image` : `Generate an image of ${entry.name}`}
+          className={clsx("group relative h-28 w-[84px] shrink-0 overflow-hidden rounded-[10px]",
+            entry.image_media_id ? "ring-1 ring-rule" : "flex flex-col items-center justify-center gap-1 bg-wash text-[11px] font-semibold text-gall hover:bg-gall hover:text-on-accent")}>
+          {entry.image_media_id ? (
+            <>
+              <img src={`/api/media/${entry.image_media_id}`} alt={`Image of ${entry.name}`} className="h-full w-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-scrim py-1 text-[11px] font-semibold text-paper opacity-0 transition-opacity group-hover:opacity-100">
+                <Sparkles size={12} strokeWidth={1.75} /> Redo
+              </span>
+            </>
+          ) : (<><Sparkles size={18} strokeWidth={1.75} /> {entry.kind === "character" ? "Portrait" : "Image"}</>)}
+        </button>
+        <GenerateImageSheet projectId={id} open={portrait} onClose={() => setPortrait(false)} kind="portrait"
+          codexEntryId={entry.id} onDone={() => { void invalidate(); }} />
         <input aria-label="Name" value={name} onChange={(e) => touch(setName)(e.target.value)}
           className="w-full bg-transparent font-display text-[36px] font-bold leading-tight tracking-[-0.03em] text-ink outline-none" />
         <Button variant="ghost" size="sm" aria-label="Delete entry" onClick={() => { if (confirm(`Delete ${entry.name}?`)) remove.mutate(); }}>
