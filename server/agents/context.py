@@ -22,6 +22,7 @@ ROLE_PROMPT_DIR = {
     "editor": "editor",
     "guardian": "continuity_guardian",
     "curator": "style_curator",
+    "custom": "scribe",  # custom agents build on the Scribe prompt plus their brief
 }
 
 RESEARCHER_PROMPT = (

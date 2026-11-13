@@ -301,3 +301,111 @@ def test_chat_reply_streams_into_one_message(client, project, monkeypatch):
     scribe = [m for m in msgs if m["sender"].startswith("agent:") and m["intent"] == "note"]
     assert len(scribe) == 1 and scribe[0]["body"] == "Iris would say less, and mean more."
     assert deltas[-1]["id"] == scribe[0]["id"]
+
+
+# ---- per-book agent controls -------------------------------------------------------------
+
+def test_custom_agent_chats_with_its_brief(client, project, monkeypatch):
+    pid = project["id"]
+    add_chapter(pid, 1)
+    r = client.post(f"/api/projects/{pid}/agents",
+                    json={"role": "custom", "name": "Tomas", "brief": "Never use semicolons."})
+    assert r.status_code == 201 and r.json()["role"] == "custom"
+    assert client.post(f"/api/projects/{pid}/agents", json={"role": "wizard", "name": "X"}).status_code == 422
+    calls = fake_llm(monkeypatch, "Short and plain.")
+    tid = client.get(f"/api/projects/{pid}/chapters/1/thread").json()["id"]
+    client.post(f"/api/projects/{pid}/threads/{tid}/messages", json={"body": "@Tomas a line?"})
+    assert calls and calls[0]["agent"] == "Tomas"
+    assert "Never use semicolons." in calls[0]["system"]
+    assert "helpful member of a novel-writing team" not in calls[0]["system"]  # built on the scribe prompt
+    assert any(m["body"] == "Short and plain." for m in messages(client, pid, tid))
+
+
+def test_patch_brief_model_temperature_reach_prompt_and_route(client, project, monkeypatch):
+    from server.models import Agent
+    pid = project["id"]
+    add_chapter(pid, 1)
+    scribe = agents_by_name(client, pid)["Scribe"]
+    r = client.patch(f"/api/projects/{pid}/agents/{scribe['id']}",
+                     json={"brief": "Write Iris's chapters; terse.", "provider": "ollama", "model": "qwen3",
+                           "temperature": 1.2})
+    assert r.json()["model_line"] == "ollama · qwen3" and r.json()["route_provider"] == "ollama"
+    with Session(engine()) as s:
+        route = llm.resolve(s, s.get(Agent, scribe["id"]))
+        assert route.provider == "ollama" and route.model == "qwen3" and route.temperature == 1.2
+    calls = fake_llm(monkeypatch, DRAFT)
+    client.post(f"/api/projects/{pid}/agents/{scribe['id']}/run", json={"task": "draft", "chapter": 1})
+    assert "Write Iris's chapters; terse." in calls[0]["system"]
+
+
+def test_pipeline_draft_uses_assigned_agent(client, project, monkeypatch):
+    pid = project["id"]
+    add_chapter(pid, 1)
+    tomas = client.post(f"/api/projects/{pid}/agents", json={"role": "scribe", "name": "Scribe · Tomas"}).json()
+    client.put(f"/api/projects/{pid}/chapters/1/assignee", json={"agent_id": tomas["id"]})
+
+    def reply(system, user, agent):
+        return {"architect": "SYNOPSIS: x\nBEATS:\n- a", "scribe": DRAFT,
+                "editor": "[REVISED_CHAPTER]\nEdited.\n[/REVISED_CHAPTER]"}.get(
+            agent.role, "[CONTINUITY_REPORT]\nStatus: PASS\n[/CONTINUITY_REPORT]")
+
+    fake_llm(monkeypatch, reply)
+    client.post(f"/api/projects/{pid}/chapters/1/pipeline")
+    with Session(engine()) as s:
+        draft = s.exec(select(Run).where(Run.task == "draft")).one()
+        assert draft.agent_id == tomas["id"]
+
+
+def test_last_core_agent_cannot_be_deleted(client, project):
+    pid = project["id"]
+    cast = agents_by_name(client, pid)
+    assert client.delete(f"/api/projects/{pid}/agents/{cast['Editor']['id']}").status_code == 409
+    extra = client.post(f"/api/projects/{pid}/agents", json={"role": "editor", "name": "Editor two"}).json()
+    assert client.delete(f"/api/projects/{pid}/agents/{cast['Editor']['id']}").status_code == 204
+    assert client.delete(f"/api/projects/{pid}/agents/{extra['id']}").status_code == 409
+
+
+def test_cancel_queued_run(client, project):
+    from server import jobs
+    pid = project["id"]
+    with Session(engine()) as s:
+        run = Run(project_id=pid, task="draft", chapter=1)
+        s.add(run)
+        s.commit()
+        rid = run.id
+    r = client.post(f"/api/projects/{pid}/runs/{rid}/cancel")
+    assert r.status_code == 200 and r.json()["status"] == "cancelled"
+    ran = []
+    jobs._execute(rid, pid, lambda _rid: ran.append(1) or {})  # noqa: SLF001 - a worker picks it up late
+    assert not ran
+    assert client.get(f"/api/projects/{pid}/runs/{rid}").json()["status"] == "cancelled"
+
+
+def test_cancel_mid_stream_keeps_partial_reply(client, project, monkeypatch):
+    from server import jobs
+    pid = project["id"]
+    add_chapter(pid, 1)
+    after_cancel = []
+
+    def complete_streaming(session, system, user, *, on_text, agent=None, max_tokens=None):
+        words = "Iris stood at the gate and looked back at the orchard for a long time".split()
+        text = ""
+        for i, w in enumerate(words):
+            text += ("" if not text else " ") + w
+            if i == 4:  # the author presses Stop mid-reply
+                rid = session.exec(select(Run.id).where(Run.status == "running", Run.task == "chat")).first()
+                jobs.request_cancel(rid)
+            if i > 4:
+                after_cancel.append(w)
+            on_text(text)
+        return text, llm.Route("fake", "fake-1"), "fake-1"
+
+    monkeypatch.setattr(llm, "complete_streaming", complete_streaming)
+    tid = client.get(f"/api/projects/{pid}/chapters/1/thread").json()["id"]
+    client.post(f"/api/projects/{pid}/threads/{tid}/messages", json={"body": "@Scribe a line?"})
+    assert after_cancel == [], "the stream stops at the next chunk"
+    with Session(engine()) as s:
+        assert s.exec(select(Run).where(Run.task == "chat")).one().status == "cancelled"
+    reply = [m for m in messages(client, pid, tid) if m["sender"].startswith("agent:")]
+    assert len(reply) == 1
+    assert reply[0]["body"].startswith("Iris stood at the gate") and reply[0]["body"].endswith("(stopped)")

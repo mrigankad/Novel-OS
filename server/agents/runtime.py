@@ -192,18 +192,24 @@ def run_task(project_id: str, agent_id: str, task: str, chapter: Optional[int] =
 
 
 STREAM_EVERY_S = 0.12  # at most ~8 deltas a second per message
+partial: dict[str, str] = {}  # run_id -> text streamed so far (kept when a run is stopped)
 
 
 def _complete(s: Session, run_id: str, agent: Agent, system: str, user: str,
               stream_to: Optional[Message] = None) -> str:
     """One model call for a run. With stream_to, the reply streams into that
     message as message.delta events while it's being written."""
+    jobs.check(run_id)  # stopped between steps
     if stream_to is None:
         text, route, model = llm.complete(s, system, user, agent=agent)
+        jobs.check(run_id)
     else:
         last = [0.0]
 
         def on_text(so_far: str) -> None:
+            partial[run_id] = so_far
+            if jobs.is_cancelled(run_id):
+                raise jobs.Cancelled(run_id)
             t = time.monotonic()
             if t - last[0] >= STREAM_EVERY_S:
                 last[0] = t
@@ -298,7 +304,21 @@ def _execute(s: Session, run_id: str, project_id: str, agent_id: str, task: str,
                          transcript=transcript(s, thread_id) if thread_id else "",
                          task_spec=_chat_spec(s, project_id, agent))
         draft = say("", intent="note")  # appears at once; fills in as the model writes
-        text = _complete(s, run_id, agent, pack.system, pack.user, stream_to=draft)
+        try:
+            text = _complete(s, run_id, agent, pack.system, pack.user, stream_to=draft)
+        except jobs.Cancelled:
+            # Keep what was written, marked as stopped, then let the job record the cancel.
+            so_far = _visible(partial.pop(run_id, ""))
+            if draft is not None:
+                s.rollback()
+                d = s.get(Message, draft.id)
+                if d is not None:
+                    d.body = (so_far + "\n\n" if so_far else "") + "(stopped)"
+                    s.add(d)
+                    s.commit()
+                    events.publish(project_id, "message.updated", {"id": d.id, "thread_id": thread_id})
+            raise
+        partial.pop(run_id, None)
         handoffs = HANDOFF_RE.findall(text)
         reply = HANDOFF_RE.sub("", text).strip()
         if draft is not None:

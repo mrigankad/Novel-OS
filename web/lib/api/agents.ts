@@ -92,7 +92,12 @@ export const agentKeys = {
   messages: (id: string, tid: string) => ["p", id, "message", tid] as const,
   memory: (id: string, filters: Record<string, unknown> = {}) => ["p", id, "memory", filters] as const,
   research: (id: string) => ["p", id, "research", "room"] as const,
+  agentRuns: (id: string, aid: string) => ["p", id, "run", "agent", aid] as const,
+  activeRuns: (id: string) => ["p", id, "run", "active"] as const,
 };
+
+export const CORE_ROLES = ["architect", "scribe", "editor", "guardian", "curator", "researcher"] as const;
+export const ALL_ROLES = [...CORE_ROLES, "custom"] as const;
 
 const P = (id: string) => `/projects/${id}`;
 
@@ -111,6 +116,8 @@ export const agentsApi = {
   status: (id: string, n: number) => api.get<ChapterAgentStatus>(`${P(id)}/chapters/${n}/agent-status`),
   runs: (id: string, chapter?: number) =>
     api.get<Run[]>(`${P(id)}/runs${chapter != null ? `?chapter=${chapter}` : ""}`),
+  agentRuns: (id: string, aid: string, limit = 5) => api.get<Run[]>(`${P(id)}/runs?agent_id=${aid}&limit=${limit}`),
+  cancel: (id: string, rid: string) => api.post<Run>(`${P(id)}/runs/${rid}/cancel`),
   chapters: (id: string) => api.get<RoomChapter[]>(`${P(id)}/room/chapters`),
 
   chapterThread: (id: string, n: number) => api.get<Thread>(`${P(id)}/chapters/${n}/thread`),

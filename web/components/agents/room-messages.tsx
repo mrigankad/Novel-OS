@@ -1,18 +1,22 @@
 "use client";
 
 import { clsx } from "clsx";
-import { ArrowRight, BookmarkPlus, Info } from "lucide-react";
+import { ArrowRight, BookmarkPlus, Info, Square } from "lucide-react";
 import type { Agent, Message } from "@/lib/api/agents";
 import { AgentGlyph } from "./agent-icon";
 import { useIsStreaming } from "@/lib/streaming";
 
 export function RoomMessage({
-  m, agents, onAction, busy,
+  m, agents, onAction, busy, onStop, runActive,
 }: {
   m: Message;
   agents: Map<string, Agent>;
   onAction: (m: Message, action: string) => void;
   busy?: boolean;
+  /** Stop the run writing this message (shown while it streams). */
+  onStop?: (runId: string) => void;
+  /** Whether this message's run is still queued or running. */
+  runActive?: boolean;
 }) {
   if (m.sender === "author") {
     return (
@@ -55,6 +59,7 @@ export function RoomMessage({
           {m.intent !== "note" && (
             <span className={clsx("font-normal", objection ? "text-fail" : "text-muted")}>· {m.intent}</span>
           )}
+          {onStop && m.run_id && <StopWhileLive id={m.id} runId={m.run_id} active={!!runActive && !m.body} onStop={onStop} />}
         </p>
         <div className={clsx(
           "mt-1 whitespace-pre-wrap text-[14px] leading-relaxed",
@@ -83,6 +88,17 @@ export function RoomMessage({
         )}
       </div>
     </div>
+  );
+}
+
+function StopWhileLive({ id, runId, active, onStop }: { id: string; runId: string; active: boolean; onStop: (rid: string) => void }) {
+  const live = useIsStreaming(id);
+  if (!live && !active) return null;
+  return (
+    <button type="button" onClick={() => onStop(runId)}
+      className="ml-1 inline-flex h-6 items-center gap-1 rounded-full border border-rule-strong px-2 text-[11px] font-semibold text-body hover:border-ink hover:text-ink">
+      <Square className="h-2.5 w-2.5" strokeWidth={1.75} /> Stop
+    </button>
   );
 }
 

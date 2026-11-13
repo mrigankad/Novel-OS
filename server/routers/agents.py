@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from .. import events
+from .. import events, jobs
 from ..agents import runtime
 from ..db import get_session
 from ..llm import resolve
@@ -17,6 +17,8 @@ from ..models import Agent, Chapter, Message, Project, Run, Thread
 router = APIRouter(tags=["agents"])
 
 Autonomy = Literal["ask", "autopilot"]
+CORE_ROLES = ("architect", "scribe", "editor", "guardian", "curator", "researcher")
+ROLES = CORE_ROLES + ("custom",)
 
 
 class AgentIn(BaseModel):
@@ -166,6 +168,10 @@ def list_agents(pid: str, s: Session = Depends(get_session)):
 @router.post("/projects/{pid}/agents", response_model=AgentOut, status_code=201)
 def create_agent(pid: str, body: AgentIn, s: Session = Depends(get_session)):
     _project(s, pid)
+    if body.role not in ROLES:
+        raise HTTPException(422, f"role must be one of {', '.join(ROLES)}")
+    if not body.name.strip():
+        raise HTTPException(422, "Give the agent a name")
     runtime.ensure_cast(s, pid)
     a = Agent(project_id=pid, **body.model_dump())
     s.add(a)
@@ -188,6 +194,10 @@ def update_agent(pid: str, aid: str, body: AgentPatch, s: Session = Depends(get_
 @router.delete("/projects/{pid}/agents/{aid}", status_code=204)
 def delete_agent(pid: str, aid: str, s: Session = Depends(get_session)):
     a = _agent(s, pid, aid)
+    if a.role in CORE_ROLES:
+        same = s.exec(select(Agent.id).where(Agent.project_id == pid, Agent.role == a.role, Agent.id != aid)).first()
+        if not same:
+            raise HTTPException(409, f"This is the only {a.role}. Add another {a.role} before deleting it.")
     for ch in s.exec(select(Chapter).where(Chapter.assigned_agent_id == aid)).all():
         ch.assigned_agent_id = None
         s.add(ch)
@@ -275,6 +285,20 @@ def read_run(pid: str, rid: str, s: Session = Depends(get_session)):
     r = s.get(Run, rid)
     if not r or r.project_id != pid:
         raise HTTPException(404, "Run not found")
+    return run_out(r)
+
+
+@router.post("/projects/{pid}/runs/{rid}/cancel", response_model=RunOut)
+def cancel_run(pid: str, rid: str, s: Session = Depends(get_session)):
+    """Stop a run. Queued runs are cancelled at once; running ones stop at their next checkpoint
+    (between steps, or mid-stream for chat replies)."""
+    r = s.get(Run, rid)
+    if not r or r.project_id != pid:
+        raise HTTPException(404, "Run not found")
+    if r.status in ("queued", "running"):
+        jobs.cancel(rid)
+        s.expire_all()
+        r = s.get(Run, rid)
     return run_out(r)
 
 
