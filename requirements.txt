@@ -13,3 +13,7 @@ google-genai>=0.3.0
 
 # Claude Code / MCP connector
 mcp>=1.25.0
+
+# Ship (optional: image sizes, cover PDF, print PDF)
+Pillow>=10.0
+reportlab>=4.0

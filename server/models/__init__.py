@@ -29,3 +29,4 @@ __all__ = [
     "BookMetadata", "Connection", "CoverDesign", "Release", "ResearchSource",
     "ResearchTask", "VoiceProfile", "VoiceSample",
 ]
+from .publish_extra import MarketingAsset  # noqa: E402,F401
