@@ -105,6 +105,13 @@ PROVIDERS: list[dict[str, Any]] = [
      "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "images",
      "labels": {"api_key": "Key ID:Secret"},
      "default_model": "higgsfield-ai/soul/v2/standard", "help_url": "https://cloud.higgsfield.ai"},
+    {"id": "elevenlabs", "label": "ElevenLabs", "description": "Audiobook narration with ElevenLabs voices.",
+     "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "audio",
+     "default_model": "eleven_multilingual_v2", "help_url": "https://elevenlabs.io/app/settings/api-keys"},
+    {"id": "openai_tts", "label": "OpenAI TTS", "description": "Audiobook narration only. Optional: your OpenAI "
+     "connection already works for narration; add this to use a separate key.",
+     "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "audio",
+     "default_model": "gpt-4o-mini-tts", "help_url": "https://platform.openai.com/api-keys"},
     {"id": "lmstudio", "label": "LM Studio", "description": "A local server from LM Studio.",
      "fields": ["base_url", "default_model"], "needs_key": False, "default_base_url": "http://localhost:1234/v1",
      "default_model": "local-model", "help_url": "https://lmstudio.ai/docs/local-server"},
@@ -113,8 +120,8 @@ PROVIDERS: list[dict[str, Any]] = [
      "default_model": "", "help_url": "https://platform.openai.com/docs/api-reference/chat"},
 ]
 PROVIDER_IDS = {p["id"] for p in PROVIDERS}
-# Image-only services (Runway, Higgsfield) can never be the default *writing* model.
-IMAGE_ONLY = {p["id"] for p in PROVIDERS if p.get("capability") == "images"}
+# Image-only and audio-only services (Runway, ElevenLabs...) can never be the default *writing* model.
+IMAGE_ONLY = {p["id"] for p in PROVIDERS if p.get("capability") in ("images", "audio")}
 _BY_ID = {p["id"]: p for p in PROVIDERS}
 
 
@@ -270,7 +277,7 @@ def delete_connection(cid: str, session: Session = Depends(get_session)):
 def set_default(cid: str, session: Session = Depends(get_session)) -> dict:
     target = _get(session, cid)
     if target.provider in IMAGE_ONLY:
-        raise HTTPException(400, f"{target.label or target.provider} makes images, so it can't be the writing model.")
+        raise HTTPException(400, f"{target.label or target.provider} makes images or audio, so it can't be the writing model.")
     for c in session.exec(select(Connection)).all():
         c.is_default = c.id == target.id
         session.add(c)

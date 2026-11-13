@@ -2,7 +2,7 @@
 
 import { clsx } from "clsx";
 import {
-  Bot, BookOpen, Brain, Download, Fingerprint, GitBranch, Globe, Image as ImageIcon,
+  Bot, BookOpen, Brain, Download, Fingerprint, GitBranch, Globe, Headphones, Image as ImageIcon,
   Library, LibraryBig, type LucideIcon, PanelLeftClose, PanelLeftOpen, Plug, Search, Shield,
   SlidersHorizontal, Users,
 } from "lucide-react";
@@ -38,6 +38,7 @@ function projectNav(id: string): NavGroup[] {
       items: [
         { href: `${p}/media`, label: "Media and images", icon: ImageIcon },
         { href: `${p}/cover`, label: "Cover studio", icon: LibraryBig },
+        { href: `${p}/audio`, label: "Audiobook", icon: Headphones },
         { href: `${p}/publish`, label: "Publish and distribute", icon: Download },
       ],
     },
