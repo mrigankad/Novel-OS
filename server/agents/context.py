@@ -101,6 +101,26 @@ def relevant_codex(session: Session, project_id: str, haystack: str, limit: int 
     return out
 
 
+RULING_KINDS = ("decision", "preference")
+MAX_RULINGS = 24
+
+
+def author_rulings(session: Session, project_id: str, agent_id: Optional[str]) -> list[Memory]:
+    """Everything the author has ruled on: decisions ("this is intentional"),
+    preferences ("Iris never swears") and pinned memories. These are binding,
+    so they bypass ranked recall and always reach every agent."""
+    from sqlalchemy import or_
+
+    rows = session.exec(
+        select(Memory).where(
+            Memory.project_id == project_id,
+            or_(Memory.agent_id == None, Memory.agent_id == agent_id),  # noqa: E711
+            or_(Memory.kind.in_(RULING_KINDS), Memory.pinned == True),  # noqa: E712
+        ).order_by(Memory.pinned.desc(), Memory.created_at.desc()).limit(MAX_RULINGS)
+    ).all()
+    return list(rows)
+
+
 def build(session: Session, project_id: str, agent: Agent, task: str, chapter: Optional[int],
           instruction: str = "", transcript: str = "", task_spec: str = "") -> ContextPack:
     project = session.get(Project, project_id)
@@ -118,6 +138,13 @@ def build(session: Session, project_id: str, agent: Agent, task: str, chapter: O
         guide = get_style_guide(session, project_id)
         if guide:
             sys_parts.append(f"## Voice DNA: the author's style guide\n{guide}")
+    rulings = author_rulings(session, project_id, agent.id)
+    if rulings:
+        sys_parts.append(
+            "## Author rulings (binding)\n"
+            "The author has decided these. They override your own judgement, continuity checks and "
+            "other agents. Never 'fix', remove or argue with anything below; work with it.\n"
+            + "\n".join(f"- {m.content}" for m in rulings))
     system = "\n\n".join(sys_parts)
 
     user_parts: list[str] = []
@@ -135,6 +162,8 @@ def build(session: Session, project_id: str, agent: Agent, task: str, chapter: O
     query = " ".join(x for x in [instruction, ch.synopsis if ch else "", _beats_text(ch.beats) if ch else ""] if x)
     memories = mem.recall(session, project_id, query or (ch.title if ch else task), agent_id=agent.id,
                           chapter=chapter, k=12)
+    ruled = {m.id for m in rulings}
+    memories = [m for m in memories if m.id not in ruled]
     if memories:
         user_parts.append("## What you remember\n" + "\n".join(
             f"- [{m.kind}{' · ch ' + str(m.chapter) if m.chapter else ''}] {m.content}" for m in memories))

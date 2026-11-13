@@ -251,3 +251,24 @@ def test_pipeline_runs_all_steps(client, project, monkeypatch):
     with Session(engine()) as s:
         assert [r.task for r in s.exec(select(Run).order_by(Run.created_at)).all()] == ["plan", "draft", "edit", "check"]
         assert s.exec(select(Message).where(Message.intent == "handoff")).all()
+
+
+def test_author_rulings_bind_every_agent_regardless_of_recall(client, project, monkeypatch):
+    """Regression: the Editor 'fixed' a knife the author had marked intentional,
+    because decisions only reached agents when ranked recall happened to pick them."""
+    pid = project["id"]
+    add_chapter(pid, 3, text="The grafting knife lay on the sill.", synopsis="The valuer walks the orchard.")
+    with Session(engine()) as s:
+        mem.remember(s, pid, "decision", "Intentional: the knife on the sill in ch 3 is a second knife.")
+        mem.remember(s, pid, "preference", "Iris never swears.")
+        for i in range(40):  # bury them under unrelated, more 'relevant' memories
+            mem.remember(s, pid, "fact", f"The valuer walks the orchard on visit {i}.", importance=0.9)
+        s.commit()
+    calls = fake_llm(monkeypatch, "Tightened.")
+    editor = agents_by_name(client, pid)["Editor"]
+    assert client.post(f"/api/projects/{pid}/agents/{editor['id']}/run",
+                       json={"task": "edit", "chapter": 3}).status_code in (200, 201, 202)
+    system = calls[0]["system"]
+    assert "Author rulings (binding)" in system
+    assert "second knife" in system and "Iris never swears" in system
+    assert "second knife" not in calls[0]["user"]  # not duplicated in the recall section
