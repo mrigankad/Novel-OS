@@ -3,6 +3,7 @@ import { Inter_Tight, Newsreader, Urbanist } from "next/font/google";
 import type { ReactNode } from "react";
 import Providers from "@/lib/providers";
 import Sidebar from "@/components/sidebar";
+import CommandPalette from "@/components/command-palette";
 import "./globals.css";
 
 const inter = Inter_Tight({ subsets: ["latin"], variable: "--font-inter-tight", display: "swap" });
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${inter.variable} ${urbanist.variable} ${newsreader.variable}`}>
       <body>
         <Providers>
+          <CommandPalette />
           <div className="flex h-full">
             <Sidebar />
             <main id="main" className="h-full min-w-0 flex-1 overflow-y-auto">{children}</main>
