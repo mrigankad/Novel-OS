@@ -18,7 +18,7 @@ export function Sheet({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-40 flex justify-end" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/20" onClick={onClose} />
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-scrim" onClick={onClose} />
       <aside className="relative flex h-full w-full max-w-[440px] flex-col bg-paper shadow-[-12px_0_40px_rgba(20,19,26,0.12)]">
         <header className="flex items-start justify-between gap-4 border-b border-rule px-6 py-5">
           <div>

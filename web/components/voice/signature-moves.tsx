@@ -10,7 +10,7 @@ export function SignatureMoves({ moves, never }: { moves: SignatureMove[]; never
         <ol className="flex flex-col gap-6">
           {moves.map((m, i) => (
             <li key={i}>
-              <blockquote className="border-l-2 border-ink pl-4 font-prose text-[18px] leading-[1.5] text-[#2a2933]">
+              <blockquote className="border-l-2 border-ink pl-4 font-prose text-[18px] leading-[1.5] text-prose">
                 &ldquo;{m.example}&rdquo;
               </blockquote>
               <p className="mt-2 pl-4 text-[13px] leading-relaxed text-body">{m.note}</p>

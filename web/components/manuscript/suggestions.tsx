@@ -108,8 +108,10 @@ export function useSuggestions(id: string, n: number) {
 }
 
 export function SuggestionsPanel({
-  id, n, items, activeId, onActive, beforeAction, onApplied,
+  id, n, items, activeId, onActive, beforeAction, onApplied, inDrawer = false,
 }: {
+  /** Rendered inside a drawer (below xl) rather than as the inline column. */
+  inDrawer?: boolean;
   id: string;
   n: number;
   items: Suggestion[];
@@ -170,7 +172,7 @@ export function SuggestionsPanel({
   const busy = accept.isPending || acceptAll.isPending;
 
   return (
-    <aside aria-label="Editor suggestions" className="hidden w-[320px] shrink-0 flex-col border-l border-rule lg:flex">
+    <aside aria-label="Editor suggestions" className={inDrawer ? "flex min-h-0 w-full flex-1 flex-col" : "hidden w-[320px] shrink-0 flex-col border-l border-rule xl:flex"}>
       <div className="space-y-3 border-b border-rule p-4">
         <p className="eyebrow">Editor suggestions</p>
         <Input value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="Focus, e.g. tighten dialogue"

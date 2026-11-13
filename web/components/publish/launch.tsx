@@ -98,7 +98,7 @@ function Checklist({ projectId, release }: { projectId: string; release: Release
               onClick={() => patch.mutate({ checklist: { [i.key]: !i.done } })}
               aria-label={i.auto ? `${i.label}: checked automatically` : `Toggle ${i.label}`}
               className={clsx("mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border",
-                i.done ? "border-ink bg-ink text-white" : "border-rule-strong bg-paper",
+                i.done ? "border-inverse bg-inverse text-on-inverse" : "border-rule-strong bg-paper",
                 !i.auto && "cursor-pointer hover:border-ink")}>
               {i.done && <Check size={11} strokeWidth={3} />}
             </button>
@@ -203,7 +203,7 @@ function MarketingKit({ projectId }: { projectId: string }) {
         {MARKETING_KINDS.map(({ kind, label }) => (
           <button key={kind} type="button" onClick={() => gen.mutate(kind)} disabled={busy.includes(kind)}
             className={clsx("inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium transition-colors",
-              "bg-wash text-gall hover:bg-gall hover:text-white disabled:opacity-50")}>
+              "bg-wash text-gall hover:bg-gall hover:text-on-accent disabled:opacity-50")}>
             <Sparkles size={13} strokeWidth={S} />{label}
           </button>
         ))}
@@ -219,7 +219,7 @@ function MarketingKit({ projectId }: { projectId: string }) {
                 <IconBtn label="Delete" onClick={() => del.mutate(a.id)}><Trash2 size={14} strokeWidth={S} /></IconBtn>
               </span>
             </div>
-            <p className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-line font-prose text-[15px] leading-relaxed text-[#2a2933]">{a.content}</p>
+            <p className="mt-1.5 max-h-48 overflow-y-auto whitespace-pre-line font-prose text-[15px] leading-relaxed text-prose">{a.content}</p>
           </article>
         ))}
       </div>

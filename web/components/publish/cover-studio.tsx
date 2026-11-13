@@ -56,7 +56,7 @@ export function CoverStudio({ projectId }: { projectId: string }) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col bg-sheet">
-        <header className="flex flex-wrap items-center justify-between gap-4 px-8 pt-8">
+        <header className="flex flex-wrap items-center justify-between gap-4 px-4 pt-6 sm:px-8 sm:pt-8">
           <div>
             <p className="eyebrow mb-1">Ship</p>
             <h1 className="font-display text-[32px] font-bold leading-none tracking-[-0.03em] text-ink">Cover studio</h1>
@@ -65,14 +65,14 @@ export function CoverStudio({ projectId }: { projectId: string }) {
             {FORMATS.map((f) => (
               <button key={f.id} role="tab" type="button" aria-selected={format === f.id} onClick={() => setFormat(f.id)}
                 className={clsx("h-8 rounded-[8px] px-3 text-[13px] font-semibold transition-colors",
-                  format === f.id ? "bg-ink text-white" : "text-body hover:text-ink")}>
+                  format === f.id ? "bg-inverse text-on-inverse" : "text-body hover:text-ink")}>
                 {f.label}
               </button>
             ))}
           </div>
         </header>
 
-        <div className="flex flex-1 items-center justify-center p-8 lg:p-12">
+        <div className="flex flex-1 items-center justify-center p-4 sm:p-8 lg:p-12">
           {spec.data ? (
             <div className={clsx("w-full", format === "audiobook" ? "max-w-[460px]" : format === "ebook" ? "max-w-[380px]" : "max-w-[980px]")}>
               <CoverStage spec={spec.data} cover={cover} title={title} author={author} />
@@ -82,7 +82,7 @@ export function CoverStudio({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      <aside className="w-full shrink-0 border-l border-rule bg-paper lg:w-[360px]">
+      <aside className="w-full shrink-0 border-t border-rule bg-paper lg:w-[360px] lg:border-l lg:border-t-0">
         <div className="flex h-full flex-col">
           <div className="flex-1 space-y-8 overflow-y-auto p-6">
             {!covers.isLoading && !cover ? (
@@ -147,7 +147,7 @@ function Mockup({ spec, cover, title, author }: { spec: CoverSpec; cover: CoverD
   const depth = Math.max(12, spec.spine_in * 60);
   return (
     <div className="[perspective:1400px]" onClick={(e) => e.stopPropagation()}>
-      <div className="relative w-[320px] [transform-style:preserve-3d] [transform:rotateY(-28deg)_rotateX(4deg)] transition-transform duration-700 hover:[transform:rotateY(-12deg)_rotateX(2deg)]">
+      <div className="relative w-[min(320px,70vw)] [transform-style:preserve-3d] [transform:rotateY(-28deg)_rotateX(4deg)] transition-transform duration-700 hover:[transform:rotateY(-12deg)_rotateX(2deg)]">
         <CoverStage spec={frontSpec} cover={cover} title={title} author={author} />
         <div className="absolute inset-y-0 left-0 origin-left"
           style={{ width: depth, transform: "rotateY(90deg)", background: cover?.colors?.background || "#14131a", filter: "brightness(0.7)" }} />
@@ -239,7 +239,7 @@ function CoverEditor({ projectId, cover, spec, onSaved }: { projectId: string; c
               aria-label={`Use ${m.filename}`}>
               {/* Media tiles are user uploads served by the API; next/image is not configured for them. */}
               <img src={m.url} alt="" className="h-full w-full object-cover" />
-              {cover.front_media_id === m.id && <Check size={14} strokeWidth={2.5} className="absolute right-1 top-1 rounded-full bg-gall p-0.5 text-white" />}
+              {cover.front_media_id === m.id && <Check size={14} strokeWidth={2.5} className="absolute right-1 top-1 rounded-full bg-gall p-0.5 text-on-accent" />}
             </button>
           ))}
         </div>

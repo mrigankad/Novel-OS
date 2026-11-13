@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* `dark:` follows the resolved theme: an explicit choice wins, otherwise the OS. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
 /* Inkwell: iron-gall ink on clean paper stock. One accent, reserved for AI. */
 @theme {
   --color-paper: #ffffff;
@@ -16,6 +28,16 @@
   --color-warn: #b26b00;
   --color-fail: #d23f45;
 
+  /* Semantic: dark surfaces (primary buttons, the author's chat bubble, toasts). */
+  --color-inverse: #14131a;
+  --color-inverse-hover: #2a2933;
+  --color-on-inverse: #ffffff;
+  /* Text on a filled accent (gall, pass, fail). */
+  --color-on-accent: #ffffff;
+  /* Long-form reading text. */
+  --color-prose: #2a2933;
+  --color-scrim: rgb(20 19 26 / 0.2);
+
   --font-sans: var(--font-inter-tight), system-ui, "Segoe UI", sans-serif;
   --font-display: var(--font-urbanist), var(--font-inter-tight), system-ui, sans-serif;
   --font-prose: var(--font-newsreader), Georgia, serif;
@@ -29,7 +51,55 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* Inkwell at night: a deep blue-black desk, not an inverted page. */
 @layer base {
+  :root[data-theme="dark"] {
+    --color-paper: #121117;
+    --color-sheet: #1a1920;
+    --color-rule: #2a2933;
+    --color-rule-strong: #3a3946;
+    --color-ink: #ecebf1;
+    --color-body: #b9b7c6;
+    --color-muted: #8a8898;
+    --color-gall: #8f86ff;
+    --color-gall-hover: #a59eff;
+    --color-wash: #25223f;
+    --color-pass: #3fbf8a;
+    --color-warn: #e0a33a;
+    --color-fail: #ff6b70;
+    --color-inverse: #ecebf1;
+    --color-inverse-hover: #ffffff;
+    --color-on-inverse: #14131a;
+    --color-on-accent: #121117;
+    --color-prose: #e6e2d8;
+    --color-scrim: rgb(0 0 0 / 0.55);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --color-paper: #121117;
+      --color-sheet: #1a1920;
+      --color-rule: #2a2933;
+      --color-rule-strong: #3a3946;
+      --color-ink: #ecebf1;
+      --color-body: #b9b7c6;
+      --color-muted: #8a8898;
+      --color-gall: #8f86ff;
+      --color-gall-hover: #a59eff;
+      --color-wash: #25223f;
+      --color-pass: #3fbf8a;
+      --color-warn: #e0a33a;
+      --color-fail: #ff6b70;
+      --color-inverse: #ecebf1;
+      --color-inverse-hover: #ffffff;
+      --color-on-inverse: #14131a;
+      --color-on-accent: #121117;
+      --color-prose: #e6e2d8;
+      --color-scrim: rgb(0 0 0 / 0.55);
+      color-scheme: dark;
+    }
+  }
+
   html, body { height: 100%; }
   body {
     background: var(--color-paper);
@@ -38,22 +108,31 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  ::selection { background: color-mix(in srgb, var(--color-gall) 20%, transparent); }
+  ::selection { background: color-mix(in srgb, var(--color-gall) 24%, transparent); }
   :where(a, button, input, textarea, select, [tabindex]):focus-visible {
     outline: 2px solid var(--color-gall);
     outline-offset: 2px;
     border-radius: 6px;
   }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(20, 19, 26, 0.16); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--color-ink) 16%, transparent);
+    border-radius: 999px; border: 2px solid transparent; background-clip: content-box;
+  }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important; scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
   .eyebrow { @apply text-[11px] font-medium uppercase tracking-[0.12em] text-gall; }
   .label { @apply text-[11px] font-medium uppercase tracking-[0.1em] text-muted; }
-  .prose-book { font-family: var(--font-prose); font-size: 19px; line-height: 1.7; color: #2a2933; }
+  .prose-book { font-family: var(--font-prose); font-size: 19px; line-height: 1.7; color: var(--color-prose); }
   .prose-book p { margin: 0 0 1em; }
+  @media (max-width: 639px) {
+    .prose-book { font-size: 18px; }
+  }
 }

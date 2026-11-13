@@ -9,17 +9,17 @@ export function PageHeader({
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.03em] text-ink">{title}</h1>
+        <h1 className="font-display text-[30px] font-bold sm:text-[40px] leading-[1.05] tracking-[-0.03em] text-ink">{title}</h1>
         {description && <p className="mt-2 max-w-2xl text-[15px] text-body">{description}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
 
 export function Page({ children, wide, className }: { children: ReactNode; wide?: boolean; className?: string }) {
   return (
-    <div className={clsx("mx-auto px-6 py-10 sm:px-12", wide ? "max-w-[1400px]" : "max-w-5xl", className)}>
+    <div className={clsx("mx-auto px-4 py-6 sm:px-8 sm:py-10 lg:px-12", wide ? "max-w-[1400px]" : "max-w-5xl", className)}>
       {children}
     </div>
   );

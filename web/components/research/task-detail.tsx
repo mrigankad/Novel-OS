@@ -43,7 +43,7 @@ function SourceRow({ projectId, source, n, question }: { projectId: string; sour
       <p className="mt-0.5 pl-7 text-[12px] text-muted">{source.domain}</p>
       {source.note && <p className="mt-2 pl-7 text-[14px] text-body">{source.note}</p>}
       {source.excerpt && (
-        <blockquote className="mt-2 ml-7 border-l-2 border-rule-strong pl-4 font-prose text-[16px] italic leading-relaxed text-[#2a2933]">
+        <blockquote className="mt-2 ml-7 border-l-2 border-rule-strong pl-4 font-prose text-[16px] italic leading-relaxed text-prose">
           &ldquo;{source.excerpt}&rdquo;
         </blockquote>
       )}

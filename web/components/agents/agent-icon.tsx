@@ -27,7 +27,7 @@ export function AgentGlyph({ role, size = "md", tone = "soft" }: {
       "inline-flex shrink-0 items-center justify-center rounded-[10px]",
       size === "sm" ? "h-7 w-7" : "h-9 w-9",
       tone === "fail" ? "bg-[color-mix(in_srgb,var(--color-fail)_10%,transparent)] text-fail"
-        : tone === "ink" ? "bg-ink text-white" : "bg-wash text-gall",
+        : tone === "ink" ? "bg-inverse text-on-inverse" : "bg-wash text-gall",
     )}>
       {createElement(roleIcon(role), { className: iconClass, strokeWidth: 1.75 })}
     </span>
