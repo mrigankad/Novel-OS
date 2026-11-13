@@ -26,7 +26,6 @@ const EDITABLE: { role: string; label: string; hint: string }[] = [
 const FONTS = [
   { value: "serif", label: "Serif" },
   { value: "sans", label: "Sans" },
-  { value: "mono", label: "Mono" },
 ];
 
 const ALIGNMENTS = [

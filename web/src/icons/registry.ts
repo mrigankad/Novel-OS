@@ -38,6 +38,7 @@ import arrowLeft from "../assets/icons/arrow-left.svg?raw";
 import eye from "../assets/icons/eye.svg?raw";
 import focus from "../assets/icons/focus.svg?raw";
 import bot from "../assets/icons/bot.svg?raw";
+import plug from "../assets/icons/plug.svg?raw";
 import brain from "../assets/icons/brain.svg?raw";
 import scrollText from "../assets/icons/scroll-text.svg?raw";
 import notebookPen from "../assets/icons/notebook-pen.svg?raw";
@@ -81,6 +82,7 @@ export const ICONS = {
   eye,
   focus,
   bot,
+  plug,
   brain,
   "scroll-text": scrollText,
   "notebook-pen": notebookPen,

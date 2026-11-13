@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { motion } from "motion/react";
 import BrandMark, { BrandLogo } from "./BrandMark";
-import Icon from "./Icon";
+import Icon, { type IconName } from "./Icon";
 
 const STORAGE_KEY = "novelos-sidebar-collapsed";
 
@@ -26,86 +25,84 @@ export default function Sidebar() {
   return (
     <aside
       className={`glass-rail flex shrink-0 flex-col text-ink-text transition-[width] duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
-        collapsed ? "w-[72px]" : "w-[240px]"
+        collapsed ? "w-[64px]" : "w-[248px]"
       }`}
       data-collapsed={collapsed ? "true" : "false"}
     >
-      <div className={`pt-4 pb-3 ${collapsed ? "px-2" : "px-4"}`}>
-        <div className={`mb-2 flex ${collapsed ? "justify-center" : "justify-end"}`}>
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-muted transition-colors hover:bg-white/70 hover:text-ink-text"
-          >
-            <Icon
-              name="chevron-right"
-              className={`h-4 w-4 transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`}
-            />
-          </button>
-        </div>
-        {collapsed ? (
-          <div className="flex justify-center">
-            <BrandMark className="h-11 w-11" />
-          </div>
-        ) : (
-          <BrandLogo className="h-24 w-auto max-w-[208px] object-contain object-left" />
+      <div className={`flex items-center pt-5 pb-4 ${collapsed ? "justify-center px-2" : "justify-between px-4"}`}>
+        {collapsed ? <BrandMark className="h-7 w-7" /> : <BrandLogo />}
+        {!collapsed && (
+          <CollapseButton collapsed={collapsed} onClick={() => setCollapsed(true)} />
         )}
       </div>
 
-      {!collapsed && <div className="mx-4 mb-3 h-px bg-[rgba(74,91,133,0.12)]" />}
-      {collapsed && <div className="mx-3 mb-2 h-px bg-[rgba(74,91,133,0.12)]" />}
-
-      <nav className={`flex flex-col gap-1.5 ${collapsed ? "px-2" : "px-3"}`}>
+      <nav className={`flex flex-col gap-0.5 ${collapsed ? "px-2" : "px-3"}`}>
         <button
           type="button"
-          title="Search"
-          aria-label="Search"
+          title="Search or command"
+          aria-label="Search or command"
           onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
-          className={`flex h-11 items-center rounded-2xl text-[13px] font-medium text-ink-muted transition-colors duration-150 hover:bg-white/70 hover:text-ink-text ${
-            collapsed ? "justify-center px-0" : "justify-between gap-3 px-3.5"
+          className={`mb-3 flex h-9 items-center rounded-lg border border-paper-line bg-paper text-[13px] text-paper-muted transition-colors hover:border-ink-line hover:text-ink-text ${
+            collapsed ? "justify-center px-0" : "justify-between gap-2 px-2.5"
           }`}
         >
-          <span className={`flex items-center ${collapsed ? "" : "gap-2.5"}`}>
+          <span className="flex items-center gap-2">
             <Icon name="search" className="h-4 w-4" />
-            {!collapsed && "Search"}
+            {!collapsed && "Search or command"}
           </span>
-          {!collapsed && (
-            <kbd className="rounded-md border border-[rgba(74,91,133,0.14)] bg-white/80 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-ink-muted shadow-sm">
-              ⌘K
-            </kbd>
-          )}
+          {!collapsed && <kbd className="text-[11px] font-medium">Ctrl K</kbd>}
         </button>
-        <SideLink to="/" label="Library" hint="Projects" icon="library" end collapsed={collapsed} />
-        <SideLink to="/settings" label="Settings" hint="Models" icon="sparkles" collapsed={collapsed} />
+
+        <SideLink to="/" label="Library" icon="library" end collapsed={collapsed} />
+
+        {!collapsed && <SectionLabel>Settings</SectionLabel>}
+        <SideLink to="/settings" label="Connections" icon="plug" collapsed={collapsed} />
       </nav>
 
-      {!collapsed && (
-        <div className="mt-auto px-4 pb-5 pt-6">
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.12, duration: 0.4, ease: [0.2, 0.8, 0.2, 1] }}
-            className="glass-card rounded-[20px] px-3.5 py-3.5"
-          >
-            <p className="text-[12px] leading-relaxed text-ink-muted">
-              Structure first. Prose second. Continuity always.
-            </p>
-          </motion.div>
-        </div>
-      )}
-      {collapsed && <div className="mt-auto" />}
+      <div className={`mt-auto pb-4 ${collapsed ? "flex justify-center px-2" : "px-4"}`}>
+        {collapsed ? (
+          <CollapseButton collapsed={collapsed} onClick={() => setCollapsed(false)} />
+        ) : (
+          <p className="text-[12px] leading-relaxed text-paper-muted">
+            Structure first. Prose second. Continuity always.
+          </p>
+        )}
+      </div>
     </aside>
   );
 }
 
+function CollapseButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  const label = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      title={label}
+      className="flex h-7 w-7 items-center justify-center rounded-md text-paper-muted transition-colors hover:bg-paper hover:text-ink-text"
+    >
+      <Icon
+        name="chevron-right"
+        className={`h-4 w-4 transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`}
+      />
+    </button>
+  );
+}
+
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <div className="px-2.5 pt-5 pb-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-paper-muted">
+      {children}
+    </div>
+  );
+}
+
 function SideLink({
-  to, label, hint, icon, end, collapsed,
+  to, label, icon, end, collapsed,
 }: {
-  to: string; label: string; hint: string; icon: "library" | "sparkles";
-  end?: boolean; collapsed?: boolean;
+  to: string; label: string; icon: IconName; end?: boolean; collapsed?: boolean;
 }) {
   return (
     <NavLink
@@ -114,22 +111,17 @@ function SideLink({
       title={label}
       aria-label={label}
       className={({ isActive }) =>
-        `group flex h-11 items-center rounded-2xl transition-all duration-200 ${
-          collapsed ? "justify-center px-0" : "justify-between gap-3 px-3.5"
+        `flex h-9 items-center gap-2.5 rounded-lg text-[14px] transition-colors duration-150 ${
+          collapsed ? "justify-center px-0" : "px-2.5"
         } ${
           isActive
-            ? "bg-ink text-on-ink shadow-[0_10px_24px_rgba(23,33,63,0.18)]"
-            : "text-ink-muted hover:bg-white/70 hover:text-ink-text"
+            ? "bg-paper font-semibold text-ink-text shadow-[0_0_0_1px_var(--color-paper-line)]"
+            : "text-ink-muted hover:bg-paper hover:text-ink-text"
         }`
       }
     >
-      <span className={`flex items-center ${collapsed ? "" : "gap-2.5"}`}>
-        <Icon name={icon} className="h-4 w-4" />
-        {!collapsed && (
-          <span className="text-[13px] font-semibold tracking-[-0.01em] leading-none">{label}</span>
-        )}
-      </span>
-      {!collapsed && <span className="text-[11px] leading-none opacity-55">{hint}</span>}
+      <Icon name={icon} className="h-[18px] w-[18px]" />
+      {!collapsed && <span className="leading-none">{label}</span>}
     </NavLink>
   );
 }

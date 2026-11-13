@@ -14,7 +14,7 @@ export function applyTheme(): void {
   root.style.colorScheme = "light";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", "#1676df");
+    ?.setAttribute("content", "#ffffff");
 }
 
 export function setTheme(): void {
@@ -23,19 +23,18 @@ export function setTheme(): void {
 
 // --- Reader font (manuscript canvas only; chrome always stays on --font-sans) ---
 
-export type ReaderFont = "sans" | "serif" | "mono";
+export type ReaderFont = "sans" | "serif";
 
 export const READER_FONTS: { value: ReaderFont; label: string }[] = [
-  { value: "sans", label: "SF Pro" },
   { value: "serif", label: "Newsreader" },
-  { value: "mono", label: "Mono" },
+  { value: "sans", label: "Inter Tight" },
 ];
 
 const FONT_KEY = "novel-os-reader-font";
 
 export function getReaderFont(): ReaderFont {
   const saved = localStorage.getItem(FONT_KEY) as ReaderFont | null;
-  return saved === "serif" || saved === "mono" || saved === "sans" ? saved : "sans";
+  return saved === "sans" ? "sans" : "serif";
 }
 
 export function applyReaderFont(font: ReaderFont): void {

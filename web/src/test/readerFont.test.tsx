@@ -41,27 +41,27 @@ beforeEach(() => {
   delete document.documentElement.dataset.readerFont;
 });
 
-test("defaults the manuscript canvas to SF Pro", () => {
+test("defaults the manuscript canvas to Newsreader", () => {
   renderEditor();
-  expect(getReaderFont()).toBe("sans");
+  expect(getReaderFont()).toBe("serif");
   const group = screen.getByRole("radiogroup", { name: "Reading font" });
-  expect(group.querySelector('[aria-checked="true"]')).toHaveAttribute("aria-label", "SF Pro");
+  expect(group.querySelector('[aria-checked="true"]')).toHaveAttribute("aria-label", "Newsreader");
 });
 
 test("switching the reader font rebinds the token and persists it", async () => {
   const user = userEvent.setup();
   renderEditor();
-  await user.click(screen.getByRole("radio", { name: "Newsreader" }));
+  await user.click(screen.getByRole("radio", { name: "Inter Tight" }));
 
-  expect(document.documentElement.dataset.readerFont).toBe("serif");
-  expect(getReaderFont()).toBe("serif");
+  expect(document.documentElement.dataset.readerFont).toBe("sans");
+  expect(getReaderFont()).toBe("sans");
 });
 
-test("offers all three reader fonts as visible choices", () => {
+test("offers both reader fonts as visible choices", () => {
   renderEditor();
   const group = screen.getByRole("radiogroup", { name: "Reading font" });
   const labels = [...group.querySelectorAll('[role="radio"]')].map((el) =>
     el.getAttribute("aria-label"),
   );
-  expect(labels).toEqual(["SF Pro", "Newsreader", "Mono"]);
+  expect(labels).toEqual(["Newsreader", "Inter Tight"]);
 });

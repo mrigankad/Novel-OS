@@ -266,9 +266,7 @@ export default function FinalEditor(props: {
                         fontFamily:
                           f.value === "serif"
                             ? "var(--font-reader-serif)"
-                            : f.value === "mono"
-                              ? "var(--font-reader-mono)"
-                              : "var(--font-reader-sans)",
+                            : "var(--font-reader-sans)",
                       }}
                     >
                       Aa

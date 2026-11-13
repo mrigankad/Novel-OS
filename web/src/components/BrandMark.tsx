@@ -1,9 +1,8 @@
 import markUrl from "../assets/brand/novel-os-mark.svg";
-import logoUrl from "../assets/brand/novel-os-logo.svg";
 
-/** Compact owl mark (favicon art) for small chrome. */
+/** The book-N mark: an open book folded into an N, the gutter drawn as a caret. */
 export default function BrandMark({
-  className = "h-11 w-11",
+  className = "h-7 w-7",
   title = "Novel OS",
 }: {
   className?: string;
@@ -14,28 +13,24 @@ export default function BrandMark({
       src={markUrl}
       alt={title}
       className={className}
-      width={44}
-      height={44}
+      width={28}
+      height={28}
       draggable={false}
     />
   );
 }
 
-/** Full Novel OS wordmark logo for sidebar / hero. */
-export function BrandLogo({
-  className = "h-24 w-auto",
-  title = "Novel OS",
-}: {
-  className?: string;
-  title?: string;
-}) {
+/** Mark + wordmark lockup ("Novel" in ink, "OS" in iron-gall). */
+export function BrandLogo({ className = "" }: { className?: string }) {
   return (
-    <img
-      src={logoUrl}
-      alt={title}
-      className={className}
-      height={96}
-      draggable={false}
-    />
+    <span className={`inline-flex items-center gap-2.5 ${className}`} role="img" aria-label="Novel OS">
+      <BrandMark className="h-7 w-7 shrink-0" title="" />
+      <span
+        aria-hidden="true"
+        className="font-display text-[20px] font-bold leading-none tracking-[-0.03em] text-ink-text"
+      >
+        Novel <span className="text-violet">OS</span>
+      </span>
+    </span>
   );
 }
