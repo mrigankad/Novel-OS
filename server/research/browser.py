@@ -13,6 +13,7 @@ most one request in flight per domain.
 
 from __future__ import annotations
 
+import atexit
 import importlib.util
 import os
 import threading
@@ -207,25 +208,60 @@ def _fetch_http(url: str) -> Page:
     return extract(body, final)
 
 
-def _fetch_playwright(url: str) -> Page:
+_pw_local = threading.local()
+_pw_all: list = []  # (playwright, browser) pairs, closed at exit
+_pw_all_lock = threading.Lock()
+
+
+def _shared_browser():
+    """One headless Chromium per worker thread, reused across pages.
+
+    Launching Chromium costs ~1-2s; a fresh *context* per page costs ~50ms and
+    still isolates cookies/storage. Playwright's sync objects are thread-bound,
+    hence thread-local rather than one global browser."""
+    b = getattr(_pw_local, "browser", None)
+    if b is not None and b.is_connected():
+        return b
     from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
 
-    with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=True)
-        try:
-            ctx = browser.new_context(user_agent=USER_AGENT)
-            page = ctx.new_page()
-            resp = page.goto(url, timeout=TIMEOUT * 1000, wait_until="domcontentloaded")
-            if resp and resp.status >= 400:
-                raise FetchError(f"HTTP {resp.status} for {url}")
+    pw = sync_playwright().start()
+    b = pw.chromium.launch(headless=True)
+    _pw_local.pw, _pw_local.browser = pw, b
+    with _pw_all_lock:
+        _pw_all.append((pw, b))
+    return b
+
+
+def _close_browsers() -> None:
+    with _pw_all_lock:
+        pairs, _pw_all[:] = list(_pw_all), []
+    for pw, b in pairs:
+        for closer in (b.close, pw.stop):
             try:
-                page.wait_for_load_state("networkidle", timeout=3000)
-            except Exception:  # noqa: BLE001 - busy pages never go idle; use what rendered
+                closer()
+            except Exception:  # noqa: BLE001 - best effort at shutdown
                 pass
-            html = page.content()[:MAX_BYTES]
-            return extract(html, page.url)
-        finally:
-            browser.close()
+
+
+atexit.register(_close_browsers)
+
+
+def _fetch_playwright(url: str) -> Page:
+    browser = _shared_browser()
+    ctx = browser.new_context(user_agent=USER_AGENT)
+    try:
+        page = ctx.new_page()
+        resp = page.goto(url, timeout=TIMEOUT * 1000, wait_until="domcontentloaded")
+        if resp and resp.status >= 400:
+            raise FetchError(f"HTTP {resp.status} for {url}")
+        try:
+            page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:  # noqa: BLE001 - busy pages never go idle; use what rendered
+            pass
+        html = page.content()[:MAX_BYTES]
+        return extract(html, page.url)
+    finally:
+        ctx.close()
 
 
 def fetch(url: str) -> Page:

@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookPlus, Check, ExternalLink, RotateCcw, Square, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { bk, bookApi } from "@/lib/api/book";
 import { Badge, EmptyState, SectionLabel, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { isRunning, researchApi, researchKeys, type ResearchSource } from "@/lib/api/research";
@@ -24,8 +26,11 @@ function Reliability({ value }: { value: number }) {
 function SourceRow({ projectId, source, n, question }: { projectId: string; source: ResearchSource; n: number; question: string }) {
   const qc = useQueryClient();
   const toast = useToast();
+  const codex = useQuery({ queryKey: bk.codex(projectId), queryFn: () => bookApi.codex(projectId) });
+  const NEW = "__new__";
   const file = useMutation({
-    mutationFn: () => researchApi.file(projectId, source.id, { name: `Research: ${question.slice(0, 80)}` }),
+    mutationFn: (target: string) => researchApi.file(projectId, source.id,
+      target === NEW ? { name: `Research: ${question.slice(0, 80)}` } : { entry_id: target }),
     onSuccess: () => {
       toast("Filed to the Codex", "success");
       void qc.invalidateQueries({ queryKey: researchKeys.all(projectId) });
@@ -51,9 +56,16 @@ function SourceRow({ projectId, source, n, question }: { projectId: string; sour
         {source.filed_to_codex_id ? (
           <Badge tone="pass"><Check className="h-3 w-3" strokeWidth={1.75} /> In the Codex</Badge>
         ) : (
-          <Button size="sm" variant="secondary" disabled={file.isPending} onClick={() => file.mutate()}>
-            <BookPlus className="h-3.5 w-3.5" strokeWidth={1.75} /> File to Codex
-          </Button>
+          <Select<string>
+            size="sm" className="w-56" aria-label="File to Codex" value={null} disabled={file.isPending}
+            placeholder={file.isPending ? "Filing…" : "File to Codex…"}
+            onChange={(target) => file.mutate(target)}
+            options={[
+              { value: NEW, label: "New research note", hint: question.slice(0, 60),
+                icon: <BookPlus className="h-3.5 w-3.5 text-gall" strokeWidth={1.75} /> },
+              ...(codex.data ?? []).map((e) => ({ value: e.id, label: e.name, hint: e.kind })),
+            ]}
+          />
         )}
         <a href={source.url} target="_blank" rel="noreferrer noopener"
           className="inline-flex h-8 items-center gap-2 rounded-[10px] px-3 text-[13px] font-semibold text-body hover:bg-sheet hover:text-ink">
