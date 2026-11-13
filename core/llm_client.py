@@ -332,7 +332,10 @@ class LLMClient:
                     if text:
                         yield text
             return
-        if self.provider_name in ("claude_cli", "gemini"):
+        if self.provider_name == "claude_cli":
+            yield from self._stream_claude_cli(system, user)
+            return
+        if self.provider_name == "gemini":
             yield self.complete(system, user, max_tokens=limit)
             return
         stream = self._backend.chat.completions.create(
@@ -361,18 +364,13 @@ class LLMClient:
 
     # ----- backend completions
 
-    def _complete_claude_cli(self, system: str, user: str) -> str:
-        """Run the prompt through the Claude Code CLI in non-interactive print mode.
-
-        Uses the user's `claude` login (subscription) no API key, no per-token billing.
-        The user prompt is passed on stdin (not argv) to avoid length/quoting limits.
-        """
-        cli = self._backend  # path to the claude binary
-        cmd = [
-            cli,
-            "-p",
-            "--output-format", "json",
-        ]
+    def _claude_cli_call(self, system: str, user: str, *, stream: bool) -> tuple[list, str]:
+        """Command line and stdin prompt for the Claude Code CLI (print mode)."""
+        cmd = [self._backend, "-p"]  # backend is the path to the claude binary
+        if stream:
+            cmd += ["--output-format", "stream-json", "--verbose", "--include-partial-messages"]
+        else:
+            cmd += ["--output-format", "json"]
         if self.model:
             cmd += ["--model", self.model]
         # Fold the agent's system prompt into the message turn. Passing it via
@@ -393,6 +391,59 @@ class LLMClient:
             "choices and proceed.\n\n"
         )
         prompt = f"{preamble}# ROLE\n{system}\n\n# TASK / CONTEXT\n{user}" if system else user
+        return cmd, prompt
+
+    def _stream_claude_cli(self, system: str, user: str) -> Iterator[str]:
+        """Stream text deltas from `claude -p --output-format stream-json --include-partial-messages`."""
+        cmd, prompt = self._claude_cli_call(system, user, stream=True)
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                    text=True, encoding="utf-8")
+        except OSError as e:
+            raise LLMError(f"Failed to invoke the Claude Code CLI: {e}") from e
+        assert proc.stdin and proc.stdout
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+        streamed = False
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            kind = evt.get("type")
+            if kind == "stream_event":
+                inner = evt.get("event") or {}
+                delta = inner.get("delta") or {}
+                if inner.get("type") == "content_block_delta" and delta.get("type") == "text_delta":
+                    text = delta.get("text") or ""
+                    if text:
+                        streamed = True
+                        yield text
+            elif kind == "result":
+                usage = evt.get("usage") or {}
+                self.last_usage = {
+                    "input": int(usage.get("input_tokens", 0)) + int(usage.get("cache_read_input_tokens", 0))
+                    + int(usage.get("cache_creation_input_tokens", 0)),
+                    "output": int(usage.get("output_tokens", 0)),
+                }
+                if evt.get("is_error"):
+                    raise LLMError(f"Claude Code CLI error: {evt.get('result') or 'unknown'}")
+                if not streamed and evt.get("result"):  # older CLIs without partial messages
+                    yield evt["result"]
+        if proc.wait() != 0 and not streamed:
+            err = (proc.stderr.read() if proc.stderr else "").strip()
+            raise LLMError(f"Claude Code CLI failed (exit {proc.returncode}): {err}")
+
+    def _complete_claude_cli(self, system: str, user: str) -> str:
+        """Run the prompt through the Claude Code CLI in non-interactive print mode.
+
+        Uses the user's `claude` login (subscription): no API key, no per-token billing.
+        The prompt is passed on stdin (not argv) to avoid length/quoting limits.
+        """
+        cmd, prompt = self._claude_cli_call(system, user, stream=False)
         try:
             proc = subprocess.run(
                 cmd,

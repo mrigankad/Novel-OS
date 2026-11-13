@@ -29,7 +29,15 @@ def fake_llm(monkeypatch, reply):
         text = reply(system, user, agent) if callable(reply) else reply
         return text, llm.Route("fake", "fake-1"), "fake-1"
 
+    def complete_streaming(session, system, user, *, on_text, agent=None, max_tokens=None):
+        text, route, model = complete(session, system, user, agent=agent, max_tokens=max_tokens)
+        for i in range(1, len(text) + 1, max(1, len(text) // 4)):  # a few chunks, like a real stream
+            on_text(text[:i])
+        on_text(text)
+        return text, route, model
+
     monkeypatch.setattr(llm, "complete", complete)
+    monkeypatch.setattr(llm, "complete_streaming", complete_streaming)
     return calls
 
 
@@ -272,3 +280,24 @@ def test_author_rulings_bind_every_agent_regardless_of_recall(client, project, m
     assert "Author rulings (binding)" in system
     assert "second knife" in system and "Iris never swears" in system
     assert "second knife" not in calls[0]["user"]  # not duplicated in the recall section
+
+
+def test_chat_reply_streams_into_one_message(client, project, monkeypatch):
+    from server import events
+    from server.agents import runtime as rt
+    pid = project["id"]
+    add_chapter(pid, 1)
+    monkeypatch.setattr(rt, "STREAM_EVERY_S", 0)
+    published = []
+    monkeypatch.setattr(events, "publish", lambda p, t, d=None: published.append((t, d or {})))
+    fake_llm(monkeypatch, "Iris would say less, and mean more.\nHANDOFF @Editor: tighten it")
+    tid = client.get(f"/api/projects/{pid}/chapters/1/thread").json()["id"]
+    client.post(f"/api/projects/{pid}/threads/{tid}/messages", json={"body": "@Scribe a line for Iris?"})
+
+    deltas = [d for t, d in published if t == "message.delta"]
+    assert len(deltas) >= 2, "reply should arrive in pieces"
+    assert all("HANDOFF" not in d["body"] for d in deltas), "routing lines never shown mid-stream"
+    msgs = messages(client, pid, tid)
+    scribe = [m for m in msgs if m["sender"].startswith("agent:") and m["intent"] == "note"]
+    assert len(scribe) == 1 and scribe[0]["body"] == "Iris would say less, and mean more."
+    assert deltas[-1]["id"] == scribe[0]["id"]

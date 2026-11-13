@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import threading
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Optional
 
@@ -121,3 +121,19 @@ def stream(route: Optional[Route], system: str, user: str, *, max_tokens: Option
     """Yield text chunks for a resolved route (used by the playground)."""
     client = client_for(route, max_tokens)
     yield from client.complete_stream(system=system, user=user)
+
+
+def complete_streaming(session: Session, system: str, user: str, *, on_text: Callable[[str], None],
+                       agent: Optional[Agent] = None, max_tokens: Optional[int] = None,
+                       ) -> tuple[str, Route | None, str]:
+    """Like complete(), but calls on_text(text_so_far) as chunks arrive.
+
+    Providers that can't stream deliver one chunk; the result is identical."""
+    route = resolve(session, agent)
+    client = client_for(route, max_tokens)
+    text = ""
+    for chunk in client.complete_stream(system=system, user=user):
+        text += chunk
+        on_text(text)
+    _usage.value = dict(client.last_usage) if client.last_usage else {}
+    return text, route, client.model

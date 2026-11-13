@@ -11,6 +11,7 @@ so nested runs never fight over a write lock.
 from __future__ import annotations
 
 import re
+import time
 from typing import Callable, Optional
 
 from sqlmodel import Session, select
@@ -190,8 +191,26 @@ def run_task(project_id: str, agent_id: str, task: str, chapter: Optional[int] =
     return _submit(project_id, task, fn, agent_id=agent_id, chapter=chapter, input=payload)
 
 
-def _complete(s: Session, run_id: str, agent: Agent, system: str, user: str) -> str:
-    text, route, model = llm.complete(s, system, user, agent=agent)
+STREAM_EVERY_S = 0.12  # at most ~8 deltas a second per message
+
+
+def _complete(s: Session, run_id: str, agent: Agent, system: str, user: str,
+              stream_to: Optional[Message] = None) -> str:
+    """One model call for a run. With stream_to, the reply streams into that
+    message as message.delta events while it's being written."""
+    if stream_to is None:
+        text, route, model = llm.complete(s, system, user, agent=agent)
+    else:
+        last = [0.0]
+
+        def on_text(so_far: str) -> None:
+            t = time.monotonic()
+            if t - last[0] >= STREAM_EVERY_S:
+                last[0] = t
+                events.publish(agent.project_id, "message.delta",
+                               {"id": stream_to.id, "thread_id": stream_to.thread_id, "body": _visible(so_far)})
+
+        text, route, model = llm.complete_streaming(s, system, user, agent=agent, on_text=on_text)
     run = s.get(Run, run_id)
     if run:
         run.provider = (route.provider if route else "") or run.provider or "auto"
@@ -239,6 +258,20 @@ def _bullets(text: str) -> list[str]:
             and ln.strip()[1:].strip()]
 
 
+def _visible(text: str) -> str:
+    """What the author sees mid-stream: handoff directives are routing, not prose.
+
+    Hides whole HANDOFF lines, half-written ones ("HANDOFF @Ed"), and a trailing
+    fragment that could still become one ("HAND")."""
+    lines = text.split("\n")
+    kept = [ln for ln in lines if not ln.lstrip().upper().startswith("HANDOFF")]
+    if kept and kept[-1] is lines[-1]:
+        tail = kept[-1].lstrip().upper()
+        if tail and "HANDOFF".startswith(tail):
+            kept.pop()
+    return "\n".join(kept).rstrip()
+
+
 def _execute(s: Session, run_id: str, project_id: str, agent_id: str, task: str, chapter: Optional[int],
              payload: dict, followups: list) -> dict:
     agent = s.get(Agent, agent_id)
@@ -264,11 +297,19 @@ def _execute(s: Session, run_id: str, project_id: str, agent_id: str, task: str,
         pack = ctx.build(s, project_id, agent, task, chapter, instruction,
                          transcript=transcript(s, thread_id) if thread_id else "",
                          task_spec=_chat_spec(s, project_id, agent))
-        text = _complete(s, run_id, agent, pack.system, pack.user)
+        draft = say("", intent="note")  # appears at once; fills in as the model writes
+        text = _complete(s, run_id, agent, pack.system, pack.user, stream_to=draft)
         handoffs = HANDOFF_RE.findall(text)
         reply = HANDOFF_RE.sub("", text).strip()
-        if reply:
-            say(reply, intent="note")
+        if draft is not None:
+            draft = s.get(Message, draft.id)
+            if reply:
+                draft.body = reply
+                s.add(draft)
+            else:
+                s.delete(draft)
+            s.commit()
+            events.publish(project_id, "message.updated", {"id": draft.id, "thread_id": thread_id})
         agents = [a for a in ensure_cast(s, project_id) if a.enabled]
         for name, request in handoffs:
             target = resolve_mention(agents, name)

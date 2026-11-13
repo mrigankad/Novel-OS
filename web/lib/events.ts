@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { streaming } from "./streaming";
 
 export type ServerEvent = { type: string; data: Record<string, unknown> };
 
@@ -19,6 +20,15 @@ export function useProjectEvents(projectId: string | undefined, onEvent?: (e: Se
       let data: Record<string, unknown> = {};
       try { data = JSON.parse(msg.data); } catch { /* keep-alive */ }
       onEvent?.({ type, data });
+      // Streaming text: patch the cached message in place; refetching per chunk would be wasteful.
+      if (type === "message.delta") {
+        const { id, thread_id, body } = data as { id: string; thread_id: string; body: string };
+        streaming.start(id);
+        qc.setQueryData<{ id: string; body: string }[]>(["p", projectId, "message", thread_id],
+          (msgs) => msgs?.map((m) => (m.id === id ? { ...m, body } : m)));
+        return;
+      }
+      if (type === "message.updated") streaming.end(String(data.id));
       const domain = type.split(".")[0];
       void qc.invalidateQueries({ queryKey: ["p", projectId, domain] });
       // Agent cards show live status (writing/idle) derived from runs.
@@ -28,7 +38,7 @@ export function useProjectEvents(projectId: string | undefined, onEvent?: (e: Se
       }
     };
     const types = [
-      "run.updated", "chapter.updated", "message.created", "memory.created", "memory.updated",
+      "run.updated", "chapter.updated", "message.created", "message.delta", "message.updated", "memory.created", "memory.updated",
       "agent.updated",
       "codex.updated", "research.updated", "voice.updated", "publish.updated", "project.updated",
     ];
