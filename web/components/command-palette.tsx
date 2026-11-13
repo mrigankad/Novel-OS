@@ -33,6 +33,9 @@ export default function CommandPalette() {
 
   const go = (href: string) => { setOpen(false); router.push(href); };
 
+  // Public reader pages are not the studio: no palette, no studio queries.
+  if (pathname?.startsWith("/read/")) return null;
+
   return (
     <Command.Dialog
       open={open}

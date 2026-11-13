@@ -12,11 +12,12 @@ import importlib
 import pkgutil
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from . import events, routers
+from . import auth, events, routers
 from .config import settings
 from .db import init_db
 from .recovery import recover_interrupted
@@ -55,6 +56,15 @@ def _static_routes_first(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Novel OS", version=VERSION, lifespan=lifespan)
+    @app.middleware("http")
+    async def access_control(request: Request, call_next):
+        ok, code, message = auth.allowed(
+            request.url.path, request.client.host if request.client else None,
+            request.headers.get("x-forwarded-for"), request.cookies.get(auth.COOKIE))
+        if not ok:
+            return JSONResponse({"detail": message}, status_code=code)
+        return await call_next(request)
+
     app.add_middleware(_GZipExceptStreams, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,

@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { AuthGate } from "@/components/auth-gate";
 import { Toaster } from "@/components/ui/toast";
 
 export default function Providers({ children }: { children: ReactNode }) {
@@ -15,7 +16,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
-      <Toaster>{children}</Toaster>
+      <Toaster><AuthGate>{children}</AuthGate></Toaster>
     </QueryClientProvider>
   );
 }

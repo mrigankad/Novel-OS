@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("NOVEL_OS_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("NOVEL_OS_DATABASE_URL", raising=False)
+    # TestClient's peer is "testclient", not loopback; access control has its own tests.
+    monkeypatch.setenv("NOVEL_OS_LOCAL_ONLY", "0")
+    monkeypatch.delenv("NOVEL_OS_PASSWORD", raising=False)
     from server import db
     db.reset_engine()
     from server.main import create_app
