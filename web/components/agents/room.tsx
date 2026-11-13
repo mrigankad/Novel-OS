@@ -2,11 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, ChevronRight, Globe, Pencil, Play, Plus, Square } from "lucide-react";
+import { ChevronLeft, ChevronRight, Globe, Pencil, Play, Plus, Square, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/drawer";
 import { Select } from "@/components/ui/select";
 import { Badge, EmptyState, Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
@@ -169,10 +170,8 @@ export default function Room() {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages.data?.length]);
 
-  return (
-    <div className="flex h-screen min-h-0">
-      {/* The cast */}
-      <section className="flex w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-rule px-5 py-6">
+  const castPanel = (
+    <>
         <div className="flex items-end justify-between gap-2">
           <div>
             <p className="eyebrow mb-1">Agents</p>
@@ -192,11 +191,26 @@ export default function Room() {
           </ul>
         )}
         <Link href="/settings/agents" className="text-[12px] font-semibold text-gall hover:underline">Agents and models</Link>
+    </>
+  );
+  const [castOpen, setCastOpen] = useState(false);
+
+  return (
+    <div className="flex h-full min-h-0 lg:h-screen">
+      {/* The cast: inline on wide screens, a drawer below lg */}
+      <section className="hidden w-[300px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-rule px-5 py-6 lg:flex">
+        {castPanel}
       </section>
+      <Drawer open={castOpen} onClose={() => setCastOpen(false)} side="left" label="The cast">
+        <div className="flex flex-col gap-4 px-5 py-6">{castPanel}</div>
+      </Drawer>
 
       {/* Writers' room */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-8 py-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-4 py-4 sm:px-8">
+          <Button size="sm" variant="secondary" className="lg:hidden" onClick={() => setCastOpen(true)}>
+            <Users className="h-3.5 w-3.5" strokeWidth={1.75} /> Cast
+          </Button>
           <div className="inline-flex rounded-[10px] bg-sheet p-0.5" role="tablist" aria-label="View">
             {([["room", "Room"], ["assignments", "Assignments"]] as const).map(([v, label]) => (
               <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}
