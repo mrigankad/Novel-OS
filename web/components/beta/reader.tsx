@@ -144,9 +144,11 @@ function Book({ token, view }: { token: string; view: ReaderView }) {
       const s = window.getSelection();
       if (!s || s.isCollapsed || !s.rangeCount || !ch) return;
       const range = s.getRangeAt(0);
-      const startP = (range.startContainer.parentElement)?.closest<HTMLElement>("[data-start]");
-      const endP = (range.endContainer.parentElement)?.closest<HTMLElement>("[data-start]");
-      if (!startP || !endP || !article.current?.contains(startP)) return;
+      // Triple-click ends the range on an element (next paragraph / article), not text.
+      const para = (n: Node) =>
+        (n.nodeType === Node.ELEMENT_NODE ? (n as HTMLElement) : n.parentElement)?.closest<HTMLElement>("[data-start]") ?? null;
+      const startP = para(range.startContainer);
+      if (!startP || !article.current?.contains(startP)) return;
       const offsetIn = (p: HTMLElement, node: Node, off: number) => {
         const r = document.createRange();
         r.setStart(p, 0);
@@ -154,7 +156,10 @@ function Book({ token, view }: { token: string; view: ReaderView }) {
         return Number(p.dataset.start) + r.toString().length;
       };
       const from = offsetIn(startP, range.startContainer, range.startOffset);
-      const to = offsetIn(endP, range.endContainer, range.endOffset);
+      const endP = para(range.endContainer);
+      const to = endP && article.current.contains(endP)
+        ? offsetIn(endP, range.endContainer, range.endOffset)
+        : Number(startP.dataset.start) + (startP.textContent ?? "").length;
       const quote = ch.text.slice(from, to).trim();
       if (!quote) return;
       const rect = range.getBoundingClientRect();
