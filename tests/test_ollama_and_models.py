@@ -107,3 +107,46 @@ def test_bad_key_hint():
 
     out = model_catalog.list_models("openai", api_key="sk-bad", fetch=fetch)
     assert out["ok"] is False and "API key" in out["error"]
+
+
+def test_explicit_key_and_base_url_honoured_for_native_providers(monkeypatch):
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    # No env keys are set (see _clean_env); construction must not touch the network.
+    a = LLMClient(provider="anthropic", api_key="sk-ant-explicit", base_url="https://proxy.example/anthropic")
+    assert a._backend.api_key == "sk-ant-explicit"
+    assert str(a._backend.base_url).startswith("https://proxy.example/anthropic")
+    o = LLMClient(provider="openai", api_key="sk-explicit", base_url="https://proxy.example/v1")
+    assert o._backend.api_key == "sk-explicit"
+    assert str(o._backend.base_url).startswith("https://proxy.example/v1")
+    plain = LLMClient(provider="openai", api_key="sk-explicit")
+    assert str(plain._backend.base_url).startswith("https://api.openai.com")
+
+
+def test_complete_stream_openai_shape():
+    client = LLMClient(provider="ollama_cloud", api_key="ok-x")
+
+    class Delta:
+        def __init__(self, c):
+            self.content = c
+
+    class Choice:
+        def __init__(self, c):
+            self.delta = Delta(c)
+
+    class Ev:
+        def __init__(self, c):
+            self.choices = [Choice(c)]
+
+    class Completions:
+        def create(self, **kw):
+            assert kw["stream"] is True
+            return iter([Ev("Once "), Ev(None), Ev("upon")])
+
+    class Chat:
+        completions = Completions()
+
+    class Backend:
+        chat = Chat()
+
+    client._backend = Backend()
+    assert "".join(client.complete_stream("s", "u")) == "Once upon"

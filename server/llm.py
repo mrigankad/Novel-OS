@@ -1,13 +1,15 @@
 """LLM gateway: every agent call goes through here.
 
-Resolves which provider/model to use (agent override -> studio default
-Connection -> environment), calls core.llm_client, and records usage on the Run.
-Streaming and per-agent routing UI are built on top of this (see routers/settings.py).
+Route resolution order:
+  1. the Agent's own provider/model override (set per book in the Agent room)
+  2. the studio RoleDefault for the agent's role (Settings > Agents)
+  3. the default Connection (Settings > Connections)
+  4. environment auto-detect inside core.llm_client (OLLAMA_API_KEY, ANTHROPIC_API_KEY, ...)
 """
 
 from __future__ import annotations
 
-import os
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Optional
 
@@ -16,8 +18,9 @@ from sqlmodel import Session, select
 from core.llm_client import LLMClient, LLMError
 
 from .models import Agent, Connection
+from .models.settings_extra import RoleDefault
 
-__all__ = ["Route", "resolve", "complete", "LLMError"]
+__all__ = ["Route", "resolve", "complete", "stream", "client_for", "route_for_connection", "LLMError"]
 
 # Env var each provider reads its key from inside core.llm_client.
 KEY_ENV = {
@@ -32,38 +35,63 @@ KEY_ENV = {
 }
 
 
-@dataclass
+@dataclass(repr=False)
 class Route:
     provider: str
     model: str
     base_url: str = ""
     api_key: str = ""
+    source: str = ""  # agent | role | default
+    temperature: Optional[float] = None
+
+    def __repr__(self) -> str:  # never leak the key into logs
+        return f"Route(provider={self.provider!r}, model={self.model!r}, source={self.source!r})"
 
 
-def resolve(session: Session, agent: Optional[Agent] = None) -> Optional[Route]:
-    """Pick the connection for an agent. None means 'let LLMClient auto-detect from env'."""
+def route_for_connection(c: Connection, model: str = "", source: str = "default") -> Route:
+    return Route(c.provider, model or c.default_model, c.base_url, c.api_key, source)
+
+
+def _route_for_provider(conns: dict[str, Connection], provider: str, model: str, source: str) -> Route:
+    c = conns.get(provider)
+    if c:
+        return route_for_connection(c, model, source)
+    return Route(provider, model, "", "", source)
+
+
+def resolve(session: Session, agent: Optional[Agent] = None, role: Optional[str] = None) -> Optional[Route]:
+    """Pick the route for an agent (or a bare role). None means 'let LLMClient auto-detect from env'."""
     conns = {c.provider: c for c in session.exec(select(Connection)).all()}
     if agent and agent.provider:
-        c = conns.get(agent.provider)
-        return Route(agent.provider, agent.model or (c.default_model if c else ""),
-                     c.base_url if c else "", c.api_key if c else "")
+        r = _route_for_provider(conns, agent.provider, agent.model, "agent")
+        r.temperature = agent.temperature
+        return r
+    role = role or (agent.role if agent else None)
+    if role:
+        rd = session.exec(select(RoleDefault).where(RoleDefault.role == role)).first()
+        if rd and rd.provider:
+            model = (agent.model if agent and agent.model else "") or rd.model
+            r = _route_for_provider(conns, rd.provider, model, "role")
+            r.temperature = rd.temperature
+            return r
     default = next((c for c in conns.values() if c.is_default), None)
     if default:
         model = (agent.model if agent and agent.model else "") or default.default_model
-        return Route(default.provider, model, default.base_url, default.api_key)
+        return route_for_connection(default, model, "default")
     return None
 
 
 def client_for(route: Optional[Route], max_tokens: Optional[int] = None) -> LLMClient:
     if route is None:
         return LLMClient(max_tokens=max_tokens)
-    if route.provider == "ollama" and route.base_url:
-        os.environ["OLLAMA_HOST"] = route.base_url
-    kwargs = {"provider": route.provider, "model": route.model or None, "max_tokens": max_tokens}
+    kwargs: dict = {"provider": route.provider, "model": route.model or None, "max_tokens": max_tokens}
     if route.api_key:
         kwargs["api_key"] = route.api_key
-    if route.base_url and route.provider not in ("ollama",):
-        kwargs["base_url"] = route.base_url
+    if route.base_url:
+        base = route.base_url.rstrip("/")
+        if route.provider == "ollama" and not base.endswith("/v1"):
+            base += "/v1"
+        kwargs["base_url"] = base
     return LLMClient(**kwargs)
 
 
@@ -71,7 +99,12 @@ def complete(session: Session, system: str, user: str, *, agent: Optional[Agent]
              max_tokens: Optional[int] = None) -> tuple[str, Route | None, str]:
     """Run one completion. Returns (text, route, model_used)."""
     route = resolve(session, agent)
-    client = client_for(route)
-    text = client.complete(system=system, user=user, max_tokens=max_tokens) if max_tokens \
-        else client.complete(system=system, user=user)
+    client = client_for(route, max_tokens)
+    text = client.complete(system=system, user=user)
     return text, route, client.model
+
+
+def stream(route: Optional[Route], system: str, user: str, *, max_tokens: Optional[int] = None) -> Iterator[str]:
+    """Yield text chunks for a resolved route (used by the playground)."""
+    client = client_for(route, max_tokens)
+    yield from client.complete_stream(system=system, user=user)

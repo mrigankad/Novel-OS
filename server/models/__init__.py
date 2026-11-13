@@ -29,3 +29,4 @@ __all__ = [
     "BookMetadata", "Connection", "CoverDesign", "Release", "ResearchSource",
     "ResearchTask", "VoiceProfile", "VoiceSample",
 ]
+from .settings_extra import RoleDefault  # noqa: E402,F401
