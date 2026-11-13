@@ -1,0 +1,63 @@
+# Novel OS 2: two services, one data volume.
+#
+#   docker compose up --build                      # studio on http://localhost:3000
+#   docker compose --profile postgres up --build   # + Postgres (set NOVEL_OS_DATABASE_URL, see below)
+#
+# Keys go in .env (copied from .env.example); compose passes it to the API.
+
+services:
+  api:
+    build:
+      context: .
+      target: api
+      args:
+        WITH_BROWSER: ${WITH_BROWSER:-0}
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NOVEL_OS_DATA_DIR: /app/data
+      NOVEL_OS_CORS_ORIGINS: ${NOVEL_OS_CORS_ORIGINS:-http://localhost:3000}
+      # With the postgres profile:
+      #   NOVEL_OS_DATABASE_URL=postgresql+psycopg://novel:novel@postgres:5432/novel_os
+      NOVEL_OS_DATABASE_URL: ${NOVEL_OS_DATABASE_URL:-}
+    volumes:
+      - novel-data:/app/data
+    ports:
+      - "${NOVEL_OS_API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        # Baked into the Next build (rewrites are resolved at build time).
+        NOVEL_OS_API_URL: http://api:8000
+    environment:
+      NOVEL_OS_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${NOVEL_OS_WEB_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: novel
+      POSTGRES_PASSWORD: novel
+      POSTGRES_DB: novel_os
+    volumes:
+      - novel-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U novel -d novel_os"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  novel-data:
+  novel-pg:

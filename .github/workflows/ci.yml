@@ -1,11 +1,10 @@
 name: CI
 
-# Runs on every push and pull request. The point is that a contributor gets an
-# answer from the repository rather than from the maintainer's word: no one
-# should have to take "the tests pass on my machine" on trust.
+# Every push to the main lines and every pull request gets an answer from the
+# repository itself: tests, migrations, types, lint and a production build.
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main, "redesign/**"]
   pull_request:
 
 # A new push to the same branch supersedes the run already in flight.
@@ -17,15 +16,14 @@ permissions:
   contents: read
 
 jobs:
-  engine:
+  server:
     name: Python ${{ matrix.python }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # The floor the README claims, and the current release - so the claim
-        # is verified rather than asserted.
-        python: ["3.10", "3.13"]
+        # 3.10 is the floor pyproject.toml declares (all tests pass on it), 3.13 the current release.
+        python: ["3.10", "3.11", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
@@ -43,8 +41,20 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      # Includes tests/api and tests/api/test_migrations.py (models vs migrations).
       - name: pytest
-        run: pytest -q
+        run: python -m pytest tests -q
+
+      - name: Migrations apply to a fresh database
+        env:
+          NOVEL_OS_DATA_DIR: ${{ runner.temp }}/novel-os-data
+          NOVEL_OS_DATABASE_URL: sqlite:///${{ runner.temp }}/alembic-smoke.db
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current | tee /dev/stderr | grep -q "(head)"
+
+      - name: Launcher imports
+        run: python -m novel_os --help
 
   web:
     name: Web
@@ -65,16 +75,14 @@ jobs:
       - name: Install
         run: npm ci
 
-      # Each step is named for what it proves, so a red check says which of the
-      # four guarantees broke without anyone opening the log.
       - name: Types
-        run: npx tsc -b
+        run: npm run typecheck
 
       - name: Lint
         run: npm run lint
 
       - name: Tests
-        run: npm test
+        run: npx vitest run
 
-      - name: Build
-        run: npm run build
+      - name: Build (standalone)
+        run: npx next build

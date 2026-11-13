@@ -6,6 +6,42 @@ versions carry features and may change interfaces.
 
 ---
 
+## [2.0.0] — 2026-11-13
+
+**Novel OS 2 is a rebuild.** The JSON-state CLI and Vite studio are replaced by a FastAPI +
+SQLModel + Alembic server and a Next.js 15 studio. The database is now the source of truth.
+
+### Changed
+- **Relicensed from MIT to AGPL-3.0-or-later.**
+- Architecture: auto-mounted FastAPI routers, one model gateway (`server/llm.py`), a job runner
+  with tracked runs, Server-Sent Events for live updates, Alembic migrations applied on startup,
+  SQLite (WAL) by default or Postgres via `NOVEL_OS_DATABASE_URL`.
+- The five-agent JSON pipeline became a per-book **cast** (Architect, Scribe, Editor, Guardian,
+  Curator, Researcher, plus custom agents) with a writers' room, @mentions, handoffs, ask/autopilot
+  autonomy, live streaming, cancellation, per-agent models and an assignments matrix. See `AGENTS.md`.
+- New "inkwell" design: paper and ink tokens, Urbanist / Inter Tight / Newsreader, dark mode,
+  responsive shell, custom dropdowns everywhere.
+
+### Added
+- Long-term memory with ranked recall; author rulings are binding for every agent; rejected edits
+  are taste hints.
+- Manuscript: chapters by act, versions and diffs, reorder, plot threads board, Codex with
+  auto-extraction proposals, inline Editor suggestions, deterministic continuity checks.
+- Research swarm with browser agents, pluggable search and cited synthesis.
+- Voice Lab: samples, Voice DNA traits, draft match, editable Never list and style guide.
+- Ship: media library, cover studio, metadata vault, releases, EPUB/DOCX/PDF/HTML/MD compile,
+  marketing kit; manuscript import and `.novelos.zip` backup/restore.
+- Image generation: Google Nano Banana, OpenAI Images, Runway, Higgsfield, Google Flow via useapi.net.
+- Connections for Ollama (local and Cloud, with a model manager), Claude Code login, Anthropic,
+  OpenAI, Azure, AWS Bedrock, Gemini, xAI, Perplexity, OpenRouter, Groq and any OpenAI-compatible URL.
+- MCP server for Claude Code, Cursor and Codex; restart recovery; real token usage; Library covers;
+  first-run checklist.
+- Tooling: `python -m novel_os` starts API and studio together (`novel-os` after `pip install -e .`),
+  `pyproject.toml`, Dockerfile (api / web / all-in-one targets) and `docker-compose.yml`,
+  CI on Python 3.10/3.11/3.13 plus web typecheck, lint, tests and standalone build.
+
+---
+
 ## [0.3.0] — 2026-08-08
 
 **Novel OS became a studio.** v0.2.0 was a multi-agent CLI with a dashboard. This

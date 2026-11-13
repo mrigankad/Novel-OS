@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Separate output dirs so `next build` never clobbers a running `next dev`.
   distDir: process.env.NODE_ENV === "production" ? ".next-prod" : ".next",
+  // Self-contained server bundle (.next-prod/standalone/server.js) for the Docker image.
+  // Rewrites still work; their destination is fixed at build time from NOVEL_OS_API_URL.
+  output: "standalone",
+  // Trace from web/ itself, so a lockfile in a parent folder can't nest server.js deep inside.
+  outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   // Off on purpose: Next would gzip the proxied SSE stream (/api/.../events) and buffer it.
   // FastAPI already gzips API responses; put a CDN or reverse proxy in front for static assets.
