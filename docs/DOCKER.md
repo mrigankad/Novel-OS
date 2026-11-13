@@ -43,3 +43,14 @@ docker run -p 3000:3000 -v novel-data:/app/data --env-file .env novel-os
 - If you open the studio on a host other than `localhost:3000`, set `NOVEL_OS_CORS_ORIGINS`
   (only needed for direct browser calls to the API; the proxy is same-origin).
 - The containers have no auth. Don't expose them to the internet without a reverse proxy that adds it.
+
+## Access
+
+The studio has no accounts. By default compose publishes both ports on `127.0.0.1`, so only this
+computer can reach it. To write from another device, set a password and bind to all interfaces:
+
+```
+NOVEL_OS_PASSWORD=choose-one NOVEL_OS_BIND=0.0.0.0 docker compose up
+```
+
+Beta-reader links (`/read/...`) never need the password.

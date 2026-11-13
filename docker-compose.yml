@@ -17,6 +17,11 @@ services:
         required: false
     environment:
       NOVEL_OS_DATA_DIR: /app/data
+      # Requests reach the API from container IPs, so 'this computer only' is enforced
+      # by publishing on 127.0.0.1 instead. Set NOVEL_OS_PASSWORD (and NOVEL_OS_BIND=0.0.0.0)
+      # to use the studio from other devices; reader links stay public.
+      NOVEL_OS_LOCAL_ONLY: "0"
+      NOVEL_OS_PASSWORD: ${NOVEL_OS_PASSWORD:-}
       NOVEL_OS_CORS_ORIGINS: ${NOVEL_OS_CORS_ORIGINS:-http://localhost:3000}
       # With the postgres profile:
       #   NOVEL_OS_DATABASE_URL=postgresql+psycopg://novel:novel@postgres:5432/novel_os
@@ -24,7 +29,7 @@ services:
     volumes:
       - novel-data:/app/data
     ports:
-      - "${NOVEL_OS_API_PORT:-8000}:8000"
+      - "${NOVEL_OS_BIND:-127.0.0.1}:${NOVEL_OS_API_PORT:-8000}:8000"
     restart: unless-stopped
 
   web:
@@ -40,7 +45,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "${NOVEL_OS_WEB_PORT:-3000}:3000"
+      - "${NOVEL_OS_BIND:-127.0.0.1}:${NOVEL_OS_WEB_PORT:-3000}:3000"
     restart: unless-stopped
 
   postgres:
