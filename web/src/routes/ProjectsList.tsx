@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "../lib/nav";
 import { motion } from "motion/react";
 import { api, type ProjectSummary, type StudioLlmStatus } from "../api/client";
 import ProjectCard from "../components/ProjectCard";

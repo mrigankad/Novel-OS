@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 import { AnimatePresence, motion } from "motion/react";
 import { api, type CodexEntry, type RelationshipEdge } from "../api/client";
 import Icon from "./Icon";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "../lib/nav";
 import { api, type BinderNode, type ChapterSummary } from "../api/client";
 import StatusPill from "./StatusPill";
 import { useToast } from "./toastContext";

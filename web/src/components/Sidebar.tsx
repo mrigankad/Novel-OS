@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "../lib/nav";
 import BrandMark, { BrandLogo } from "./BrandMark";
 import Icon, { type IconName } from "./Icon";
 

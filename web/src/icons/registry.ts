@@ -2,48 +2,9 @@
  * Icon registry Lucide static SVGs (ISC) downloaded from unpkg lucide-static@0.525.0
  * Brand mark is original Novel OS art in ../assets/brand/
  */
-import library from "../assets/icons/library.svg?raw";
-import search from "../assets/icons/search.svg?raw";
-import bookOpen from "../assets/icons/book-open.svg?raw";
-import layoutDashboard from "../assets/icons/layout-dashboard.svg?raw";
-import layers from "../assets/icons/layers.svg?raw";
-import layoutGrid from "../assets/icons/layout-grid.svg?raw";
-import folderTree from "../assets/icons/folder-tree.svg?raw";
-import stickyNote from "../assets/icons/sticky-note.svg?raw";
-import users from "../assets/icons/users.svg?raw";
-import mapPin from "../assets/icons/map-pin.svg?raw";
-import landmark from "../assets/icons/landmark.svg?raw";
-import pkg from "../assets/icons/package.svg?raw";
-import shield from "../assets/icons/shield.svg?raw";
-import shieldAlert from "../assets/icons/shield-alert.svg?raw";
-import triangleAlert from "../assets/icons/triangle-alert.svg?raw";
-import circleCheck from "../assets/icons/circle-check.svg?raw";
-import circleAlert from "../assets/icons/circle-alert.svg?raw";
-import pencil from "../assets/icons/pencil.svg?raw";
-import penLine from "../assets/icons/pen-line.svg?raw";
-import scissors from "../assets/icons/scissors.svg?raw";
-import palette from "../assets/icons/palette.svg?raw";
-import compass from "../assets/icons/compass.svg?raw";
-import sparkles from "../assets/icons/sparkles.svg?raw";
-import messageSquare from "../assets/icons/message-square.svg?raw";
-import image from "../assets/icons/image.svg?raw";
-import history from "../assets/icons/history.svg?raw";
-import gitBranch from "../assets/icons/git-branch.svg?raw";
-import fileText from "../assets/icons/file-text.svg?raw";
-import download from "../assets/icons/download.svg?raw";
-import upload from "../assets/icons/upload.svg?raw";
-import plus from "../assets/icons/plus.svg?raw";
-import chevronRight from "../assets/icons/chevron-right.svg?raw";
-import arrowLeft from "../assets/icons/arrow-left.svg?raw";
-import eye from "../assets/icons/eye.svg?raw";
-import focus from "../assets/icons/focus.svg?raw";
-import bot from "../assets/icons/bot.svg?raw";
-import plug from "../assets/icons/plug.svg?raw";
-import brain from "../assets/icons/brain.svg?raw";
-import scrollText from "../assets/icons/scroll-text.svg?raw";
-import notebookPen from "../assets/icons/notebook-pen.svg?raw";
-import clapperboard from "../assets/icons/clapperboard.svg?raw";
-import waypoints from "../assets/icons/waypoints.svg?raw";
+import {
+  library, search, bookOpen, layoutDashboard, layers, layoutGrid, folderTree, stickyNote, users, mapPin, landmark, pkg, shield, shieldAlert, triangleAlert, circleCheck, circleAlert, pencil, penLine, scissors, palette, compass, sparkles, messageSquare, image, history, gitBranch, fileText, download, upload, plus, chevronRight, arrowLeft, eye, focus, bot, plug, brain, scrollText, notebookPen, clapperboard, waypoints,
+} from "./svgs";
 
 export const ICONS = {
   library,

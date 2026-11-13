@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// Same-origin by default: Next proxies /api/* to the Python API (next.config.ts).
+// Set NEXT_PUBLIC_API_BASE to call a different API host directly.
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "";
 
 export interface ProjectSummary {
   id: string; title: string; genre: string; chapter_count: number; status: string;

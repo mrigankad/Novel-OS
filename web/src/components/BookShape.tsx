@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 import { api, type BookShapeReport } from "../api/client";
 import Icon from "./Icon";
 

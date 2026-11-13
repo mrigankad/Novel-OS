@@ -1,4 +1,4 @@
-import markUrl from "../assets/brand/novel-os-mark.svg";
+const markUrl = "/brand/mark.svg";
 
 /** The book-N mark: an open book folded into an N, the gutter drawn as a caret. */
 export default function BrandMark({

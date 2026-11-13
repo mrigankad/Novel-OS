@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "../lib/nav";
 import { motion } from "motion/react";
 import { api, type CodexEntry, type RelationshipEdge } from "../api/client";
 import Scene from "../components/Scene";

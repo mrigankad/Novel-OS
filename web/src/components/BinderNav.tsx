@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 import { api, type BinderNode } from "../api/client";
 import { dropPlaceFromY, reorderIndex, type DropPlace } from "../lib/binderReorder";
 import { useToast } from "./toastContext";

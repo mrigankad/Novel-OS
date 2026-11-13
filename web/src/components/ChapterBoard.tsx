@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "../lib/nav";
 import { motion } from "motion/react";
 import { api, type BinderNode, type ChapterSummary } from "../api/client";
 import { dropPlaceFromY, reorderIndex, type DropPlace } from "../lib/binderReorder";

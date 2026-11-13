@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 import type { ProjectSummary } from "../api/client";
 import StatusPill from "./StatusPill";
 import Icon from "./Icon";

@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "../lib/nav";
 
 export default function Breadcrumbs({ items }: { items: { label: string; to?: string }[] }) {
   return (

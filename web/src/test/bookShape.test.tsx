@@ -1,5 +1,5 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "./testRouter";
 import { beforeEach, expect, test, vi } from "vitest";
 import BookShape from "../components/BookShape";
 import { api, type BookShapeReport } from "../api/client";

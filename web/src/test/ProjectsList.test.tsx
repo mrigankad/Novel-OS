@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "./testRouter";
 import { vi } from "vitest";
 import ProjectsList from "../routes/ProjectsList";
 import * as client from "../api/client";

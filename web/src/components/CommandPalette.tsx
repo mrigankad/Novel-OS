@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "../lib/nav";
 import { Command } from "cmdk";
 import { AnimatePresence, motion } from "motion/react";
 import { api, type ProjectSummary, type ChapterSummary, type SearchHit } from "../api/client";
