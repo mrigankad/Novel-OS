@@ -31,3 +31,4 @@ __all__ = [
 ]
 from .settings_extra import RoleDefault  # noqa: E402,F401
 from .publish_extra import MarketingAsset  # noqa: E402,F401
+from .suggest_extra import Suggestion  # noqa: E402,F401

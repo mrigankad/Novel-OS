@@ -7,11 +7,12 @@ import { Check, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChapterAgentPanel from "@/components/agents/chapter-panel";
 import { fmt, StatusDot } from "@/components/manuscript/bits";
 import { Binder } from "@/components/manuscript/binder";
 import { FindingRow } from "@/components/manuscript/findings";
+import { SuggestionsPanel, useSuggestions } from "@/components/manuscript/suggestions";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/page";
@@ -113,6 +114,20 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [flush, id, n, prev, next, qc, router, toast]);
 
+  // ---- Editor suggestions (Revise mode) -----------------------------------------
+  const suggestions = useSuggestions(id, n);
+  const [activeSugg, setActiveSugg] = useState<string | null>(null);
+  const [editorRev, setEditorRev] = useState(0);
+  const openSugg = useMemo(() => (mode === "revise" ? suggestions.data ?? [] : []), [mode, suggestions.data]);
+  const highlights = useMemo(() => openSugg.map((s) => ({ id: s.id, quote: s.quote })), [openSugg]);
+  const onApplied = useCallback((saved: Chapter) => {
+    qc.setQueryData(bk.chapter(id, n), saved);
+    void qc.invalidateQueries({ queryKey: bk.chapters(id) });
+    void qc.invalidateQueries({ queryKey: bk.versions(id, n) });
+    setLiveWords(null);
+    setEditorRev((r) => r + 1); // remount the editor from the server text
+  }, [id, n, qc]);
+
   const c = chapter.data;
   const words = liveWords ?? c?.word_count ?? 0;
 
@@ -155,12 +170,17 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
                 {mode === "revise" && <ChapterFindings id={id} n={n} />}
                 {/* Kept mounted in Plan mode so unsaved prose never resets. */}
                 <div className={mode === "plan" ? "hidden" : undefined}>
-                  <ProseEditor initialDoc={c.doc} initialText={c.text} onChange={onEditorChange} />
+                  <ProseEditor key={editorRev} initialDoc={c.doc} initialText={c.text} onChange={onEditorChange}
+                    highlights={highlights} activeHighlight={activeSugg} onHighlightClick={setActiveSugg} />
                 </div>
               </div>
             )}
           </div>
         </div>
+        {mode === "revise" && c && (
+          <SuggestionsPanel id={id} n={n} items={openSugg} activeId={activeSugg} onActive={setActiveSugg}
+            beforeAction={flush} onApplied={onApplied} />
+        )}
         <ChapterAgentPanel projectId={id} chapter={n} />
       </div>
     </div>

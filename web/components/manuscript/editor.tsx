@@ -3,6 +3,8 @@
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { useEffect } from "react";
+import { type Highlight, SUGGESTION_CLICK, SuggestionHighlights, suggestionCss, suggestionKey } from "./suggestions";
 
 /** Tiptap prose editor. Loaded with next/dynamic (ssr:false) by the writing screen. */
 
@@ -58,16 +60,21 @@ export function docToText(doc: JSONContent): string {
 
 export default function ProseEditor({
   initialDoc, initialText, onChange, placeholder = "Begin the chapter…",
+  highlights, activeHighlight = null, onHighlightClick,
 }: {
   initialDoc: Record<string, unknown>;
   initialText: string;
   onChange: (doc: JSONContent, text: string) => void;
   placeholder?: string;
+  /** Editor suggestions to mark in the prose (track-changes style). */
+  highlights?: Highlight[];
+  activeHighlight?: string | null;
+  onHighlightClick?: (id: string) => void;
 }) {
   const hasDoc = initialDoc && (initialDoc as JSONContent).type === "doc";
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [StarterKit.configure({ heading: { levels: [2, 3, 4] } }), Placeholder.configure({ placeholder })],
+    extensions: [StarterKit.configure({ heading: { levels: [2, 3, 4] } }), Placeholder.configure({ placeholder }), SuggestionHighlights],
     content: hasDoc ? (initialDoc as JSONContent) : textToHtml(initialText),
     editorProps: { attributes: { class: "prose-book outline-none min-h-[60vh] pb-[30vh]", spellcheck: "true" } },
     onUpdate: ({ editor: e }) => {
@@ -75,8 +82,23 @@ export default function ProseEditor({
       onChange(doc, docToText(doc));
     },
   });
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    editor.view.dispatch(editor.state.tr.setMeta(suggestionKey, { items: highlights ?? [], active: activeHighlight }));
+    if (activeHighlight) {
+      editor.view.dom.querySelector(`[data-suggestion-id="${activeHighlight}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [editor, highlights, activeHighlight]);
+  useEffect(() => {
+    if (!editor || !onHighlightClick) return;
+    const dom = editor.view.dom;
+    const fn = (e: Event) => onHighlightClick((e as CustomEvent<string>).detail);
+    dom.addEventListener(SUGGESTION_CLICK, fn);
+    return () => dom.removeEventListener(SUGGESTION_CLICK, fn);
+  }, [editor, onHighlightClick]);
   return (
     <>
+      <style>{suggestionCss}</style>
       <style>{`
         .prose-book p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--color-muted); }
         .prose-book h2, .prose-book h3, .prose-book h4 { font-weight: 600; margin: 1.4em 0 .5em; }
