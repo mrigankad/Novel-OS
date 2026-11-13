@@ -1,10 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Plus } from "lucide-react";
+import { Bot, ChevronDown, ChevronUp, GripVertical, Plus } from "lucide-react";
 import Link from "next/link";
 import { use, useState } from "react";
 import { fmt, ProgressBar, StatusDot } from "@/components/manuscript/bits";
+import { PlotThreads } from "@/components/manuscript/plot-threads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { EmptyState, Page, Skeleton } from "@/components/ui/page";
@@ -17,6 +18,9 @@ export default function ManuscriptPage({ params }: { params: Promise<{ id: strin
   const project = useQuery({ queryKey: qk.project(id), queryFn: () => projectsApi.get(id) });
   const chapters = useQuery({ queryKey: bk.chapters(id), queryFn: () => bookApi.chapters(id) });
   const rows = chapters.data ?? [];
+  const reorder = useReorder(id, rows);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const lastWritten = rows.filter((c) => c.word_count > 0).reduce((m, c) => Math.max(m, c.number), 0);
   const acts = [...new Set(rows.map((c) => c.act))].sort((a, b) => a - b);
   const p = project.data;
   const counts = {
@@ -56,11 +60,23 @@ export default function ManuscriptPage({ params }: { params: Promise<{ id: strin
       {acts.map((act) => (
         <section key={act} className="mt-12">
           <h2 className="label mb-2">{actLabel(act)}</h2>
-          <ul>{rows.filter((c) => c.act === act).map((c) => <ChapterLine key={c.id} id={id} c={c} />)}</ul>
+          <ul>
+            {rows.filter((c) => c.act === act).map((c) => (
+              <ChapterLine key={c.id} id={id} c={c}
+                dragging={dragId === c.id}
+                onDragStart={() => setDragId(c.id)}
+                onDragEnd={() => setDragId(null)}
+                onDropOn={() => { if (dragId && dragId !== c.id) reorder.moveTo(dragId, c.id); setDragId(null); }}
+                onMove={(delta) => reorder.moveBy(c.id, delta)}
+                isFirst={c.id === rows[0]?.id} isLast={c.id === rows[rows.length - 1]?.id} />
+            ))}
+          </ul>
         </section>
       ))}
 
       <AddChapter id={id} defaultAct={acts[acts.length - 1] ?? 1} />
+
+      {rows.length > 0 && <PlotThreads id={id} lastChapter={lastWritten} />}
     </Page>
   );
 }
@@ -74,11 +90,65 @@ function Stat({ n, label, status }: { n: number; label: string; status: string }
   );
 }
 
-function ChapterLine({ id, c }: { id: string; c: ChapterRow }) {
+/** Reordering: optimistic, then the server renumbers. Order is global across acts. */
+function useReorder(id: string, rows: ChapterRow[]) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: (order: string[]) => bookApi.reorder(id, order),
+    onMutate: async (order) => {
+      await qc.cancelQueries({ queryKey: bk.chapters(id) });
+      const prev = qc.getQueryData<ChapterRow[]>(bk.chapters(id));
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      qc.setQueryData(bk.chapters(id), order.map((oid, i) => ({ ...byId.get(oid)!, number: i + 1 })));
+      return { prev };
+    },
+    onError: (e, _o, ctx) => { if (ctx?.prev) qc.setQueryData(bk.chapters(id), ctx.prev); toast(String(e), "error"); },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["p", id, "chapter"] }),
+  });
+  const ids = rows.map((r) => r.id);
+  return {
+    moveTo(from: string, to: string) {
+      const next = ids.filter((x) => x !== from);
+      next.splice(next.indexOf(to) + (ids.indexOf(from) < ids.indexOf(to) ? 1 : 0), 0, from);
+      save.mutate(next);
+    },
+    moveBy(cid: string, delta: number) {
+      const i = ids.indexOf(cid), j = i + delta;
+      if (j < 0 || j >= ids.length) return;
+      const next = [...ids];
+      [next[i], next[j]] = [next[j], next[i]];
+      save.mutate(next);
+    },
+  };
+}
+
+function ChapterLine({ id, c, dragging, onDragStart, onDragEnd, onDropOn, onMove, isFirst, isLast }: {
+  id: string; c: ChapterRow; dragging: boolean; onDragStart: () => void; onDragEnd: () => void;
+  onDropOn: () => void; onMove: (delta: number) => void; isFirst: boolean; isLast: boolean;
+}) {
+  const [over, setOver] = useState(false);
   return (
-    <li>
-      <Link href={`/p/${id}/write/${c.number}`}
-        className="group grid grid-cols-[20px_32px_1fr_auto] items-center gap-3 border-b border-rule py-3.5 sm:grid-cols-[20px_32px_1fr_160px_90px_140px]">
+    <li
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; onDragStart(); }}
+      onDragEnd={onDragEnd}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); onDropOn(); }}
+      className={`group/row relative flex items-center ${dragging ? "opacity-40" : ""} ${over ? "shadow-[inset_0_2px_0_var(--color-gall)]" : ""}`}
+    >
+      <span className="absolute -left-14 flex items-center opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
+        <GripVertical className="h-4 w-4 cursor-grab text-muted" strokeWidth={1.75} aria-hidden />
+        <span className="flex flex-col">
+          <button type="button" aria-label={`Move chapter ${c.number} up`} disabled={isFirst} onClick={() => onMove(-1)}
+            className="rounded p-0.5 text-muted hover:text-ink disabled:opacity-30"><ChevronUp className="h-3.5 w-3.5" /></button>
+          <button type="button" aria-label={`Move chapter ${c.number} down`} disabled={isLast} onClick={() => onMove(1)}
+            className="rounded p-0.5 text-muted hover:text-ink disabled:opacity-30"><ChevronDown className="h-3.5 w-3.5" /></button>
+        </span>
+      </span>
+      <Link href={`/p/${id}/write/${c.number}`} draggable={false}
+        className="group grid w-full grid-cols-[20px_32px_1fr_auto] items-center gap-3 border-b border-rule py-3.5 sm:grid-cols-[20px_32px_1fr_160px_90px_140px]">
         <StatusDot status={c.status} />
         <span className="text-[13px] text-muted">{c.number}</span>
         <span className="min-w-0">

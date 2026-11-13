@@ -122,6 +122,11 @@ export const bookApi = {
   deleteLink: (id: string, linkId: string) => api.del(`${P(id)}/codex-links/${linkId}`),
 
   threads: (id: string) => api.get<PlotThread[]>(`${P(id)}/plot-threads`),
+  createThread: (id: string, body: Partial<PlotThread> & { name: string }) =>
+    api.post<PlotThread>(`${P(id)}/plot-threads`, body),
+  updateThread: (id: string, tid: string, body: Partial<PlotThread>) =>
+    api.patch<PlotThread>(`${P(id)}/plot-threads/${tid}`, body),
+  deleteThread: (id: string, tid: string) => api.del(`${P(id)}/plot-threads/${tid}`),
 
   continuity: (id: string, chapter?: number) =>
     api.get<ContinuityReport>(`${P(id)}/continuity${chapter ? `?chapter=${chapter}` : ""}`),
