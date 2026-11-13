@@ -10,3 +10,4 @@ def test_project_crud(client, project):
     assert r.json()["premise"] == "Frost, wasps, a knife."
     assert client.delete(f"/api/projects/{pid}").status_code == 204
     assert client.get(f"/api/projects/{pid}").status_code == 404
+

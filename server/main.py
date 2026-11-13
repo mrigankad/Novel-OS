@@ -23,6 +23,17 @@ from .db import init_db
 VERSION = "2.0.0"
 
 
+class _GZipExceptStreams(GZipMiddleware):
+    """Gzip responses, but never Server-Sent Events: compression buffers the
+    stream, so browsers (which always send Accept-Encoding: gzip) would see nothing."""
+
+    async def __call__(self, scope, receive, send):  # noqa: ANN001
+        if scope["type"] == "http" and scope["path"].endswith("/events"):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
@@ -32,7 +43,7 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Novel OS", version=VERSION, lifespan=lifespan)
-    app.add_middleware(GZipMiddleware, minimum_size=1024)
+    app.add_middleware(_GZipExceptStreams, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings().cors_origins),
