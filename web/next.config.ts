@@ -4,6 +4,8 @@ const API = process.env.NOVEL_OS_API_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Separate output dirs so `next build` never clobbers a running `next dev`.
+  distDir: process.env.NODE_ENV === "production" ? ".next-prod" : ".next",
   poweredByHeader: false,
   // Off on purpose: Next would gzip the proxied SSE stream (/api/.../events) and buffer it.
   // FastAPI already gzips API responses; put a CDN or reverse proxy in front for static assets.

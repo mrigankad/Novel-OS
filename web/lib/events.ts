@@ -21,12 +21,15 @@ export function useProjectEvents(projectId: string | undefined, onEvent?: (e: Se
       onEvent?.({ type, data });
       const domain = type.split(".")[0];
       void qc.invalidateQueries({ queryKey: ["p", projectId, domain] });
+      // Agent cards show live status (writing/idle) derived from runs.
+      if (domain === "run") void qc.invalidateQueries({ queryKey: ["p", projectId, "agent"] });
       if (domain === "project" || domain === "chapter") {
         void qc.invalidateQueries({ queryKey: ["p", projectId], exact: true });
       }
     };
     const types = [
-      "run.updated", "chapter.updated", "message.created", "memory.created",
+      "run.updated", "chapter.updated", "message.created", "memory.created", "memory.updated",
+      "agent.updated",
       "codex.updated", "research.updated", "voice.updated", "publish.updated", "project.updated",
     ];
     const listeners = types.map((t) => [t, handle(t)] as const);
