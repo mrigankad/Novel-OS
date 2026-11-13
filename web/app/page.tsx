@@ -9,6 +9,7 @@ import { fmt, ProgressBar } from "@/components/manuscript/bits";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Badge, EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
+import { GettingStarted } from "@/components/getting-started";
 import { useToast } from "@/components/ui/toast";
 import { projectsApi, qk, type Project } from "@/lib/api";
 import { bookApi } from "@/lib/api/book";
@@ -56,6 +57,8 @@ function Library() {
           </>
         }
       />
+
+      <GettingStarted projects={data ?? []} />
 
       {open && (
         <form
