@@ -30,3 +30,4 @@ __all__ = [
     "ResearchTask", "VoiceProfile", "VoiceSample",
 ]
 from .settings_extra import RoleDefault  # noqa: E402,F401
+from .publish_extra import MarketingAsset  # noqa: E402,F401

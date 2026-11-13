@@ -1,11 +1,9 @@
-import { Page, PageHeader, EmptyState } from "@/components/ui/page";
+"use client";
 
-// Placeholder. Owner: publish agent.
-export default function Placeholder() {
-  return (
-    <Page>
-      <PageHeader eyebrow="Coming together" title="Publish and distribute" description="Every store, one metadata record." />
-      <div className="mt-8"><EmptyState title="Being built" body="This screen is under construction." /></div>
-    </Page>
-  );
+import { use } from "react";
+import { Launch } from "@/components/publish/launch";
+
+export default function PublishPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return <Launch projectId={id} />;
 }
