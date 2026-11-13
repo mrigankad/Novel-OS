@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { Plus, Search, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useMemo, useState } from "react";
+import { ProposalsStrip } from "@/components/transfer/proposals-strip";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
@@ -55,6 +56,8 @@ function Codex({ id }: { id: string }) {
     <Page wide>
       <PageHeader eyebrow="Story bible" title="Codex" description="The people, places and things in the book, and the facts the agents hold them to."
         actions={<Button onClick={() => create.mutate()} disabled={create.isPending}><Plus className="h-4 w-4" strokeWidth={1.75} /> New entry</Button>} />
+
+      <ProposalsStrip id={id} />
 
       <div role="tablist" className="mt-8 flex flex-wrap gap-1 border-b border-rule">
         {TABS.map((t) => (

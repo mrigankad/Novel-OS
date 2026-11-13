@@ -35,6 +35,7 @@ export default function ManuscriptPage({ params }: { params: Promise<{ id: strin
         <header>
           <p className="eyebrow mb-3">{p.genre || "Manuscript"}</p>
           <h1 className="font-display text-[56px] font-bold leading-[1] tracking-[-0.035em] text-ink">{p.title}</h1>
+          <a href={`/api/projects/${id}/backup`} download className="mt-3 inline-block text-[13px] font-medium text-body underline-offset-4 hover:text-ink hover:underline">Download backup</a>
           {p.premise && <p className="mt-5 max-w-2xl font-prose text-[19px] leading-[1.6] text-body">{p.premise}</p>}
         </header>
       ) : <Skeleton className="h-32" />}

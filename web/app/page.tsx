@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Sparkles } from "lucide-react";
+import { FileUp, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Badge, EmptyState, Page, PageHeader, Skeleton } from "@/components/ui/page";
 import { GettingStarted } from "@/components/getting-started";
+import { ImportSheet } from "@/components/transfer/import-sheet";
 import { useToast } from "@/components/ui/toast";
 import { projectsApi, qk, type Project } from "@/lib/api";
 import { bookApi } from "@/lib/api/book";
@@ -32,6 +33,7 @@ function Library() {
   const forced = search.get("new") === "1";
   const [openState, setOpen] = useState(false);
   const open = openState || forced;
+  const [importing, setImporting] = useState(false);
   const toggle = () => { if (forced) router.replace("/"); setOpen(!open); };
 
   const opened = (p: Project) => { void qc.invalidateQueries({ queryKey: qk.projects }); router.push(`/p/${p.id}`); };
@@ -53,12 +55,16 @@ function Library() {
             <Button variant="secondary" onClick={() => sample.mutate()} disabled={sample.isPending}>
               <Sparkles className="h-4 w-4" strokeWidth={1.75} /> Try the sample book
             </Button>
+            <Button variant="secondary" onClick={() => setImporting(true)}>
+              <FileUp className="h-4 w-4" strokeWidth={1.75} /> Import a manuscript
+            </Button>
             <Button onClick={toggle}><Plus className="h-4 w-4" strokeWidth={1.75} /> New book</Button>
           </>
         }
       />
 
       <GettingStarted projects={data ?? []} />
+      <ImportSheet open={importing} onClose={() => setImporting(false)} onDone={(p) => { setImporting(false); opened(p); }} />
 
       {open && (
         <form
