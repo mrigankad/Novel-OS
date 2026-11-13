@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/toast";
 import { SamplesModal } from "@/components/voice/samples-modal";
 import { LiftControl, ScoreCard } from "@/components/voice/score-card";
 import { SignatureMoves } from "@/components/voice/signature-moves";
+import { VoiceRules } from "@/components/voice/voice-rules";
 import { TraitBars } from "@/components/voice/trait-bars";
 import { voiceApi, voiceKeys, type Lift } from "@/lib/api/voice";
 import { useProjectEvents, type ServerEvent } from "@/lib/events";
@@ -118,7 +119,8 @@ export default function VoiceLabPage({ params }: { params: Promise<{ id: string 
             </section>
             <section>
               <h2 className="label mb-3">Signature moves</h2>
-              <SignatureMoves moves={p?.signature_moves ?? []} never={p?.never ?? []} />
+              <SignatureMoves moves={p?.signature_moves ?? []} never={[]} />
+              {p && <VoiceRules key={p.updated_at} projectId={id} never={p.never ?? []} styleGuide={p.style_guide ?? ""} />}
             </section>
             <section className="flex flex-col gap-8">
               <ScoreCard projectId={id} match={match.data} loading={match.isLoading && chapter != null} />
