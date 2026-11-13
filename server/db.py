@@ -47,10 +47,41 @@ def reset_engine() -> None:
     settings.cache_clear()
 
 
+def _alembic_config():
+    from pathlib import Path
+
+    from alembic.config import Config
+
+    root = Path(__file__).resolve().parent.parent
+    cfg = Config(str(root / "alembic.ini"))
+    cfg.set_main_option("script_location", str(root / "migrations"))
+    return cfg
+
+
 def init_db() -> None:
+    """Bring the schema to the latest migration.
+
+    A database created before migrations existed (tables present, no
+    alembic_version) is stamped at the baseline first, so nothing is lost.
+    Falls back to create_all if Alembic isn't installed.
+    """
     from . import models  # noqa: F401  (registers every table)
 
-    SQLModel.metadata.create_all(engine())
+    try:
+        from alembic import command
+    except ImportError:  # pragma: no cover
+        SQLModel.metadata.create_all(engine())
+        return
+
+    from sqlalchemy import inspect
+
+    cfg = _alembic_config()
+    tables = set(inspect(engine()).get_table_names())
+    with engine().begin() as conn:
+        cfg.attributes["connection"] = conn
+        if tables and "alembic_version" not in tables:
+            command.stamp(cfg, "f848e5e0e161")
+        command.upgrade(cfg, "head")
 
 
 def get_session() -> Iterator[Session]:

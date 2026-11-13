@@ -150,3 +150,42 @@ def test_complete_stream_openai_shape():
 
     client._backend = Backend()
     assert "".join(client.complete_stream("s", "u")) == "Once upon"
+
+
+def test_temperature_and_usage_flow_through_openai_shape():
+    client = LLMClient(provider="ollama_cloud", api_key="ok-x", temperature=0.3)
+    seen = {}
+
+    class Usage:
+        prompt_tokens, completion_tokens = 120, 45
+
+    class Msg:
+        content = "A frost."
+
+    class Choice:
+        message = Msg()
+
+    class Resp:
+        choices = [Choice()]
+        usage = Usage()
+
+    class Completions:
+        def create(self, **kw):
+            seen.update(kw)
+            return Resp()
+
+    class Chat:
+        completions = Completions()
+
+    class Backend:
+        chat = Chat()
+
+    client._backend = Backend()
+    assert client.complete("s", "u") == "A frost."
+    assert seen["temperature"] == 0.3
+    assert client.last_usage == {"input": 120, "output": 45}
+
+
+def test_no_temperature_sent_when_unset():
+    client = LLMClient(provider="ollama_cloud", api_key="ok-x")
+    assert client._temperature_kw() == {}

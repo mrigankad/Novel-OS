@@ -39,3 +39,15 @@ Next proxies `/api/*` to port 8000 (see `web/next.config.ts`), so the browser on
 6. **Design**: white paper, ink `#14131a`, one accent `gall #3b2be0` reserved for AI. Urbanist 700 for display, Inter Tight for UI, Newsreader for book prose. **No monospace anywhere.** Icons come from `lucide-react` at `strokeWidth={1.75}`. Prefer text on surfaces over boxing everything in cards. Use Swiss-style scale contrast.
 7. **Speed**: server components where nothing is interactive, React Query caching, lazy-load heavy editors (`next/dynamic`), SQL aggregates instead of Python loops, and indexes on every foreign key (already in place).
 8. **Secrets**: API keys live only in the `connection` table / `.env`. Never return them to the browser (expose `has_key`).
+
+## Database migrations
+
+Schema changes go through Alembic. The server applies migrations on startup (`server/db.py:init_db`).
+
+```bash
+# after changing a model in server/models/
+python -m alembic revision --autogenerate -m "add cover rating"
+python -m alembic upgrade head        # or just restart the server
+```
+
+`tests/api/test_migrations.py` fails if a model changes without a migration.

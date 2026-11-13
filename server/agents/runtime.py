@@ -196,8 +196,9 @@ def _complete(s: Session, run_id: str, agent: Agent, system: str, user: str) -> 
     if run:
         run.provider = (route.provider if route else "") or run.provider or "auto"
         run.model = model or (route.model if route else "") or ""
-        run.tokens_in += ctx.est_tokens(system) + ctx.est_tokens(user)
-        run.tokens_out += ctx.est_tokens(text)
+        usage = llm.last_usage()  # real counts when the provider reports them
+        run.tokens_in += usage.get("input") or (ctx.est_tokens(system) + ctx.est_tokens(user))
+        run.tokens_out += usage.get("output") or ctx.est_tokens(text)
         s.add(run)
         s.commit()
     events.publish(agent.project_id, "run.updated", {"id": run_id, "status": "running"})

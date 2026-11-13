@@ -19,6 +19,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from . import events, routers
 from .config import settings
 from .db import init_db
+from .recovery import recover_interrupted
 
 VERSION = "2.0.0"
 
@@ -37,6 +38,7 @@ class _GZipExceptStreams(GZipMiddleware):
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    recover_interrupted()
     events.bind_loop(asyncio.get_running_loop())
     yield
 

@@ -123,11 +123,16 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         base_url: Optional[str] = None,
         api_key: Optional[str] = None,
+        temperature: Optional[float] = None,
     ):
         self.provider_name = (provider or self._resolve_provider()).lower()
         self.max_tokens = max_tokens or int(os.environ.get("NOVEL_OS_MAX_TOKENS", DEFAULT_MAX_TOKENS))
         self._explicit_base_url = base_url
         self._explicit_api_key = api_key
+        # None leaves each provider at its own default.
+        self.temperature = temperature
+        # Token usage of the most recent completion: {"input": int, "output": int}.
+        self.last_usage: dict = {}
 
         # Map alias -> openai_compatible with preset base_url/model/key
         self._backend, self.model = self._build_backend(model)
@@ -301,7 +306,7 @@ class LLMClient:
         if self.provider_name == "anthropic":
             with self._backend.messages.stream(
                 model=self.model, max_tokens=limit, system=system,
-                messages=[{"role": "user", "content": user}],
+                messages=[{"role": "user", "content": user}], **self._temperature_kw(),
             ) as stream:
                 for text in stream.text_stream:
                     if text:
@@ -313,6 +318,7 @@ class LLMClient:
         stream = self._backend.chat.completions.create(
             model=self.model, max_tokens=limit, stream=True,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            **self._temperature_kw(),
         )
         for event in stream:
             choices = getattr(event, "choices", None) or []
@@ -322,6 +328,9 @@ class LLMClient:
             text = getattr(delta, "content", None) if delta is not None else None
             if text:
                 yield text
+
+    def _temperature_kw(self) -> dict:
+        return {} if self.temperature is None else {"temperature": float(self.temperature)}
 
     def run_agent(self, agent_name: str, user: str, agents_dir: Optional[Path] = None) -> str:
         base = agents_dir or (Path(__file__).resolve().parent.parent / "agents")
@@ -391,6 +400,12 @@ class LLMClient:
         text = data.get("result") if isinstance(data, dict) else None
         if not text:
             raise LLMError(f"Claude Code CLI JSON had no 'result' text: {out[:200]}")
+        usage = data.get("usage") or {}
+        self.last_usage = {
+            "input": int(usage.get("input_tokens", 0)) + int(usage.get("cache_read_input_tokens", 0))
+            + int(usage.get("cache_creation_input_tokens", 0)),
+            "output": int(usage.get("output_tokens", 0)),
+        }
         return text
 
     def _complete_anthropic(self, system: str, user: str) -> str:
@@ -399,7 +414,10 @@ class LLMClient:
             max_tokens=self.max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
+            **self._temperature_kw(),
         )
+        u = getattr(resp, "usage", None)
+        self.last_usage = {"input": getattr(u, "input_tokens", 0) or 0, "output": getattr(u, "output_tokens", 0) or 0}
         return "".join(getattr(b, "text", "") or "" for b in resp.content)
 
     def _complete_openai_shape(self, system: str, user: str) -> str:
@@ -410,7 +428,10 @@ class LLMClient:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
+            **self._temperature_kw(),
         )
+        u = getattr(resp, "usage", None)
+        self.last_usage = {"input": getattr(u, "prompt_tokens", 0) or 0, "output": getattr(u, "completion_tokens", 0) or 0}
         return resp.choices[0].message.content or ""
 
     def _complete_gemini(self, system: str, user: str) -> str:
@@ -421,6 +442,10 @@ class LLMClient:
             config=types.GenerateContentConfig(
                 system_instruction=system,
                 max_output_tokens=self.max_tokens,
+                **self._temperature_kw(),
             ),
         )
+        u = getattr(resp, "usage_metadata", None)
+        self.last_usage = {"input": getattr(u, "prompt_token_count", 0) or 0,
+                           "output": getattr(u, "candidates_token_count", 0) or 0}
         return resp.text or ""

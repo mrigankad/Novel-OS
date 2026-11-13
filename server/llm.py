@@ -9,6 +9,8 @@ Route resolution order:
 
 from __future__ import annotations
 
+import threading
+
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Optional
@@ -84,7 +86,8 @@ def resolve(session: Session, agent: Optional[Agent] = None, role: Optional[str]
 def client_for(route: Optional[Route], max_tokens: Optional[int] = None) -> LLMClient:
     if route is None:
         return LLMClient(max_tokens=max_tokens)
-    kwargs: dict = {"provider": route.provider, "model": route.model or None, "max_tokens": max_tokens}
+    kwargs: dict = {"provider": route.provider, "model": route.model or None, "max_tokens": max_tokens,
+                    "temperature": route.temperature}
     if route.api_key:
         kwargs["api_key"] = route.api_key
     if route.base_url:
@@ -101,7 +104,17 @@ def complete(session: Session, system: str, user: str, *, agent: Optional[Agent]
     route = resolve(session, agent)
     client = client_for(route, max_tokens)
     text = client.complete(system=system, user=user)
+    _usage.value = dict(client.last_usage) if client.last_usage else {}
     return text, route, client.model
+
+
+_usage = threading.local()
+
+
+def last_usage() -> dict:
+    """Real token usage of this thread's most recent complete(): {"input", "output"}.
+    Empty when the provider didn't report it (callers may then estimate)."""
+    return dict(getattr(_usage, "value", {}) or {})
 
 
 def stream(route: Optional[Route], system: str, user: str, *, max_tokens: Optional[int] = None) -> Iterator[str]:
