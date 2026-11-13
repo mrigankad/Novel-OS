@@ -121,7 +121,7 @@ export const bookApi = {
     api.post<CodexLink>(`${P(id)}/codex-links`, body),
   deleteLink: (id: string, linkId: string) => api.del(`${P(id)}/codex-links/${linkId}`),
 
-  threads: (id: string) => api.get<PlotThread[]>(`${P(id)}/threads`),
+  threads: (id: string) => api.get<PlotThread[]>(`${P(id)}/plot-threads`),
 
   continuity: (id: string, chapter?: number) =>
     api.get<ContinuityReport>(`${P(id)}/continuity${chapter ? `?chapter=${chapter}` : ""}`),

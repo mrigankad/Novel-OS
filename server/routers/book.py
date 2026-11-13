@@ -434,14 +434,14 @@ def _thread(session: Session, project_id: str, thread_id: str) -> PlotThread:
     return t
 
 
-@router.get(P + "/threads", response_model=list[ThreadOut])
+@router.get(P + "/plot-threads", response_model=list[ThreadOut])
 def list_threads(project_id: str, session: Session = Depends(get_session)):
     rows = session.exec(select(PlotThread).where(PlotThread.project_id == project_id)
                         .order_by(PlotThread.priority, PlotThread.name)).all()
     return [ThreadOut(**t.model_dump(exclude={"project_id"})) for t in rows]
 
 
-@router.post(P + "/threads", response_model=ThreadOut, status_code=201)
+@router.post(P + "/plot-threads", response_model=ThreadOut, status_code=201)
 def create_thread(project_id: str, body: ThreadIn, session: Session = Depends(get_session)):
     get_project(session, project_id)
     t = PlotThread(project_id=project_id, **body.model_dump())
@@ -452,7 +452,7 @@ def create_thread(project_id: str, body: ThreadIn, session: Session = Depends(ge
     return ThreadOut(**t.model_dump(exclude={"project_id"}))
 
 
-@router.patch(P + "/threads/{thread_id}", response_model=ThreadOut)
+@router.patch(P + "/plot-threads/{thread_id}", response_model=ThreadOut)
 def update_thread(project_id: str, thread_id: str, body: ThreadPatch, session: Session = Depends(get_session)):
     t = _thread(session, project_id, thread_id)
     for k, v in body.model_dump(exclude_unset=True).items():
@@ -464,7 +464,7 @@ def update_thread(project_id: str, thread_id: str, body: ThreadPatch, session: S
     return ThreadOut(**t.model_dump(exclude={"project_id"}))
 
 
-@router.delete(P + "/threads/{thread_id}", status_code=204)
+@router.delete(P + "/plot-threads/{thread_id}", status_code=204)
 def delete_thread(project_id: str, thread_id: str, session: Session = Depends(get_session)):
     session.delete(_thread(session, project_id, thread_id))
     session.commit()

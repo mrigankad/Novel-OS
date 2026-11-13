@@ -81,9 +81,9 @@ def test_codex_crud_filter_search_links_threads(client, project):
                        json={"source_id": iris["id"], "target_id": orchard["id"], "label": "owns"}).json()
     assert client.get(f"/api/projects/{pid}/codex-links", params={"entry": orchard["id"]}).json()[0]["id"] == link["id"]
 
-    t = client.post(f"/api/projects/{pid}/threads", json={"name": "Sell or keep"}).json()
-    assert client.patch(f"/api/projects/{pid}/threads/{t['id']}", json={"status": "resolved"}).json()["status"] == "resolved"
-    assert client.delete(f"/api/projects/{pid}/threads/{t['id']}").status_code == 204
+    t = client.post(f"/api/projects/{pid}/plot-threads", json={"name": "Sell or keep"}).json()
+    assert client.patch(f"/api/projects/{pid}/plot-threads/{t['id']}", json={"status": "resolved"}).json()["status"] == "resolved"
+    assert client.delete(f"/api/projects/{pid}/plot-threads/{t['id']}").status_code == 204
 
     assert client.delete(f"{base}/{orchard['id']}").status_code == 204
     assert client.get(f"/api/projects/{pid}/codex-links").json() == []
@@ -102,7 +102,7 @@ def test_sample_book(client):
     codex = client.get(f"/api/projects/{p['id']}/codex").json()
     names = {e["name"] for e in codex}
     assert {"Iris Vale", "Tomas Reed", "Grafting knife", "North Orchard"} <= names
-    assert len(client.get(f"/api/projects/{p['id']}/threads").json()) == 2
+    assert len(client.get(f"/api/projects/{p['id']}/plot-threads").json()) == 2
 
 
 def test_continuity_finds_the_knife(client):
