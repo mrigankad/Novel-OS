@@ -27,6 +27,9 @@ export interface StudioPreset {
   id: string; label: string; hint: string;
   provider: string; model: string; mature_capable: boolean;
 }
+export type ModelInfo = { id: string; size?: number | null; family?: string | null; parameters?: string | null };
+export type ModelCatalog = { ok: boolean; provider: string; endpoint: string; models: ModelInfo[]; error: string | null };
+
 export interface StudioLlmStatus {
   configured: boolean;
   provider: string;
@@ -368,6 +371,11 @@ export const api = {
     preset?: string; provider?: string; model?: string;
     api_key?: string; base_url?: string; onboarding_completed?: boolean;
   }) => send<StudioLlmStatus>("/api/studio/llm", "PUT", body),
+  studioModels: (provider: string, baseUrl?: string) =>
+    get<ModelCatalog>(
+      `/api/studio/llm/models?provider=${encodeURIComponent(provider)}` +
+        (baseUrl ? `&base_url=${encodeURIComponent(baseUrl)}` : ""),
+    ),
   continuity: (id: string) => get<ContinuityReport>(`/api/projects/${id}/continuity`),
   /** Edit an entry. Send only what changed - absent fields are left alone. */
   updateCodexEntry: (

@@ -18,6 +18,8 @@ _ENV_KEYS = (
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "DEEPSEEK_API_KEY",
+    "OLLAMA_API_KEY",
+    "OLLAMA_HOST",
 )
 
 PRESETS: dict[str, dict[str, str]] = {
@@ -41,6 +43,13 @@ PRESETS: dict[str, dict[str, str]] = {
         "provider": "ollama",
         "model": "llama3.2",
         "mature_capable": "true",
+    },
+    "ollama_cloud": {
+        "label": "Ollama Cloud",
+        "hint": "Big open models hosted by Ollama. Needs an ollama.com API key.",
+        "provider": "ollama_cloud",
+        "model": "gpt-oss:120b",
+        "mature_capable": "false",
     },
     "mature": {
         "label": "Mature-capable",

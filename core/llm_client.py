@@ -53,10 +53,23 @@ OPENAI_COMPAT_ALIASES = {
     "deepseek":   ("https://api.deepseek.com/v1",     "deepseek-chat",               "DEEPSEEK_API_KEY"),
     "mistral":    ("https://api.mistral.ai/v1",       "mistral-large-latest",        "MISTRAL_API_KEY"),
     "fireworks":  ("https://api.fireworks.ai/inference/v1", "accounts/fireworks/models/llama-v3p3-70b-instruct", "FIREWORKS_API_KEY"),
-    "ollama":     ("http://localhost:11434/v1",       "llama3.2",                    "OLLAMA_API_KEY"),  # key usually ignored
+    # Local Ollama needs no key; OLLAMA_HOST overrides the server (see _ollama_local_base).
+    "ollama":     ("http://localhost:11434/v1",       "llama3.2",                    "OLLAMA_LOCAL_API_KEY"),
+    # Ollama Cloud: same API, hosted at ollama.com, Bearer key from ollama.com/settings/keys.
+    "ollama_cloud": ("https://ollama.com/v1",         "gpt-oss:120b",                "OLLAMA_API_KEY"),
     "lmstudio":   ("http://localhost:1234/v1",        "local-model",                 "LMSTUDIO_API_KEY"),
     "nvidia":     ("https://integrate.api.nvidia.com/v1", "meta/llama-3.3-70b-instruct", "NVIDIA_API_KEY"),
 }
+
+def ollama_local_base() -> str:
+    """Root URL of the local Ollama server, honouring OLLAMA_HOST like the ollama CLI does."""
+    host = (os.environ.get("OLLAMA_HOST") or "http://localhost:11434").strip().rstrip("/")
+    if not host.startswith(("http://", "https://")):
+        host = "http://" + host
+    if host.endswith("/v1"):
+        host = host[:-3]
+    return host
+
 
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
 DEFAULT_OPENAI_MODEL = "gpt-4o"
@@ -173,6 +186,8 @@ class LLMClient:
         if name in OPENAI_COMPAT_ALIASES:
             base_url, default_model, key_env = OPENAI_COMPAT_ALIASES[name]
             key = self._explicit_api_key or os.environ.get(key_env) or os.environ.get("NOVEL_OS_API_KEY") or "not-needed"
+            if name == "ollama":
+                base_url = ollama_local_base() + "/v1"
             base_url = self._explicit_base_url or os.environ.get(f"{name.upper()}_BASE_URL", base_url)
             return self._build_openai_compatible(base_url, key), model or env_model or default_model
         if name == "openai_compatible":

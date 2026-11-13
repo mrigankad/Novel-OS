@@ -71,12 +71,30 @@ def put_studio_llm(body: StudioLlmUpdate):
             patch["ANTHROPIC_API_KEY"] = key or None
         if body.preset == "fast" or body.provider == "openai":
             patch["OPENAI_API_KEY"] = key or None
+        if body.preset == "ollama_cloud" or body.provider == "ollama_cloud":
+            patch["OLLAMA_API_KEY"] = key or None
     if body.base_url is not None:
-        patch["NOVEL_OS_BASE_URL"] = body.base_url.strip() or None
+        url = body.base_url.strip() or None
+        if body.preset == "local" or body.provider == "ollama":
+            # Local Ollama is addressed by OLLAMA_HOST, same as the ollama CLI.
+            patch["OLLAMA_HOST"] = url
+        else:
+            patch["NOVEL_OS_BASE_URL"] = url
     if body.onboarding_completed is not None:
         patch["onboarding_completed"] = body.onboarding_completed
     studio_settings.save_settings(patch)
     return studio_settings.llm_status()
+
+
+@router.get("/studio/llm/models")
+def get_studio_llm_models(provider: str, base_url: str | None = None):
+    """Models the chosen provider actually offers (Ollama /api/tags or OpenAI /models).
+
+    Uses keys already saved in studio settings; never echoes them back.
+    """
+    from core import model_catalog, studio_settings
+    studio_settings.apply_to_environ(studio_settings.load_settings())
+    return model_catalog.list_models(provider, base_url=base_url or None)
 
 
 @router.get("/projects", response_model=list[ProjectSummary])
