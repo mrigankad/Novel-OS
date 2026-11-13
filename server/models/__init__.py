@@ -34,3 +34,4 @@ from .publish_extra import MarketingAsset  # noqa: E402,F401
 from .suggest_extra import Suggestion  # noqa: E402,F401
 from .codex_extra import CodexProposal  # noqa: E402,F401
 from .beta_extra import BetaComment, BetaProgress, BetaReader, BetaRound  # noqa: E402,F401
+from .audio_extra import AudioCast, AudioTrack, Pronunciation  # noqa: E402,F401
