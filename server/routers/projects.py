@@ -11,7 +11,7 @@ from sqlmodel import Session, func, select
 
 from .. import events
 from ..db import get_session
-from ..models import Chapter, Project
+from ..models import Chapter, CoverDesign, Project
 from ..models.base import now
 
 router = APIRouter(tags=["projects"])
@@ -46,6 +46,8 @@ class ProjectOut(BaseModel):
     target_words: int
     word_count: int = 0
     chapter_count: int = 0
+    # Selected cover design (or the newest), for Library thumbnails.
+    cover: Optional[dict] = None
     updated_at: str
 
 
@@ -56,20 +58,37 @@ def get_project(session: Session, project_id: str) -> Project:
     return p
 
 
-def _out(session: Session, p: Project) -> ProjectOut:
+def _covers(session: Session, ids: list[str]) -> dict[str, dict]:
+    """One query for every book's cover: the selected design, else the newest."""
+    if not ids:
+        return {}
+    rows = session.exec(select(CoverDesign).where(CoverDesign.project_id.in_(ids))
+                        .order_by(CoverDesign.selected.desc(), CoverDesign.created_at.desc())).all()
+    out: dict[str, dict] = {}
+    for c in rows:
+        out.setdefault(c.project_id, {
+            "media_id": c.front_media_id,
+            "background": (c.colors or {}).get("background") or "",
+            "text": (c.colors or {}).get("text") or "",
+        })
+    return out
+
+
+def _out(session: Session, p: Project, cover: Optional[dict] = None) -> ProjectOut:
     words, count = session.exec(
         select(func.coalesce(func.sum(Chapter.word_count), 0), func.count(Chapter.id))
         .where(Chapter.project_id == p.id)
     ).one()
     return ProjectOut(**p.model_dump(exclude={"created_at", "updated_at"}),
-                      word_count=int(words), chapter_count=int(count),
+                      word_count=int(words), chapter_count=int(count), cover=cover,
                       updated_at=p.updated_at.isoformat())
 
 
 @router.get("/projects", response_model=list[ProjectOut])
 def list_projects(session: Session = Depends(get_session)):
     rows = session.exec(select(Project).order_by(Project.updated_at.desc())).all()
-    return [_out(session, p) for p in rows]
+    covers = _covers(session, [p.id for p in rows])
+    return [_out(session, p, covers.get(p.id)) for p in rows]
 
 
 @router.post("/projects", response_model=ProjectOut, status_code=201)

@@ -54,6 +54,7 @@ export interface Project {
   target_words: number;
   word_count: number;
   chapter_count: number;
+  cover: { media_id: string | null; background: string; text: string } | null;
   updated_at: string;
 }
 

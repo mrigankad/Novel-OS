@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -72,7 +72,7 @@ function Library() {
         </form>
       )}
 
-      <div className="mt-10 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid grid-cols-2 gap-x-8 gap-y-12 sm:grid-cols-3 lg:grid-cols-4">
         {isLoading && [0, 1, 2].map((i) => <Skeleton key={i} className="h-40" />)}
         {error && <p className="text-[14px] text-fail">Couldn&apos;t reach the Novel OS server.</p>}
         {data?.map((p) => <BookCard key={p.id} p={p} />)}
@@ -88,13 +88,36 @@ function Library() {
   );
 }
 
+/** The book as an object: uploaded front cover, else a typeset cover in the design's colours. */
+function BookCover({ p }: { p: Project }) {
+  const bg = p.cover?.background || "#14131a";
+  const fg = p.cover?.text || "#ffffff";
+  return (
+    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-[6px] shadow-[0_1px_2px_rgba(20,19,26,0.08),0_12px_28px_rgba(20,19,26,0.12)] transition-transform duration-200 [transition-timing-function:var(--ease-out)] group-hover:-translate-y-1"
+      style={{ background: bg, color: fg }}>
+      {p.cover?.media_id ? (
+        <img src={`/api/media/${p.cover.media_id}`} alt="" loading="lazy" className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full flex-col justify-between p-[9%]">
+          <p className="font-display text-[clamp(18px,2.2vw,30px)] font-bold leading-[1.02] tracking-[-0.03em]">{p.title}</p>
+          <div>
+            <div className="mb-3 h-px w-8" style={{ background: fg, opacity: 0.4 }} />
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em]" style={{ opacity: 0.75 }}>
+              {p.author || p.genre || "Novel OS"}
+            </p>
+          </div>
+        </div>
+      )}
+      <span className="pointer-events-none absolute inset-y-0 left-0 w-[3%] bg-black/15" aria-hidden />
+    </div>
+  );
+}
+
 function BookCard({ p }: { p: Project }) {
   const pct = p.target_words ? Math.round((p.word_count / p.target_words) * 100) : 0;
   return (
     <Link href={`/p/${p.id}`} className="group flex flex-col">
-      <div className="flex aspect-[3/2] items-end rounded-[16px] bg-sheet p-5 transition-colors group-hover:bg-rule">
-        <BookOpen className="h-5 w-5 text-muted" strokeWidth={1.75} />
-      </div>
+      <BookCover p={p} />
       <div className="mt-4 flex items-start justify-between gap-3">
         <p className="font-display text-[22px] font-bold leading-tight tracking-[-0.02em] text-ink">{p.title}</p>
         <Badge>{p.status}</Badge>
