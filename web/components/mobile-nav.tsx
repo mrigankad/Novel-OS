@@ -15,6 +15,7 @@ export default function MobileNav() {
   const [openAt, setOpenAt] = useState<string | null>(null);
   const open = openAt === pathname;
   const close = () => setOpenAt(null);
+  if (pathname.startsWith("/read/")) return null; // public beta reader: no studio chrome
 
   return (
     <>

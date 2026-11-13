@@ -4,7 +4,7 @@ import { clsx } from "clsx";
 import {
   Bot, BookOpen, Brain, Download, Fingerprint, GitBranch, Globe, Image as ImageIcon,
   Library, LibraryBig, type LucideIcon, PanelLeftClose, PanelLeftOpen, Plug, Search, Shield,
-  SlidersHorizontal, Users,
+  SlidersHorizontal, Users, Users2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -39,6 +39,7 @@ function projectNav(id: string): NavGroup[] {
         { href: `${p}/media`, label: "Media and images", icon: ImageIcon },
         { href: `${p}/cover`, label: "Cover studio", icon: LibraryBig },
         { href: `${p}/publish`, label: "Publish and distribute", icon: Download },
+        { href: `${p}/beta`, label: "Beta readers", icon: Users2 },
       ],
     },
   ];
@@ -110,6 +111,8 @@ export function NavList({ rail = false, onNavigate }: { rail?: boolean; onNaviga
  */
 export default function Sidebar() {
   const collapsed = useSyncExternalStore(subscribeRail, readRail, () => false);
+  // The public beta reader (/read/[token]) has no studio chrome.
+  if (usePathname()?.startsWith("/read/")) return null;
   return (
     <>
       <Rail className={collapsed ? "hidden md:flex" : "hidden md:flex lg:hidden"} canExpand={collapsed} />
