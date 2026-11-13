@@ -32,6 +32,9 @@ export const BRAND_LABELS: Record<string, string> = {
   windsurf: "Windsurf", cline: "Cline", obsidian: "Obsidian",
 };
 
+/** Monochrome marks drawn in black; they need inverting on the dark theme. */
+const MONO = new Set(["ollama", "openai", "groq", "xai", "cursor", "lmstudio", "openrouter", "githubcopilot", "windsurf", "cline", "runway"]);
+
 const SIZES = { xs: "h-4 w-4", sm: "h-5 w-5", md: "h-6 w-6", lg: "h-8 w-8" } as const;
 const TILES = { xs: "h-6 w-6", sm: "h-8 w-8", md: "h-10 w-10", lg: "h-12 w-12" } as const;
 
@@ -40,7 +43,7 @@ export function BrandIcon({
 }: { id: string; size?: keyof typeof SIZES; tile?: boolean; className?: string }) {
   const file = FILES[id];
   const glyph = file ? (
-    <img src={`/brands/${file}.svg`} alt="" aria-hidden className={clsx(SIZES[size], "shrink-0 object-contain")} />
+    <img src={`/brands/${file}.svg`} alt="" aria-hidden className={clsx(SIZES[size], "shrink-0 object-contain", MONO.has(file) && "dark:invert")} />
   ) : id === "higgsfield" ? (
     // No official mark available in the icon set; a neutral glyph beats a fake logo.
     <Clapperboard className={clsx(SIZES[size], "shrink-0 text-body")} strokeWidth={1.75} aria-hidden />

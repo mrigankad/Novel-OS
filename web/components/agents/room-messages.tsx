@@ -17,7 +17,7 @@ export function RoomMessage({
   if (m.sender === "author") {
     return (
       <div className="group flex flex-col items-end gap-1">
-        <div className="max-w-[78%] whitespace-pre-wrap rounded-[16px] rounded-br-[4px] bg-ink px-4 py-2.5 text-[14px] leading-relaxed text-white">
+        <div className="max-w-[78%] whitespace-pre-wrap rounded-[16px] rounded-br-[4px] bg-inverse px-4 py-2.5 text-[14px] leading-relaxed text-on-inverse">
           {m.body}
         </div>
         <button
@@ -72,7 +72,7 @@ export function RoomMessage({
                 onClick={() => onAction(m, a.action)}
                 className={clsx(
                   "h-7 rounded-full border px-3 text-[12px] font-semibold transition-colors disabled:opacity-40",
-                  objection ? "border-fail/40 text-fail hover:bg-fail hover:text-white"
+                  objection ? "border-fail/40 text-fail hover:bg-fail hover:text-on-accent"
                     : "border-rule-strong text-ink hover:border-gall hover:text-gall",
                 )}
               >

@@ -69,18 +69,18 @@ export function ConnectionsScreen() {
 
         <section>
           <h2 className="label mb-4">Agents · who can reach your story</h2>
-          <div className="rounded-[16px] bg-ink p-6 text-white">
+          <div className="rounded-[16px] bg-inverse p-6 text-on-inverse">
             <div className="flex items-center justify-between">
               <h3 className="flex items-center gap-3 font-display text-[24px] font-bold tracking-[-0.02em]">
                 <BrandIcon id="claude_code" size="sm" tile className="ring-0" /> Claude Code
               </h3>
-              <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-white/60">MCP · stdio</span>
+              <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-on-inverse/60">MCP · stdio</span>
             </div>
-            <p className="mt-2 text-[14px] leading-relaxed text-white/75">
+            <p className="mt-2 text-[14px] leading-relaxed text-on-inverse/75">
               Let Claude Code read your bible, chapters and Codex, write drafts that land in Versions, and run
               continuity, all on this machine.
             </p>
-            <div className="mt-5 rounded-[12px] bg-white/10 px-4 py-3 font-sans text-[14px] leading-relaxed text-white">
+            <div className="mt-5 rounded-[12px] bg-on-inverse/10 px-4 py-3 font-sans text-[14px] leading-relaxed text-on-inverse">
               {CLAUDE_CMD}
             </div>
             <div className="mt-4">

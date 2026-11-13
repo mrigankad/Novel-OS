@@ -3,6 +3,8 @@ import { Inter_Tight, Newsreader, Urbanist } from "next/font/google";
 import type { ReactNode } from "react";
 import Providers from "@/lib/providers";
 import Sidebar from "@/components/sidebar";
+import MobileNav from "@/components/mobile-nav";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import CommandPalette from "@/components/command-palette";
 import "./globals.css";
 
@@ -18,17 +20,27 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg" },
 };
 
-export const viewport: Viewport = { themeColor: "#ffffff" };
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#121117" },
+  ],
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${urbanist.variable} ${newsreader.variable}`}>
+    <html lang="en" className={`${inter.variable} ${urbanist.variable} ${newsreader.variable}`} suppressHydrationWarning>
+      <head>
+        {/* Apply a stored theme before first paint, so there is no flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>
         <Providers>
           <CommandPalette />
-          <div className="flex h-full">
+          <div className="flex h-full flex-col md:flex-row">
+            <MobileNav />
             <Sidebar />
-            <main id="main" className="h-full min-w-0 flex-1 overflow-y-auto">{children}</main>
+            <main id="main" className="min-h-0 min-w-0 flex-1 overflow-y-auto">{children}</main>
           </div>
         </Providers>
       </body>

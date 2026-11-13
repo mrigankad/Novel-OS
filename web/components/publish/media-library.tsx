@@ -148,7 +148,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   return (
     <button type="button" onClick={onClick} className={clsx(
       "h-8 rounded-full px-3 text-[13px] font-medium capitalize transition-colors",
-      active ? "bg-ink text-white" : "bg-sheet text-body hover:text-ink",
+      active ? "bg-inverse text-on-inverse" : "bg-sheet text-body hover:text-ink",
     )}>{children}</button>
   );
 }
@@ -183,13 +183,13 @@ function Lightbox({ media, onClose, onPrev, onNext, onChanged }: {
   const commit = () => save.mutate({ caption, tags: tags.split(",").map((t) => t.trim()).filter(Boolean) });
 
   return (
-    <div className="fixed inset-0 z-40 flex bg-[rgba(20,19,26,0.88)]" role="dialog" aria-modal="true" aria-label={media.filename}>
-      <div className="relative flex flex-1 items-center justify-center p-10" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex flex-col overflow-y-auto bg-[rgba(20,19,26,0.88)] md:flex-row md:overflow-hidden" role="dialog" aria-modal="true" aria-label={media.filename}>
+      <div className="relative flex min-h-[50vh] flex-1 items-center justify-center p-4 md:p-10" onClick={onClose}>
         <img src={media.url} alt={media.caption || media.filename} className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
         {onPrev && <NavBtn side="left" onClick={onPrev}><ChevronLeft size={20} strokeWidth={S} /></NavBtn>}
         {onNext && <NavBtn side="right" onClick={onNext}><ChevronRight size={20} strokeWidth={S} /></NavBtn>}
       </div>
-      <aside className="flex w-[340px] shrink-0 flex-col gap-5 bg-paper p-6">
+      <aside className="flex w-full shrink-0 flex-col gap-5 bg-paper p-6 md:w-[340px]">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate font-display text-[20px] font-bold tracking-[-0.02em] text-ink">{media.filename}</p>

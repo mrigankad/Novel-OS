@@ -104,7 +104,7 @@ export function GettingStarted({ projects }: { projects: Project[] }) {
             <div className="flex items-center gap-2">
               <span className={clsx(
                 "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold",
-                s.done ? "bg-pass text-white" : "bg-sheet text-body ring-1 ring-rule-strong",
+                s.done ? "bg-pass text-on-accent" : "bg-sheet text-body ring-1 ring-rule-strong",
               )}>
                 {s.done ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : i + 1}
               </span>

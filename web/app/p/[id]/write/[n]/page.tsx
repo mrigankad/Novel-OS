@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { JSONContent } from "@tiptap/react";
 import { clsx } from "clsx";
-import { Check, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { Bot, Check, ChevronRight, ListTree, Loader2, Plus, Sparkles, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,6 +15,7 @@ import { FindingRow } from "@/components/manuscript/findings";
 import { SuggestionsPanel, useSuggestions } from "@/components/manuscript/suggestions";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { Drawer } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/page";
 import { useToast } from "@/components/ui/toast";
 import { actLabel, bk, bookApi, type Chapter, type ChapterPatch } from "@/lib/api/book";
@@ -43,6 +44,8 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
   const toast = useToast();
   const [mode, setMode] = useState<Mode>(() => (["plan", "write", "revise"].includes(search.get("mode") ?? "") ? search.get("mode") as Mode : "write"));
   const [binderOpen, setBinderOpen] = useState(true);
+  // Below the inline breakpoints, binder / suggestions / agents open as drawers.
+  const [sheet, setSheet] = useState<"binder" | "suggestions" | "agents" | null>(null);
   const chapters = useQuery({ queryKey: bk.chapters(id), queryFn: () => bookApi.chapters(id) });
   const chapter = useQuery({ queryKey: bk.chapter(id, n), queryFn: () => bookApi.chapter(id, n) });
 
@@ -133,8 +136,12 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-rule px-5">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-rule px-4 py-2 sm:px-5">
         <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[13px] text-body">
+          <button type="button" onClick={() => setSheet("binder")} aria-label="Chapters" aria-haspopup="dialog"
+            className="-ml-1 mr-1 rounded-[8px] p-1.5 text-muted hover:bg-sheet hover:text-ink md:hidden">
+            <ListTree className="h-4 w-4" strokeWidth={1.75} />
+          </button>
           <Link href={`/p/${id}`} className="hover:text-ink">{c ? actLabel(c.act) : "…"}</Link>
           <ChevronRight className="h-3.5 w-3.5 text-muted" strokeWidth={1.75} />
           <span className="truncate font-semibold text-ink">Chapter {n}</span>
@@ -148,16 +155,28 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-[13px]">
+        <div className="flex items-center gap-3 text-[13px] sm:gap-4">
           <SaveIndicator state={save} />
-          <span className="text-body"><span className="font-semibold text-ink">{fmt(words)}</span> / {fmt(c?.target_words ?? 0)}</span>
+          <span className="hidden text-body sm:inline"><span className="font-semibold text-ink">{fmt(words)}</span> / {fmt(c?.target_words ?? 0)}</span>
+          {mode === "revise" && c && (
+            <button type="button" onClick={() => setSheet("suggestions")} aria-label="Editor suggestions" aria-haspopup="dialog"
+              className="rounded-[8px] p-1.5 text-gall hover:bg-wash xl:hidden">
+              <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+            </button>
+          )}
+          <button type="button" onClick={() => setSheet("agents")} aria-label="Chapter agents" aria-haspopup="dialog"
+            className="rounded-[8px] p-1.5 text-muted hover:bg-sheet hover:text-ink 2xl:hidden">
+            <Bot className="h-4 w-4" strokeWidth={1.75} />
+          </button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <Binder projectId={id} chapters={rows} current={n} open={binderOpen} onToggle={() => setBinderOpen((o) => !o)} />
+        <div className="hidden md:flex">
+          <Binder projectId={id} chapters={rows} current={n} open={binderOpen} onToggle={() => setBinderOpen((o) => !o)} />
+        </div>
         <div className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[680px] px-6 pt-14">
+          <div className="mx-auto w-full max-w-[680px] px-4 pt-8 sm:px-6 sm:pt-14">
             {chapter.isLoading && <Skeleton className="h-12 w-2/3" />}
             {chapter.error && <p className="text-[14px] text-fail">This chapter doesn&apos;t exist. <Link className="underline" href={`/p/${id}`}>Back to the manuscript</Link></p>}
             {c && (
@@ -181,8 +200,19 @@ function WriteScreen({ id, n }: { id: string; n: number }) {
           <SuggestionsPanel id={id} n={n} items={openSugg} activeId={activeSugg} onActive={setActiveSugg}
             beforeAction={flush} onApplied={onApplied} />
         )}
-        <ChapterAgentPanel projectId={id} chapter={n} />
+        <div className="hidden 2xl:flex"><ChapterAgentPanel projectId={id} chapter={n} /></div>
       </div>
+
+      <Drawer open={sheet === "binder"} onClose={() => setSheet(null)} side="left" label="Chapters" showClose={false} width="w-[232px]">
+        <Binder projectId={id} chapters={rows} current={n} open onToggle={() => setSheet(null)} />
+      </Drawer>
+      <Drawer open={sheet === "suggestions" && mode === "revise" && !!c} onClose={() => setSheet(null)} side="bottom" label="Editor suggestions">
+        <SuggestionsPanel id={id} n={n} items={openSugg} activeId={activeSugg} onActive={setActiveSugg}
+          beforeAction={flush} onApplied={onApplied} inDrawer />
+      </Drawer>
+      <Drawer open={sheet === "agents"} onClose={() => setSheet(null)} side="right" label="Chapter agents" width="w-[min(360px,92vw)]">
+        <ChapterAgentPanel projectId={id} chapter={n} />
+      </Drawer>
     </div>
   );
 }
@@ -202,7 +232,7 @@ function TitleField({ c, onSave }: { c: Chapter; onSave: (title: string) => void
       value={title}
       placeholder="Untitled chapter"
       onChange={(e) => { setTitle(e.target.value); onSave(e.target.value); }}
-      className="w-full bg-transparent font-prose text-[44px] font-medium leading-[1.1] tracking-[-0.01em] text-ink outline-none placeholder:text-rule-strong"
+      className="w-full bg-transparent font-prose text-[34px] sm:text-[44px] font-medium leading-[1.1] tracking-[-0.01em] text-ink outline-none placeholder:text-rule-strong"
     />
   );
 }

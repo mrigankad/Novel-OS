@@ -40,9 +40,10 @@ export function AgentsScreen() {
         <Link href="/settings/connections" className="font-medium text-gall hover:underline">Connections</Link>.
       </p>
 
-      <div className="mt-8 overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-left">
-          <thead>
+      <div className="mt-8 md:overflow-x-auto">
+        {/* Below md each role stacks into a card-free block; md and up it is a table. */}
+        <table className="block w-full border-collapse text-left md:table md:min-w-[760px]">
+          <thead className="hidden md:table-header-group">
             <tr className="border-b border-rule">
               <th className="label py-3 pr-4 font-medium">Role</th>
               <th className="label py-3 pr-4 font-medium">Connection</th>
@@ -51,7 +52,7 @@ export function AgentsScreen() {
               <th className="py-3" />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="block md:table-row-group">
             {roles.isLoading || conns.isLoading
               ? ROLES.map((r) => (
                 <tr key={r.id}><td colSpan={5} className="py-3"><Skeleton className="h-10" /></td></tr>
@@ -95,8 +96,8 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
   if (effectiveModel && !modelIds.includes(effectiveModel)) modelIds.unshift(effectiveModel);
 
   return (
-    <tr className="border-b border-rule align-middle">
-      <td className="py-4 pr-4">
+    <tr className="block border-b border-rule py-3 align-middle md:table-row md:py-0">
+      <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
         <div className="flex items-center gap-3">
           <Icon size={18} strokeWidth={1.75} className="text-ink" />
           <div>
@@ -105,7 +106,8 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
           </div>
         </div>
       </td>
-      <td className="py-4 pr-4">
+      <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
+        <span className="label mb-1 block md:hidden">Connection</span>
         <div className="flex items-center gap-2">
           <BrandIcon id={row.provider || fallback?.provider || "openai_compatible"} size="xs" tile />
           <select aria-label={`${meta.label} connection`} className={`${inputClass} h-10`} value={row.provider}
@@ -115,7 +117,8 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
           </select>
         </div>
       </td>
-      <td className="py-4 pr-4">
+      <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
+        <span className="label mb-1 block md:hidden">Model</span>
         <select aria-label={`${meta.label} model`} className={`${inputClass} h-10`} value={row.model}
           disabled={!conn} onChange={(e) => save.mutate({ ...row, model: e.target.value })}>
           <option value="">{effectiveModel ? `Connection default (${conn?.default_model || "auto"})` : "Connection default"}</option>
@@ -123,7 +126,8 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
         </select>
         {models.data && !models.data.ok && <p className="mt-1 text-[12px] text-fail">{models.data.error}</p>}
       </td>
-      <td className="py-4 pr-4">
+      <td className="block py-1.5 md:table-cell md:py-4 md:pr-4">
+        <span className="label mb-1 block md:hidden">Temperature</span>
         <div className="flex items-center gap-3">
           <input type="range" min={0} max={1.5} step={0.05} value={temp} aria-label={`${meta.label} temperature`}
             className="w-32 accent-[var(--color-ink)]"
@@ -133,7 +137,7 @@ function RoleRow({ meta, row, connections, fallback, onTry }: {
           <span className="w-9 text-[13px] tabular-nums text-body">{temp.toFixed(2)}</span>
         </div>
       </td>
-      <td className="py-4 text-right">
+      <td className="block py-1.5 md:table-cell md:py-4 md:text-right">
         <Button size="sm" variant="ai" onClick={() => onTry(row)}>
           <Play size={14} strokeWidth={1.75} /> Try it
         </Button>

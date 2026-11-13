@@ -49,7 +49,7 @@ function MemoryRow({ m, agent, onPatch, onDelete }: {
           <input type="range" min={0} max={1} step={0.1} defaultValue={m.importance}
             onPointerUp={(e) => onPatch({ importance: Number((e.target as HTMLInputElement).value) })}
             onKeyUp={(e) => onPatch({ importance: Number((e.target as HTMLInputElement).value) })}
-            className="w-20 accent-[#3b2be0]" aria-label="Importance" />
+            className="w-20 accent-gall" aria-label="Importance" />
         </label>
         <Button size="sm" variant="ghost" aria-label={m.pinned ? "Unpin" : "Pin"} onClick={() => onPatch({ pinned: !m.pinned })}
           className={clsx("px-2", m.pinned && "text-gall")}>
