@@ -92,6 +92,13 @@ PROVIDERS: list[dict[str, Any]] = [
     {"id": "kimi", "label": "Kimi", "description": "Moonshot's Kimi models.",
      "fields": ["api_key", "default_model"], "needs_key": True, "default_base_url": "https://api.moonshot.ai/v1",
      "default_model": "kimi-k2-0905-preview", "help_url": "https://platform.moonshot.ai/console/api-keys"},
+    {"id": "runway", "label": "Runway", "description": "Image generation for covers, portraits and scenes.",
+     "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "images",
+     "default_model": "gen4_image", "help_url": "https://dev.runwayml.com"},
+    {"id": "higgsfield", "label": "Higgsfield", "description": "Image generation (Soul models). Key as KEY_ID:KEY_SECRET.",
+     "fields": ["api_key"], "needs_key": True, "default_base_url": "", "capability": "images",
+     "labels": {"api_key": "Key ID:Secret"},
+     "default_model": "higgsfield-ai/soul/v2/standard", "help_url": "https://cloud.higgsfield.ai"},
     {"id": "lmstudio", "label": "LM Studio", "description": "A local server from LM Studio.",
      "fields": ["base_url", "default_model"], "needs_key": False, "default_base_url": "http://localhost:1234/v1",
      "default_model": "local-model", "help_url": "https://lmstudio.ai/docs/local-server"},
@@ -100,6 +107,8 @@ PROVIDERS: list[dict[str, Any]] = [
      "default_model": "", "help_url": "https://platform.openai.com/docs/api-reference/chat"},
 ]
 PROVIDER_IDS = {p["id"] for p in PROVIDERS}
+# Image-only services (Runway, Higgsfield) can never be the default *writing* model.
+IMAGE_ONLY = {p["id"] for p in PROVIDERS if p.get("capability") == "images"}
 _BY_ID = {p["id"]: p for p in PROVIDERS}
 
 
@@ -208,7 +217,7 @@ def create_connection(body: ConnectionIn, session: Session = Depends(get_session
     has_default = session.exec(select(Connection).where(Connection.is_default == True)).first()  # noqa: E712
     c = Connection(provider=body.provider, label=body.label.strip(), base_url=body.base_url.strip(),
                    api_key=body.api_key.strip(), default_model=body.default_model.strip(),
-                   is_default=bool(body.is_default) or not has_default)
+                   is_default=body.provider not in IMAGE_ONLY and (bool(body.is_default) or not has_default))
     if c.is_default and has_default:
         for other in session.exec(select(Connection)).all():
             other.is_default = False
@@ -243,7 +252,8 @@ def delete_connection(cid: str, session: Session = Depends(get_session)):
     session.delete(c)
     session.commit()
     if was_default:
-        nxt = session.exec(select(Connection).order_by(Connection.created_at)).first()
+        nxt = session.exec(select(Connection).where(Connection.provider.not_in(IMAGE_ONLY))
+                           .order_by(Connection.created_at)).first()
         if nxt:
             nxt.is_default = True
             session.add(nxt)
@@ -253,6 +263,8 @@ def delete_connection(cid: str, session: Session = Depends(get_session)):
 @router.post("/connections/{cid}/default")
 def set_default(cid: str, session: Session = Depends(get_session)) -> dict:
     target = _get(session, cid)
+    if target.provider in IMAGE_ONLY:
+        raise HTTPException(400, f"{target.label or target.provider} makes images, so it can't be the writing model.")
     for c in session.exec(select(Connection)).all():
         c.is_default = c.id == target.id
         session.add(c)

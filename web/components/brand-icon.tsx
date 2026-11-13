@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { Bot, Plug } from "lucide-react";
+import { Bot, Clapperboard, Plug } from "lucide-react";
 
 /**
  * Marks for model providers and connected tools (LobeHub Icons, MIT; see
@@ -15,6 +15,8 @@ const FILES: Record<string, string> = {
   openrouter: "openrouter", groq: "groq", deepseek: "deepseek-color", mistral: "mistral-color",
   xai: "xai", perplexity: "perplexity-color", together: "together-color", fireworks: "fireworks-color",
   nvidia: "nvidia-color", kimi: "kimi-color", moonshot: "kimi-color", lmstudio: "lmstudio",
+  // image generation
+  runway: "runway", nanobanana: "nanobanana-color",
   // tools that connect over MCP / files
   claude_code: "claudecode-color", codex: "codex-color", cursor: "cursor",
   copilot: "githubcopilot", windsurf: "windsurf", cline: "cline", obsidian: "obsidian-color",
@@ -25,7 +27,7 @@ export const BRAND_LABELS: Record<string, string> = {
   openai: "OpenAI", azure: "Azure OpenAI", bedrock: "AWS Bedrock", gemini: "Google Gemini",
   openrouter: "OpenRouter", groq: "Groq", deepseek: "DeepSeek", mistral: "Mistral", xai: "xAI Grok",
   perplexity: "Perplexity", together: "Together AI", fireworks: "Fireworks", nvidia: "NVIDIA NIM",
-  kimi: "Kimi", lmstudio: "LM Studio", openai_compatible: "Custom endpoint",
+  kimi: "Kimi", lmstudio: "LM Studio", runway: "Runway", higgsfield: "Higgsfield", nanobanana: "Nano Banana", openai_compatible: "Custom endpoint",
   claude_code: "Claude Code", codex: "Codex", cursor: "Cursor", copilot: "GitHub Copilot",
   windsurf: "Windsurf", cline: "Cline", obsidian: "Obsidian",
 };
@@ -39,6 +41,9 @@ export function BrandIcon({
   const file = FILES[id];
   const glyph = file ? (
     <img src={`/brands/${file}.svg`} alt="" aria-hidden className={clsx(SIZES[size], "shrink-0 object-contain")} />
+  ) : id === "higgsfield" ? (
+    // No official mark available in the icon set; a neutral glyph beats a fake logo.
+    <Clapperboard className={clsx(SIZES[size], "shrink-0 text-body")} strokeWidth={1.75} aria-hidden />
   ) : id === "openai_compatible" ? (
     <Plug className={clsx(SIZES[size], "shrink-0 text-body")} strokeWidth={1.75} aria-hidden />
   ) : (

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { Box, Check, Copy, FileDown, ImageDown, Plus, Sparkles, Upload, X } from "lucide-react";
+import { GenerateImageSheet } from "@/components/images/generate-image-sheet";
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/field";
@@ -196,6 +197,7 @@ function CoverEditor({ projectId, cover, spec, onSaved }: { projectId: string; c
   const [pages, setPages] = useState(cover.pages ? String(cover.pages) : "");
   const fileRef = useRef<HTMLInputElement>(null);
   const media = useQuery({ queryKey: publishKeys.media(projectId), queryFn: () => mediaApi.list(projectId) });
+  const [generating, setGenerating] = useState(false);
 
   const save = useMutation({
     mutationFn: (body: Parameters<typeof coverApi.update>[2]) => coverApi.update(projectId, cover.id, body),
@@ -227,12 +229,19 @@ function CoverEditor({ projectId, cover, spec, onSaved }: { projectId: string; c
 
       <div>
         <span className="text-[12px] font-semibold text-ink">Front image</span>
+        <GenerateImageSheet projectId={projectId} open={generating} onClose={() => setGenerating(false)} kind="cover"
+          initialAspect={cover.format === "audiobook" ? "1:1" : "2:3"}
+          onDone={(mediaId) => save.mutate({ front_media_id: mediaId })} />
         <div className="mt-2 grid grid-cols-4 gap-2">
           <button type="button" onClick={() => fileRef.current?.click()}
             className="flex aspect-[2/3] flex-col items-center justify-center gap-1 rounded-[8px] border border-dashed border-rule-strong text-[11px] text-body hover:border-gall hover:text-gall">
             <Upload size={16} strokeWidth={S} />{upload.isPending ? "…" : "Upload"}
           </button>
-          {(media.data ?? []).slice(0, 11).map((m) => (
+          <button type="button" onClick={() => setGenerating(true)}
+            className="flex aspect-[2/3] flex-col items-center justify-center gap-1 rounded-[8px] bg-wash text-[11px] font-semibold text-gall hover:bg-gall hover:text-white">
+            <Sparkles size={16} strokeWidth={S} />Generate
+          </button>
+          {(media.data ?? []).slice(0, 10).map((m) => (
             <button key={m.id} type="button" onClick={() => save.mutate({ front_media_id: m.id })}
               className={clsx("relative aspect-[2/3] overflow-hidden rounded-[8px] bg-sheet ring-2",
                 cover.front_media_id === m.id ? "ring-gall" : "ring-transparent hover:ring-rule-strong")}
@@ -309,6 +318,10 @@ function Concepts({ projectId, cover, onApplied }: { projectId: string; cover: C
     onSuccess: () => { toast("The art director is sketching. Concepts appear here when ready."); setTimeout(() => setWaiting(false), 60_000); },
     onError: (e: Error) => { setWaiting(false); toast(e.message, "error"); },
   });
+  const setFront = useMutation({
+    mutationFn: (mediaId: string) => coverApi.update(projectId, cover!.id, { front_media_id: mediaId }),
+    onSuccess: () => onApplied(),
+  });
   const apply = useMutation({
     mutationFn: (c: CoverConcept) => coverApi.update(projectId, cover!.id, {
       colors: { ...cover!.colors, background: c.palette[0] ?? "#14131a", text: c.palette[c.palette.length - 1] ?? "#ffffff" },
@@ -326,17 +339,24 @@ function Concepts({ projectId, cover, onApplied }: { projectId: string; cover: C
       </div>
       {waiting && !concepts.data?.length && <Skeleton className="h-28" />}
       <div className="space-y-3">
-        {(concepts.data ?? []).map((c, i) => <ConceptCard key={`${c.name}-${i}`} concept={c} onApply={cover ? () => apply.mutate(c) : undefined} />)}
+        {(concepts.data ?? []).map((c, i) => (
+          <ConceptCard key={`${c.name}-${i}`} concept={c} projectId={projectId}
+            onApply={cover ? () => apply.mutate(c) : undefined}
+            onGenerated={cover ? (mediaId) => setFront.mutate(mediaId) : undefined} />
+        ))}
       </div>
       {!concepts.data?.length && !waiting && (
-        <p className="text-[13px] text-body">Three art-direction briefs with palettes and a prompt you can paste into any image generator. Upload the result as the front image.</p>
+        <p className="text-[13px] text-body">Three art-direction briefs with palettes and prompts. Generate one with Google, OpenAI, Runway or Higgsfield, or upload your own art.</p>
       )}
     </section>
   );
 }
 
-function ConceptCard({ concept, onApply }: { concept: CoverConcept; onApply?: () => void }) {
+function ConceptCard({ concept, onApply, projectId, onGenerated }: {
+  concept: CoverConcept; onApply?: () => void; projectId: string; onGenerated?: (mediaId: string) => void;
+}) {
   const toast = useToast();
+  const [generating, setGenerating] = useState(false);
   return (
     <article className="rounded-[10px] bg-sheet p-4">
       <div className="flex items-center justify-between gap-2">
@@ -354,8 +374,11 @@ function ConceptCard({ concept, onApply }: { concept: CoverConcept; onApply?: ()
         <Button size="sm" variant="secondary" onClick={() => {
           void navigator.clipboard?.writeText(concept.image_prompt).then(() => toast("Prompt copied", "success"));
         }}><Copy size={14} strokeWidth={S} />Copy prompt</Button>
+        <Button size="sm" variant="ai" onClick={() => setGenerating(true)}><Sparkles size={14} strokeWidth={S} />Generate</Button>
         {onApply && concept.palette.length > 0 && <Button size="sm" variant="ghost" onClick={onApply}>Use palette</Button>}
       </div>
+      <GenerateImageSheet projectId={projectId} open={generating} onClose={() => setGenerating(false)} kind="cover"
+        initialPrompt={concept.image_prompt} initialAspect="2:3" onDone={onGenerated} />
     </article>
   );
 }

@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, ChevronRight, ImagePlus, Link2, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Link2, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { GenerateImageSheet } from "@/components/images/generate-image-sheet";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
@@ -18,6 +19,7 @@ export function MediaLibrary({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [kind, setKind] = useState<MediaKind | "">("");
+  const [generating, setGenerating] = useState(false);
   const [tag, setTag] = useState("");
   const [url, setUrl] = useState("");
   const [drag, setDrag] = useState(false);
@@ -60,7 +62,10 @@ export function MediaLibrary({ projectId }: { projectId: string }) {
         eyebrow="Ship"
         title="Media"
         description="Portraits, maps, mood boards and cover art. Everything here can go on the cover or into the Codex."
-        actions={<Button onClick={() => fileRef.current?.click()}><Upload size={16} strokeWidth={S} />Upload</Button>}
+        actions={<>
+          <Button variant="ai" onClick={() => setGenerating(true)}><Sparkles size={16} strokeWidth={S} />Generate</Button>
+          <Button onClick={() => fileRef.current?.click()}><Upload size={16} strokeWidth={S} />Upload</Button>
+        </>}
       />
       <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { send(e.target.files); e.target.value = ""; }} />
 
@@ -133,6 +138,8 @@ export function MediaLibrary({ projectId }: { projectId: string }) {
           onChanged={refresh}
         />
       )}
+      <GenerateImageSheet projectId={projectId} open={generating} onClose={() => setGenerating(false)}
+        kind={kind === "cover" || kind === "portrait" || kind === "map" ? kind : "image"} onDone={() => refresh()} />
     </Page>
   );
 }

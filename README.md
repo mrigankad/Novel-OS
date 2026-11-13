@@ -1,8 +1,12 @@
-<p align="center"><img src="web/public/brand/mark.svg" width="72" alt=""></p>
+<p align="center"><img src="docs/readme/01-hero.png" alt="Novel OS, an open-source AI writing studio. Headline: Write the book. It remembers. Six agents, 13 tools replaced, MIT licensed, beside the chapter editor with a Guardian continuity warning about the grafting knife."></p>
 
 <h1 align="center">Novel OS</h1>
 <p align="center"><strong>The writing studio that remembers chapter 3.</strong><br>
 A team of AI agents with real memory, a research swarm that cites its sources, and everything you need to ship the book.</p>
+
+<p align="center"><img src="docs/readme/02-cast-memory.png" alt="The cast: Architect, Scribe, Editor, Guardian, Curator and Researcher, each with a one-line role, and long-term memory showing a binding ruling, a recalled fact and a cited research note."></p>
+
+<p align="center"><img src="docs/readme/03-chapter-flow.png" alt="How a chapter gets written: Architect plans, Scribe drafts, Editor suggests, Guardian checks, then you approve. Shared memory feeds every step."></p>
 
 ---
 
@@ -20,7 +24,15 @@ A team of AI agents with real memory, a research swarm that cites its sources, a
 | **Bring any model** | Ollama Cloud or local, Claude Code login, Anthropic, OpenAI, Gemini, OpenRouter, Groq and more, set per role or per agent. |
 | **Claude Code / MCP** | `claude mcp add novel-os -- python -m server.mcp_server` lets Claude Code, Cursor or Codex read canon, write chapters and run continuity. |
 
+<p align="center"><img src="docs/readme/04-studio-tour.png" alt="Studio tour: the Agent room with live handoffs and the research swarm, Voice Lab scoring a chapter at 92 percent, the Cover studio with a computed spine, and Connections with the Claude Code MCP command."></p>
+
+<p align="center"><img src="docs/readme/05-capabilities.png" alt="Capabilities: Ship (cover studio, metadata vault, store launch checklists, EPUB, DOCX and PDF export, marketing kit) and Write (memory, continuity, research swarm, Voice Lab, inline edits). Authors juggle 10 to 15 tools and spend 500 to 1,500 dollars a year; Novel OS is one studio for all 13 stages."></p>
+
+<p align="center"><img src="docs/readme/06-models-mcp.png" alt="Any model, any tool: Ollama local and cloud, Claude Code login, Anthropic, OpenAI, Azure, AWS Bedrock, Gemini, OpenRouter, Groq and any OpenAI-compatible URL, plus the MCP command for Claude Code, Cursor and Codex."></p>
+
 ## Run it
+
+<p align="center"><img src="docs/readme/07-quick-start.png" alt="Quick start in three steps: pip install -r requirements.txt, run uvicorn on port 8000, then npm run dev in web for the studio on port 3000. MIT licensed."></p>
 
 ```bash
 pip install -r requirements.txt
