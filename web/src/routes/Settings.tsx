@@ -181,6 +181,59 @@ export default function Settings() {
           </div>
         </>
       )}
+
+      <SectionLabel>Agents · who can reach your story</SectionLabel>
+      <ConnectAgents />
+    </div>
+  );
+}
+
+const STDIO_CMD = "claude mcp add novel-os -- python -m core.mcp_server --projects ./projects";
+const HTTP_CMD = "python -m core.mcp_server --http --port 8765";
+
+function ConnectAgents() {
+  const toast = useToast();
+  const copy = (text: string) =>
+    navigator.clipboard.writeText(text).then(
+      () => toast("Copied", "success"),
+      () => toast("Couldn't copy. Select the text instead.", "error"),
+    );
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <div className="rounded-xl bg-ink p-6 text-on-ink">
+        <div className="flex items-center justify-between">
+          <span className="text-[18px] font-bold">Claude Code</span>
+          <span className="text-[11px] font-medium tracking-[0.08em] text-[#a9a6ff]">MCP · STDIO</span>
+        </div>
+        <p className="mt-2 text-[13px] leading-relaxed text-[#b9b7c6]">
+          Let Claude Code read your story state, write chapters and run continuity checks,
+          all against this workspace. Run this from the Novel OS folder.
+        </p>
+        <pre className="mt-4 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#22212b] p-3.5 font-sans text-[12.5px] leading-relaxed">{STDIO_CMD}</pre>
+        <button type="button" onClick={() => copy(STDIO_CMD)}
+                className="mt-4 rounded-lg bg-violet px-3.5 py-2 text-[13px] font-semibold text-white hover:opacity-90">
+          Copy command
+        </button>
+      </div>
+      <div className="flex flex-col border-t border-paper-line">
+        <AgentRow title="Claude Desktop · Cursor · Codex" detail="HTTP · :8765/mcp" onCopy={() => copy(HTTP_CMD)} />
+        <AgentRow title="Inside this repo" detail=".mcp.json is already set up" />
+        <AgentRow title="REST API" detail="localhost:8000/api" />
+      </div>
+    </div>
+  );
+}
+
+function AgentRow({ title, detail, onCopy }: { title: string; detail: string; onCopy?: () => void }) {
+  return (
+    <div className="flex h-[52px] items-center justify-between gap-3 border-b border-paper-line">
+      <span className="text-[14px] font-semibold text-ink-text">{title}</span>
+      <span className="flex items-center gap-3 text-[12px] text-ink-muted">
+        {detail}
+        {onCopy && (
+          <button type="button" onClick={onCopy} className="font-semibold text-violet hover:underline">Copy</button>
+        )}
+      </span>
     </div>
   );
 }

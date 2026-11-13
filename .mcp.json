@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "novel-os": {
+      "command": "python",
+      "args": ["-m", "core.mcp_server", "--projects", "./projects"]
+    }
+  }
+}

@@ -383,6 +383,38 @@ just want to look around.
 
 ---
 
+## 🔗 Connect Claude Code (and other agents)
+
+Novel OS ships an MCP server, so Claude Code, Claude Desktop, Cursor or Codex can work on your book directly. They read the story state before writing, save chapters, add Codex facts and run the continuity checks. The host's model does the writing; Novel OS keeps the canon.
+
+```bash
+pip install mcp
+# Claude Code (from the Novel OS folder)
+claude mcp add novel-os -- python -m core.mcp_server --projects ./projects
+
+# Any client over Streamable HTTP
+python -m core.mcp_server --http --port 8765
+claude mcp add --transport http novel-os http://localhost:8765/mcp
+```
+
+Opening this repo in Claude Code picks the server up automatically from `.mcp.json`.
+
+| Tool | What it does |
+|---|---|
+| `list_projects` | Novels in the workspace |
+| `get_story_state` | Bible, characters, plot threads, timeline, style |
+| `list_chapters` / `get_chapter` | Chapter metadata and final text |
+| `write_chapter` | Save Markdown as a chapter's final text |
+| `search_codex` / `list_codex` / `add_codex_entry` | Read and extend the Codex |
+| `run_continuity` | Deterministic continuity findings for the book or one chapter |
+
+### Ollama, local or cloud
+
+* **Local:** `NOVEL_OS_LLM_PROVIDER=ollama` (honours `OLLAMA_HOST`). Installed models appear in the Studio's model picker.
+* **Cloud:** set `OLLAMA_API_KEY` (from ollama.com/settings/keys). That alone selects Ollama Cloud.
+
+---
+
 ## 🗂️ CLI Reference
 
 | Command | Purpose |
